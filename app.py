@@ -18,6 +18,7 @@ import re
 import sqlite3
 from datetime import datetime, date
 from functools import wraps
+from urllib.parse import urlencode
 
 from flask import (Flask, Response, flash, g, redirect, render_template,
                    request, session, url_for)
@@ -50,8 +51,6 @@ MPHIL_DOCS = [
     "GS-02 \u2013 Coursework Completion Form",
     "GS-03 \u2013 Progress Report",
     "GS-04 Form \u2013 With Thesis Submission Fee Paid Challan",
-    "Approved Synopsis",
-    "Final Thesis (Hardbound Copies)",
 ]
 
 PHD_DOCS = [
@@ -183,7 +182,7 @@ def init_db():
     db.execute(f"""
         CREATE TABLE IF NOT EXISTS students (
             {id_pg if USE_PG else id_lite},
-            cnic TEXT UNIQUE,
+            cnic TEXT,
             name TEXT NOT NULL,
             father_name TEXT,
             reg_no TEXT NOT NULL UNIQUE,
@@ -220,6 +219,7 @@ def init_db():
             value TEXT
         )
     """)
+    _migrate_cnic_not_unique(db)
     # Admin password comes from the env var (source of truth), stored hashed.
     pw_hash = generate_password_hash(
         os.environ.get("ADMIN_PASSWORD", "admin123") or "admin123")
@@ -232,6 +232,60 @@ def init_db():
                    ("admin_pw", pw_hash))
     db.commit()
     db.close()
+
+
+def _migrate_cnic_not_unique(db):
+    """Oct 2026: CNIC is no longer UNIQUE -- imports must keep every row
+    as-is, even with duplicate CNICs. Drops the old unique constraint
+    (Postgres) or rebuilds the table without it (SQLite). Safe to rerun."""
+    try:
+        if USE_PG:
+            db.execute("ALTER TABLE students DROP CONSTRAINT IF EXISTS students_cnic_key")
+            return
+        row = db.fetchone(
+            "SELECT sql FROM sqlite_master WHERE type='table' AND name='students'")
+        ddl = (row["sql"] if isinstance(row, dict) else row[0]) if row else ""
+        if "cnic TEXT UNIQUE" not in " ".join(ddl.split()):
+            return
+        db.execute("DROP TABLE IF EXISTS students_new")
+        old_cols = [r[1] for r in db.fetchall("PRAGMA table_info(students)")]
+        new_cols = ["id", "cnic", "name", "father_name", "reg_no", "gender",
+                    "degree", "session", "folder_file", "comments_missing",
+                    "synopsis", "semi_final_thesis", "final_thesis",
+                    "thesis_forward_coe", "status", "password_hash",
+                    "created_at", "updated_at"]
+        cols = [c for c in new_cols if c in old_cols]
+        colstr = ", ".join(cols)
+        db.execute("""CREATE TABLE students_new (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                cnic TEXT,
+                name TEXT NOT NULL,
+                father_name TEXT,
+                reg_no TEXT NOT NULL UNIQUE,
+                gender TEXT,
+                degree TEXT,
+                session TEXT,
+                folder_file TEXT DEFAULT 'Not Completed',
+                comments_missing TEXT DEFAULT 'N/A',
+                synopsis TEXT DEFAULT 'Not Received',
+                semi_final_thesis TEXT DEFAULT 'Not Received',
+                final_thesis TEXT DEFAULT 'Not Received',
+                thesis_forward_coe TEXT,
+                status TEXT DEFAULT 'Continue',
+                password_hash TEXT,
+                created_at TEXT,
+                updated_at TEXT
+            )""")
+        db.execute(f"INSERT INTO students_new ({colstr}) SELECT {colstr} FROM students")
+        db.execute("DROP TABLE students")
+        db.execute("ALTER TABLE students_new RENAME TO students")
+    except Exception:
+        # A migration must never break startup; worst case the old
+        # constraint stays.
+        try:
+            db.conn.rollback()
+        except Exception:
+            pass
 
 
 _db_ready = False
@@ -362,8 +416,8 @@ def check_admin_password(pw):
         return False
 
 
-def query_students(args):
-    """Apply the dashboard filters; returns list of dicts."""
+def _student_where(args):
+    """Shared WHERE clause for the dashboard filters."""
     where, params = [], []
     q = (args.get("q") or "").strip()
     if q:
@@ -376,11 +430,32 @@ def query_students(args):
         if v:
             where.append(f"{key}=?")
             params.append(v)
+    return where, params
+
+
+def count_students(args):
+    where, params = _student_where(args)
+    sql = "SELECT COUNT(*) AS n FROM students"
+    if where:
+        sql += " WHERE " + " AND ".join(where)
+    row = get_db().fetchone(sql, params)
+    return (row["n"] if isinstance(row, dict) else row[0]) if row else 0
+
+
+def query_students(args, limit=None, offset=None):
+    """Apply the dashboard filters; returns list of dicts."""
+    where, params = _student_where(args)
     sql = "SELECT * FROM students"
     if where:
         sql += " WHERE " + " AND ".join(where)
     sql += " ORDER BY name"
+    if limit is not None:
+        sql += " LIMIT ? OFFSET ?"
+        params += [limit, offset or 0]
     return [dict(r) for r in get_db().fetchall(sql, params)]
+
+
+PER_PAGE = 20
 
 
 def distinct_values(col):
@@ -428,22 +503,39 @@ def admin_logout():
 @app.route("/admin/dashboard")
 @admin_required
 def admin_dashboard():
-    students = query_students(request.args)
+    try:
+        page = max(int(request.args.get("page", 1) or 1), 1)
+    except (TypeError, ValueError):
+        page = 1
+    filtered_total = count_students(request.args)
+    pages = max((filtered_total + PER_PAGE - 1) // PER_PAGE, 1)
+    page = min(page, pages)
+    students = query_students(request.args, limit=PER_PAGE,
+                              offset=(page - 1) * PER_PAGE)
     for s in students:
         s["coe_display"] = fmt_coe(s.get("thesis_forward_coe"))
-    total = get_db().fetchone("SELECT COUNT(*) AS n FROM students")
-    total = (total["n"] if isinstance(total, dict) else total[0]) if total else 0
+    total = count_students({})
     stat_rows = get_db().fetchall(
         "SELECT status, COUNT(*) AS n FROM students GROUP BY status")
     stats = {}
     for r in stat_rows:
         r = dict(r)
         stats[r.get("status") or "Continue"] = r["n"]
-    qs = request.query_string.decode()
-    export_url = url_for("admin_export") + ("?" + qs if qs else "")
+    base_args = {k: v for k, v in request.args.items() if k != "page"}
+    export_url = url_for("admin_export")
+    if base_args:
+        export_url += "?" + urlencode(base_args)
+
+    def page_url(p):
+        a = dict(base_args)
+        a["page"] = p
+        return url_for("admin_dashboard") + "?" + urlencode(a)
+
     return render_template(
         "admin_dashboard.html", uni=UNI_NAME, title=PORTAL_TITLE,
         students=students, shown=len(students), total=total,
+        filtered_total=filtered_total, page=page, pages=pages,
+        page_url=page_url, per_page=PER_PAGE,
         stats=stats, status_list=STATUS_LIST,
         sessions=distinct_values("session"), degrees=distinct_values("degree"),
         genders=GENDER_OPTS, folders=FOLDER_OPTS,
@@ -677,10 +769,11 @@ def admin_import_upload():
                     inserted += 1
                 else:
                     updated += 1
-        except Exception as e:
+        except Exception:
             _rollback(sp)
-            if not first_error:
-                first_error = str(e)[:160]
+            # Batch failed (often just the same Reg.No twice in one batch):
+            # retry row-by-row, each in its own savepoint. A batch-level
+            # failure alone is not surfaced -- only real per-row errors are.
             for row_no, reg_no, vals in chunk:
                 sp2 = _sp()
                 try:
@@ -697,10 +790,7 @@ def admin_import_upload():
                     if not first_error:
                         first_error = str(e2)[:160]
                     if len(skip_notes) < 8:
-                        low = str(e2).lower()
-                        reason = ("duplicate CNIC" if "cnic" in low
-                                  else "save failed")
-                        skip_notes.append(f"row {row_no} ({reg_no}: {reason})")
+                        skip_notes.append(f"row {row_no} ({reg_no}: save failed)")
     db.commit()
     msg = (f"Import complete: {inserted} new, {updated} updated, {skipped} skipped.")
     if skip_notes:
@@ -834,6 +924,33 @@ def admin_student_save(sid):
     return redirect(url_for("admin_student_profile", sid=sid))
 
 
+@app.route("/admin/students/delete-selected", methods=["POST"])
+@admin_required
+def admin_students_delete_selected():
+    ids = [int(x) for x in request.form.getlist("sel") if x.isdigit()]
+    if not ids:
+        flash("No students selected.")
+        return redirect(url_for("admin_dashboard"))
+    db = get_db()
+    ph = ", ".join(["?"] * len(ids))
+    db.execute(f"DELETE FROM documents WHERE student_id IN ({ph})", ids)
+    db.execute(f"DELETE FROM students WHERE id IN ({ph})", ids)
+    db.commit()
+    flash(f"Deleted {len(ids)} student(s) and their documents.")
+    return redirect(url_for("admin_dashboard"))
+
+
+@app.route("/admin/students/delete-all", methods=["POST"])
+@admin_required
+def admin_students_delete_all():
+    db = get_db()
+    db.execute("DELETE FROM documents")
+    db.execute("DELETE FROM students")
+    db.commit()
+    flash("All student data has been deleted.")
+    return redirect(url_for("admin_dashboard"))
+
+
 @app.route("/admin/student/<int:sid>/delete", methods=["POST"])
 @admin_required
 def admin_student_delete(sid):
@@ -851,34 +968,6 @@ MIME_BY_EXT = {"pdf": "application/pdf",
                "docx": "application/vnd.openxmlformats-officedocument."
                        "wordprocessingml.document",
                "jpg": "image/jpeg", "jpeg": "image/jpeg", "png": "image/png"}
-
-
-@app.route("/admin/student/<int:sid>/upload-doc", methods=["POST"])
-@admin_required
-def admin_student_upload_doc(sid):
-    s = get_student(sid)
-    if not s:
-        return "Student not found.", 404
-    label = request.form.get("doc_label", "").strip() or "Document"
-    file = request.files.get("file")
-    if not file or not file.filename:
-        flash("Please choose a file to upload.")
-        return redirect(url_for("admin_student_profile", sid=sid))
-    ext = file.filename.rsplit(".", 1)[-1].lower() if "." in file.filename else ""
-    if ext not in ADMIN_DOC_EXTS:
-        flash("Allowed file types: PDF, DOC, DOCX, JPG, PNG.")
-        return redirect(url_for("admin_student_profile", sid=sid))
-    data = file.read()
-    db = get_db()
-    db.execute(
-        """INSERT INTO documents (student_id, doc_label, file_name, mime_type,
-           file_data, uploaded_by, uploaded_at)
-           VALUES (?, ?, ?, ?, ?, 'admin', ?)""",
-        (sid, label, secure_filename(file.filename), MIME_BY_EXT.get(ext),
-         data, datetime.now().strftime("%Y-%m-%d %H:%M")))
-    db.commit()
-    flash(f"Document '{label}' saved to {s['name']}'s record.")
-    return redirect(url_for("admin_student_profile", sid=sid))
 
 
 @app.route("/admin/doc/<int:doc_id>/download")
