@@ -577,13 +577,14 @@ def admin_import_upload():
             "session", "folder_file", "comments_missing", "synopsis",
             "semi_final_thesis", "final_thesis", "thesis_forward_coe",
             "status", "password_hash", "created_at", "updated_at"]
-    placeholders = ", ".join(["?"] * len(cols))
     upd = ", ".join(f"{c}=EXCLUDED.{c}" for c in cols
                     if c not in ("reg_no", "password_hash"))
-    upsert = (f"INSERT INTO students ({', '.join(cols)}) VALUES ({placeholders})"
-              f" ON CONFLICT(reg_no) DO UPDATE SET {upd}")
-    inserted = updated = skipped = 0
-    skip_notes = []
+    one_ph = ", ".join(["?"] * len(cols))
+    one_upsert = (f"INSERT INTO students ({', '.join(cols)}) VALUES ({one_ph})"
+                  f" ON CONFLICT(reg_no) DO UPDATE SET {upd}")
+
+    # --- parse + validate every row first (no DB writes yet) ---
+    records, skipped, skip_notes = [], 0, []
     for i, rr in enumerate(raw_rows, start=2):
         rec = {}
         for hdr, val in rr.items():
@@ -600,8 +601,8 @@ def admin_import_upload():
         cnic = norm_cnic(rec.get("cnic", ""))
         if not name or not reg_no or not cnic:
             skipped += 1
-            if len(skip_notes) < 5:
-                skip_notes.append(f"row {i} (missing Name / Reg.No / CNIC)")
+            if len(skip_notes) < 8:
+                skip_notes.append(f"row {i}: missing Name / Reg.No / CNIC")
             continue
         rec["name"] = name
         rec["reg_no"] = reg_no
@@ -614,23 +615,99 @@ def admin_import_upload():
         cm = rec.get("comments_missing", "").strip()
         rec["comments_missing"] = cm if cm else "N/A"
         rec["thesis_forward_coe"] = parse_coe(rec.get("thesis_forward_coe")) or None
-        exists = db.fetchone("SELECT id FROM students WHERE reg_no=?", (reg_no,))
-        values = tuple(rec.get(c) for c in cols[:-3]) + (
-            generate_password_hash(cnic), now, now)
+        # password_hash stays NULL: it is created lazily on the student's
+        # first portal login (default password = CNIC digits). Hashing every
+        # row up-front would take minutes for large files.
+        values = tuple(rec.get(c) for c in cols[:-3]) + (None, now, now)
+        records.append((i, reg_no, values))
+
+    # Which reg_nos already exist? (single query, for new-vs-updated counts)
+    existing = set()
+    for r in db.fetchall("SELECT reg_no FROM students"):
+        v = r["reg_no"] if isinstance(r, dict) else r[0]
+        if v:
+            existing.add(v)
+
+    def _tally(reg_no):
+        if reg_no in existing:
+            return False
+        existing.add(reg_no)
+        return True
+
+    def _one(vals):
+        db.execute(one_upsert, vals)
+
+    def _chunk(chunk_vals):
+        n = len(chunk_vals)
+        ph = ", ".join(["(" + ", ".join(["?"] * len(cols)) + ")"] * n)
+        sql = (f"INSERT INTO students ({', '.join(cols)}) VALUES {ph}"
+               f" ON CONFLICT(reg_no) DO UPDATE SET {upd}")
+        flat = [v for vals in chunk_vals for v in vals]
+        db.execute(sql, flat)
+
+    inserted = updated = 0
+    first_error = ""
+    sp_seq = [0]
+
+    def _sp():
+        sp_seq[0] += 1
+        return f"imp_sp{sp_seq[0]}"
+
+    def _rollback(sp):
         try:
-            db.execute(upsert, values)
-            if exists:
-                updated += 1
-            else:
-                inserted += 1
+            db.execute(f"ROLLBACK TO SAVEPOINT {sp}")
         except Exception:
-            skipped += 1
-            if len(skip_notes) < 5:
-                skip_notes.append(f"row {i} ({reg_no}: save failed, maybe duplicate CNIC)")
+            pass
+
+    # Batched upserts keep large imports inside serverless time limits.
+    # Each batch is isolated in a savepoint; if it fails, we retry its
+    # rows one-by-one (each in its own savepoint) so a single bad row
+    # (e.g. duplicate CNIC) can neither poison the transaction nor
+    # abort the whole import with a 500 error.
+    CHUNK = 100
+    for start in range(0, len(records), CHUNK):
+        chunk = records[start:start + CHUNK]
+        sp = _sp()
+        try:
+            db.execute(f"SAVEPOINT {sp}")
+            _chunk([vals for _, _, vals in chunk])
+            db.execute(f"RELEASE SAVEPOINT {sp}")
+            for _, reg_no, _ in chunk:
+                if _tally(reg_no):
+                    inserted += 1
+                else:
+                    updated += 1
+        except Exception as e:
+            _rollback(sp)
+            if not first_error:
+                first_error = str(e)[:160]
+            for row_no, reg_no, vals in chunk:
+                sp2 = _sp()
+                try:
+                    db.execute(f"SAVEPOINT {sp2}")
+                    _one(vals)
+                    db.execute(f"RELEASE SAVEPOINT {sp2}")
+                    if _tally(reg_no):
+                        inserted += 1
+                    else:
+                        updated += 1
+                except Exception as e2:
+                    _rollback(sp2)
+                    skipped += 1
+                    if not first_error:
+                        first_error = str(e2)[:160]
+                    if len(skip_notes) < 8:
+                        low = str(e2).lower()
+                        reason = ("duplicate CNIC" if "cnic" in low
+                                  else "save failed")
+                        skip_notes.append(f"row {row_no} ({reg_no}: {reason})")
     db.commit()
     msg = (f"Import complete: {inserted} new, {updated} updated, {skipped} skipped.")
     if skip_notes:
-        msg += " Skipped: " + "; ".join(skip_notes) + ("." if skipped <= 5 else "...")
+        msg += " Skipped: " + "; ".join(skip_notes)
+        msg += "." if skipped <= len(skip_notes) else "..."
+    if first_error and skipped:
+        msg += f" (first error: {first_error})"
     flash(msg)
     return redirect(url_for("admin_dashboard"))
 
@@ -851,9 +928,23 @@ def student_login():
     if request.method == "POST":
         reg_no = request.form.get("reg_no", "").strip()
         pw = request.form.get("password", "")
-        row = get_db().fetchone("SELECT * FROM students WHERE reg_no=?", (reg_no,))
+        db = get_db()
+        row = db.fetchone("SELECT * FROM students WHERE reg_no=?", (reg_no,))
         s = row_dict(row)
-        if s and s.get("password_hash") and check_password_hash(s["password_hash"], pw):
+        ok = False
+        if s:
+            if s.get("password_hash"):
+                ok = check_password_hash(s["password_hash"], pw)
+            elif pw and pw == (s.get("cnic") or ""):
+                # Bulk-imported record logging in for the first time:
+                # default password is the CNIC digits; hash it now.
+                db.execute(
+                    "UPDATE students SET password_hash=?, updated_at=? WHERE id=?",
+                    (generate_password_hash(pw),
+                     datetime.now().strftime("%Y-%m-%d %H:%M"), s["id"]))
+                db.commit()
+                ok = True
+        if ok:
             session["student_id"] = s["id"]
             return redirect(url_for("student_dashboard"))
         error = "Wrong Registration No. or password."
