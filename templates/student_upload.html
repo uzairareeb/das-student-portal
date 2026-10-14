@@ -8,10 +8,18 @@
   <a class="btn ghost sm" href="{{ url_for('student_dashboard') }}">&larr; Back to Profile</a>
 </div>
 
-<div class="note-box">
-  <strong>Important — read before uploading</strong>
-  In tamam documents ko <strong>ISI SEQUENCE</strong> mein ek hi PDF file mein merge karke upload karein.
-  Sab se pehle Checklist, phir GS-01, phir GS-02 ... isi tarteeb se aakhir tak. Sirf <strong>ek PDF file</strong> upload hogi (max 25 MB).
+<div class="card section instr-card">
+  <div class="section-head">
+    <span class="section-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg></span>
+    <h3>How to Upload Your File</h3>
+  </div>
+  <ol class="steps">
+    <li>Collect <strong>all</strong> the required documents listed below.</li>
+    <li>Arrange them in the <strong>exact sequence</strong> shown in the checklist (starting with the Checklist).</li>
+    <li>Merge everything into <strong>one single PDF file</strong>, keeping that same sequence.</li>
+    <li>Upload the merged PDF below — <strong>PDF only, maximum 25&nbsp;MB</strong>.</li>
+  </ol>
+  <p class="hint" style="margin:14px 0 0">Your file is saved directly to the Advanced Studies office record and will be reviewed by the admin. Uploading again keeps the previous versions as history.</p>
 </div>
 
 <div class="card section">
@@ -28,10 +36,10 @@
       <span class="dz-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg></span>
       <span class="dz-text"><strong>Choose your merged PDF</strong> or drag it here</span>
       <span class="dz-file" id="dzFile"></span>
-      <span class="dz-hint">PDF only, max 25 MB. Uploading again replaces nothing — old versions are kept as history.</span>
+      <span class="dz-hint">PDF only, max 25 MB.</span>
     </label>
     <button type="submit" class="btn primary">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2 2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
       Upload Complete File
     </button>
   </form>

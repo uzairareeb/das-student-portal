@@ -1,9 +1,10 @@
 {% extends "base.html" %}
+{% block container_extra %} wide{% endblock %}
 {% block content %}
 <div class="page-head">
   <div>
     <h2>Students</h2>
-    <p>{{ shown }} of {{ total }} students shown</p>
+    <p>{{ filtered_total }} matching &middot; {{ total }} total &middot; Page {{ page }} of {{ pages }}</p>
   </div>
   <div class="row">
     <a class="btn ghost sm" href="{{ url_for('admin_student_new') }}">+ Add Student</a>
@@ -82,59 +83,93 @@
   </form>
 </div>
 
-<div class="card section">
+<div class="card section table-card">
   <div class="section-head">
-    <span class="section-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg></span>
+    <span class="section-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg></span>
     <h3>Student List</h3>
+    <span class="hint">{{ per_page }} per page</span>
   </div>
   {% if students %}
-  <div class="table-wrap">
-    <table>
-      <thead>
-        <tr>
-          <th>Name</th><th>Reg.No</th><th>Gender</th><th>Degree</th><th>Session</th>
-          <th>Folder/File</th><th>Comments (Missing)</th><th>Synopsis</th>
-          <th>Semi-Final</th><th>Final Thesis</th><th>Thesis Forward (COE)</th>
-          <th>Status</th><th></th>
-        </tr>
-      </thead>
-      <tbody>
-        {% for s in students %}
-        <tr>
-          <td>{{ s.name }}</td>
-          <td>{{ s.reg_no }}</td>
-          <td>{{ s.gender or '—' }}</td>
-          <td>{{ s.degree or '—' }}</td>
-          <td>{{ s.session or '—' }}</td>
-          <td>
-            {% if s.folder_file == 'Completed' %}<span class="pill q">Completed</span>
-            {% else %}<span class="pill nq">Not Completed</span>{% endif %}
-          </td>
-          <td class="comments-cell">{{ s.comments_missing or '—' }}</td>
-          <td>
-            {% if s.synopsis == 'Received' %}<span class="pill q">Received</span>
-            {% else %}<span class="pill nq">Not Received</span>{% endif %}
-          </td>
-          <td>
-            {% if s.semi_final_thesis == 'Received' %}<span class="pill q">Received</span>
-            {% else %}<span class="pill nq">Not Received</span>{% endif %}
-          </td>
-          <td>
-            {% if s.final_thesis == 'Received' %}<span class="pill q">Received</span>
-            {% else %}<span class="pill nq">Not Received</span>{% endif %}
-          </td>
-          <td>{{ s.coe_display }}</td>
-          <td>
-            {% if s.status in ['Continue', 'Viva Done', 'Pass Out'] %}<span class="pill q">{{ s.status }}</span>
-            {% elif s.status in ['Viva Pending', 'Defense Pending'] %}<span class="pill warn">{{ s.status }}</span>
-            {% else %}<span class="pill nq">{{ s.status }}</span>{% endif %}
-          </td>
-          <td><a class="btn ghost sm" href="{{ url_for('admin_student_profile', sid=s.id) }}">Profile</a></td>
-        </tr>
-        {% endfor %}
-      </tbody>
-    </table>
+  <form id="bulkForm" method="post" action="{{ url_for('admin_students_delete_selected') }}">
+    <div class="bulk-bar">
+      <button type="submit" class="btn danger sm" onclick="return confirm('Delete the SELECTED students and all their documents? This cannot be undone.')">Delete Selected</button>
+      <span class="hint">Tick the boxes, then delete.</span>
+    </div>
+    <div class="table-wrap">
+      <table class="wide-table">
+        <thead>
+          <tr>
+            <th class="cb"><input type="checkbox" id="selAll" title="Select all on this page"></th>
+            <th>Name</th><th>Reg.No</th><th>Gender</th><th>Degree</th><th>Session</th>
+            <th>Folder/File</th><th>Comments (Missing)</th><th>Synopsis</th>
+            <th>Semi-Final</th><th>Final Thesis</th><th>Thesis Forward (COE)</th>
+            <th>Status</th><th></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for s in students %}
+          <tr>
+            <td class="cb"><input type="checkbox" class="selBox" name="sel" value="{{ s.id }}"></td>
+            <td>{{ s.name }}</td>
+            <td>{{ s.reg_no }}</td>
+            <td>{{ s.gender or '—' }}</td>
+            <td class="degree-cell">{{ s.degree or '—' }}</td>
+            <td>{{ s.session or '—' }}</td>
+            <td>
+              {% if s.folder_file == 'Completed' %}<span class="pill q">Completed</span>
+              {% else %}<span class="pill nq">Not Completed</span>{% endif %}
+            </td>
+            <td class="comments-cell">{{ s.comments_missing or '—' }}</td>
+            <td>
+              {% if s.synopsis == 'Received' %}<span class="pill q">Received</span>
+              {% else %}<span class="pill nq">Not Received</span>{% endif %}
+            </td>
+            <td>
+              {% if s.semi_final_thesis == 'Received' %}<span class="pill q">Received</span>
+              {% else %}<span class="pill nq">Not Received</span>{% endif %}
+            </td>
+            <td>
+              {% if s.final_thesis == 'Received' %}<span class="pill q">Received</span>
+              {% else %}<span class="pill nq">Not Received</span>{% endif %}
+            </td>
+            <td>{{ s.coe_display }}</td>
+            <td>
+              {% if s.status in ['Continue', 'Viva Done', 'Pass Out'] %}<span class="pill q">{{ s.status }}</span>
+              {% elif s.status in ['Viva Pending', 'Defense Pending'] %}<span class="pill warn">{{ s.status }}</span>
+              {% else %}<span class="pill nq">{{ s.status }}</span>{% endif %}
+            </td>
+            <td><a class="btn ghost sm" href="{{ url_for('admin_student_profile', sid=s.id) }}">Profile</a></td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </form>
+  <div class="danger-zone">
+    <form method="post" action="{{ url_for('admin_students_delete_all') }}" style="margin:0"
+          onsubmit="return confirm('DELETE ALL STUDENT DATA? Every student and every document will be permanently removed. This cannot be undone!')">
+      <button type="submit" class="btn danger sm">Delete All Students</button>
+    </form>
+    <span class="hint">Removes every student record and all uploaded documents.</span>
   </div>
+  {% if pages > 1 %}
+  <div class="pagination">
+    {% if page > 1 %}
+    <a class="btn ghost sm" href="{{ page_url(page-1) }}">&larr; Prev</a>
+    {% endif %}
+    {% for p in range(1, pages+1) %}
+      {% if p == 1 or p == pages or (p >= page-2 and p <= page+2) %}
+        {% if p == page %}<span class="page-cur">{{ p }}</span>
+        {% else %}<a class="page-num" href="{{ page_url(p) }}">{{ p }}</a>{% endif %}
+      {% elif p == 2 or p == pages-1 %}
+        <span class="page-gap">…</span>
+      {% endif %}
+    {% endfor %}
+    {% if page < pages %}
+    <a class="btn ghost sm" href="{{ page_url(page+1) }}">Next &rarr;</a>
+    {% endif %}
+  </div>
+  {% endif %}
   {% else %}
   <div class="empty">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>
@@ -142,4 +177,14 @@
   </div>
   {% endif %}
 </div>
+<script>
+  (function () {
+    var all = document.getElementById('selAll');
+    if (!all) return;
+    all.addEventListener('change', function () {
+      var boxes = document.querySelectorAll('.selBox');
+      for (var i = 0; i < boxes.length; i++) boxes[i].checked = all.checked;
+    });
+  })();
+</script>
 {% endblock %}
