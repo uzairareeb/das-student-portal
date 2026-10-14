@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="hero">
+  <div class="hero-badge">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 10L12 5 2 10l10 5 10-5z"/><path d="M6 12v5c0 1.7 2.7 3 6 3s6-1.3 6-3v-5"/><line x1="22" y1="10" x2="22" y2="16"/></svg>
+  </div>
+  <h1>Student Data Management System</h1>
+  <p class="lede">Advanced Studies Office — manage MPhil/PhD student records, files and thesis submissions, all online in one place.</p>
+  <div class="portal-grid">
+    <a class="portal-card" href="{{ url_for('admin_login') }}">
+      <div class="hero-badge">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+      </div>
+      <h3>Admin Portal</h3>
+      <p>Student list, filters &amp; search, complete profiles, Excel import/export and document management.</p>
+    </a>
+    <a class="portal-card" href="{{ url_for('student_login') }}">
+      <div class="hero-badge">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+      </div>
+      <h3>Student Portal</h3>
+      <p>View your complete profile, upload your merged PDF file, and keep your record up to date.</p>
+    </a>
+  </div>
+</div>
+{% endblock %}

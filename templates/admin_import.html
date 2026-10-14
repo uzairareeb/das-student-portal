@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <h2>Import Students</h2>
+    <p>Upload an Excel (.xlsx) file. Existing Registration Nos. are updated, new ones are added.</p>
+  </div>
+  <a class="btn ghost sm" href="{{ url_for('admin_dashboard') }}">&larr; Back to List</a>
+</div>
+
+<div class="card section">
+  <div class="section-head">
+    <span class="section-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg></span>
+    <h3>Upload Excel File</h3>
+  </div>
+  <form method="post" action="{{ url_for('admin_import_upload') }}" enctype="multipart/form-data">
+    <label class="dropzone" id="dz">
+      <input type="file" name="file" id="fileInput" accept=".xlsx" required hidden>
+      <span class="dz-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg></span>
+      <span class="dz-text"><strong>Choose a file</strong> or drag it here</span>
+      <span class="dz-file" id="dzFile"></span>
+      <span class="dz-hint">Excel (.xlsx) only. Column headers are matched flexibly — e.g. "Registration No.", "Reg No" and "Reg.No" all work.</span>
+    </label>
+    <div class="row">
+      <button type="submit" class="btn primary">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+        Import Students
+      </button>
+      <a class="btn ghost" href="{{ url_for('admin_import_template') }}">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+        Download Excel Template
+      </a>
+    </div>
+  </form>
+  <script>
+    (function () {
+      var inp = document.getElementById('fileInput'), lbl = document.getElementById('dzFile');
+      inp.addEventListener('change', function () { if (inp.files.length) lbl.textContent = inp.files[0].name; });
+    })();
+  </script>
+</div>
+
+<div class="card section">
+  <div class="section-head">
+    <span class="section-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg></span>
+    <h3>Import Rules</h3>
+  </div>
+  <ul class="hint" style="margin:0;padding-left:20px">
+    <li><strong>Required columns:</strong> Name, Registration No., CNIC.</li>
+    <li><strong>Expected columns:</strong> CNIC, Name, Father Name, Registration No., Gender, Degree, Session, Folder/File (With GS-Forms), Comments (Missing), Synopsis, Semi-Final Thesis, Final Thesis, Thesis Forward (COE), Status.</li>
+    <li><strong>Status</strong> must be one of: {{ status_list|join(', ') }}.</li>
+    <li><strong>Folder/File:</strong> Completed / Not Completed. <strong>Synopsis / Semi-Final / Final Thesis:</strong> Received / Not Received.</li>
+    <li><strong>Thesis Forward (COE):</strong> a date (e.g. 10-May-2026 or 2026-05-10).</li>
+    <li>New students get a portal password automatically: <strong>their CNIC digits</strong>.</li>
+    <li>Rows missing Name / Reg.No / CNIC are skipped and reported.</li>
+  </ul>
+</div>
+{% endblock %}

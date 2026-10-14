@@ -1,0 +1,90 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <h2>Add Student</h2>
+    <p>The student gets a portal password automatically: their CNIC digits.</p>
+  </div>
+  <a class="btn ghost sm" href="{{ url_for('admin_dashboard') }}">&larr; Back to List</a>
+</div>
+
+<div class="card section">
+  <form method="post">
+    <div class="form-grid">
+      <div>
+        <label class="f-label" for="name">Name *</label>
+        <input class="no-icon" type="text" id="name" name="name" value="{{ form.get('name','') }}" required>
+      </div>
+      <div>
+        <label class="f-label" for="father_name">Father Name</label>
+        <input class="no-icon" type="text" id="father_name" name="father_name" value="{{ form.get('father_name','') }}">
+      </div>
+      <div>
+        <label class="f-label" for="reg_no">Registration No. *</label>
+        <input class="no-icon" type="text" id="reg_no" name="reg_no" value="{{ form.get('reg_no','') }}" required>
+      </div>
+      <div>
+        <label class="f-label" for="cnic">CNIC *</label>
+        <input class="no-icon" type="text" id="cnic" name="cnic" value="{{ form.get('cnic','') }}" required>
+      </div>
+      <div>
+        <label class="f-label" for="gender">Gender</label>
+        <select class="no-icon" id="gender" name="gender">
+          <option value="">—</option>
+          {% for v in genders %}<option value="{{ v }}" {% if form.get('gender')==v %}selected{% endif %}>{{ v }}</option>{% endfor %}
+        </select>
+      </div>
+      <div>
+        <label class="f-label" for="degree">Degree</label>
+        <input class="no-icon" type="text" id="degree" name="degree" value="{{ form.get('degree','') }}" placeholder="e.g. MPhil Biochemistry">
+      </div>
+      <div>
+        <label class="f-label" for="session">Session</label>
+        <input class="no-icon" type="text" id="session" name="session" value="{{ form.get('session','') }}" placeholder="e.g. F. 23-25">
+      </div>
+      <div>
+        <label class="f-label" for="status">Status</label>
+        <select class="no-icon" id="status" name="status">
+          {% for v in status_list %}<option value="{{ v }}" {% if (form.get('status') or 'Continue')==v %}selected{% endif %}>{{ v }}</option>{% endfor %}
+        </select>
+      </div>
+      <div>
+        <label class="f-label" for="folder_file">Folder/File (With GS-Forms)</label>
+        <select class="no-icon" id="folder_file" name="folder_file">
+          {% for v in folders %}<option value="{{ v }}" {% if (form.get('folder_file') or 'Not Completed')==v %}selected{% endif %}>{{ v }}</option>{% endfor %}
+        </select>
+      </div>
+      <div class="full">
+        <label class="f-label" for="comments_missing">Comments (Missing)</label>
+        <input class="no-icon" type="text" id="comments_missing" name="comments_missing" value="{{ form.get('comments_missing','') }}" placeholder="N/A or e.g. GS-01 form 1st semester missing">
+      </div>
+      <div>
+        <label class="f-label" for="synopsis">Synopsis</label>
+        <select class="no-icon" id="synopsis" name="synopsis">
+          {% for v in received %}<option value="{{ v }}" {% if (form.get('synopsis') or 'Not Received')==v %}selected{% endif %}>{{ v }}</option>{% endfor %}
+        </select>
+      </div>
+      <div>
+        <label class="f-label" for="semi_final_thesis">Semi-Final Thesis</label>
+        <select class="no-icon" id="semi_final_thesis" name="semi_final_thesis">
+          {% for v in received %}<option value="{{ v }}" {% if (form.get('semi_final_thesis') or 'Not Received')==v %}selected{% endif %}>{{ v }}</option>{% endfor %}
+        </select>
+      </div>
+      <div>
+        <label class="f-label" for="final_thesis">Final Thesis</label>
+        <select class="no-icon" id="final_thesis" name="final_thesis">
+          {% for v in received %}<option value="{{ v }}" {% if (form.get('final_thesis') or 'Not Received')==v %}selected{% endif %}>{{ v }}</option>{% endfor %}
+        </select>
+      </div>
+      <div>
+        <label class="f-label" for="thesis_forward_coe">Thesis Forward (COE) Date</label>
+        <input class="no-icon" type="date" id="thesis_forward_coe" name="thesis_forward_coe" value="{{ form.get('thesis_forward_coe','') }}">
+      </div>
+    </div>
+    <div class="row" style="margin-top:18px">
+      <button type="submit" class="btn primary">Save Student</button>
+      <a class="btn ghost" href="{{ url_for('admin_dashboard') }}">Cancel</a>
+    </div>
+  </form>
+</div>
+{% endblock %}

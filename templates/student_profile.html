@@ -1,0 +1,173 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <h2>{{ s.name }}</h2>
+    <p>{{ s.reg_no }} &middot; {{ s.degree or '—' }} &middot; Session {{ s.session or '—' }}</p>
+  </div>
+  <div class="row">
+    <a class="btn ghost sm" href="{{ url_for('admin_dashboard') }}">&larr; Back to List</a>
+    <form method="post" action="{{ url_for('admin_student_delete', sid=s.id) }}" style="margin:0"
+          onsubmit="return confirm('Delete {{ s.name }} and ALL their documents? This cannot be undone.')">
+      <button type="submit" class="btn danger sm">Delete Student</button>
+    </form>
+  </div>
+</div>
+
+<div class="card section">
+  <div class="section-head">
+    <span class="section-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></span>
+    <h3>Complete Record</h3>
+  </div>
+  <div class="profile-grid">
+    <div>CNIC</div><div>{{ s.cnic }}</div>
+    <div>Name</div><div>{{ s.name }}</div>
+    <div>Father Name</div><div>{{ s.father_name or '—' }}</div>
+    <div>Registration No.</div><div>{{ s.reg_no }}</div>
+    <div>Gender</div><div>{{ s.gender or '—' }}</div>
+    <div>Degree</div><div>{{ s.degree or '—' }}</div>
+    <div>Session</div><div>{{ s.session or '—' }}</div>
+    <div>Folder/File (With GS-Forms)</div>
+    <div>{% if s.folder_file == 'Completed' %}<span class="pill q">Completed</span>{% else %}<span class="pill nq">Not Completed</span>{% endif %}</div>
+    <div>Comments (Missing)</div><div>{{ s.comments_missing or '—' }}</div>
+    <div>Synopsis</div>
+    <div>{% if s.synopsis == 'Received' %}<span class="pill q">Received</span>{% else %}<span class="pill nq">Not Received</span>{% endif %}</div>
+    <div>Semi-Final Thesis</div>
+    <div>{% if s.semi_final_thesis == 'Received' %}<span class="pill q">Received</span>{% else %}<span class="pill nq">Not Received</span>{% endif %}</div>
+    <div>Final Thesis</div>
+    <div>{% if s.final_thesis == 'Received' %}<span class="pill q">Received</span>{% else %}<span class="pill nq">Not Received</span>{% endif %}</div>
+    <div>Thesis Forward (COE)</div><div>{{ s.coe_display }}</div>
+    <div>Status</div>
+    <div>
+      {% if s.status in ['Continue', 'Viva Done', 'Pass Out'] %}<span class="pill q">{{ s.status }}</span>
+      {% elif s.status in ['Viva Pending', 'Defense Pending'] %}<span class="pill warn">{{ s.status }}</span>
+      {% else %}<span class="pill nq">{{ s.status }}</span>{% endif %}
+    </div>
+  </div>
+</div>
+
+<div class="card section">
+  <div class="section-head">
+    <span class="section-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.12 2.12 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></span>
+    <h3>Edit Details</h3>
+  </div>
+  <form method="post" action="{{ url_for('admin_student_save', sid=s.id) }}">
+    <div class="form-grid">
+      <div>
+        <label class="f-label" for="name">Name *</label>
+        <input class="no-icon" type="text" id="name" name="name" value="{{ s.name }}" required>
+      </div>
+      <div>
+        <label class="f-label" for="father_name">Father Name</label>
+        <input class="no-icon" type="text" id="father_name" name="father_name" value="{{ s.father_name or '' }}">
+      </div>
+      <div>
+        <label class="f-label" for="reg_no">Registration No. *</label>
+        <input class="no-icon" type="text" id="reg_no" name="reg_no" value="{{ s.reg_no }}" required>
+      </div>
+      <div>
+        <label class="f-label" for="cnic">CNIC *</label>
+        <input class="no-icon" type="text" id="cnic" name="cnic" value="{{ s.cnic }}" required>
+      </div>
+      <div>
+        <label class="f-label" for="gender">Gender</label>
+        <select class="no-icon" id="gender" name="gender">
+          <option value="">—</option>
+          {% for v in genders %}<option value="{{ v }}" {% if s.gender==v %}selected{% endif %}>{{ v }}</option>{% endfor %}
+        </select>
+      </div>
+      <div>
+        <label class="f-label" for="degree">Degree</label>
+        <input class="no-icon" type="text" id="degree" name="degree" value="{{ s.degree or '' }}">
+      </div>
+      <div>
+        <label class="f-label" for="session">Session</label>
+        <input class="no-icon" type="text" id="session" name="session" value="{{ s.session or '' }}">
+      </div>
+      <div>
+        <label class="f-label" for="status">Status</label>
+        <select class="no-icon" id="status" name="status">
+          {% for v in status_list %}<option value="{{ v }}" {% if s.status==v %}selected{% endif %}>{{ v }}</option>{% endfor %}
+        </select>
+      </div>
+      <div>
+        <label class="f-label" for="folder_file">Folder/File (With GS-Forms)</label>
+        <select class="no-icon" id="folder_file" name="folder_file">
+          {% for v in folders %}<option value="{{ v }}" {% if s.folder_file==v %}selected{% endif %}>{{ v }}</option>{% endfor %}
+        </select>
+      </div>
+      <div class="full">
+        <label class="f-label" for="comments_missing">Comments (Missing)</label>
+        <input class="no-icon" type="text" id="comments_missing" name="comments_missing" value="{{ s.comments_missing or '' }}">
+      </div>
+      <div>
+        <label class="f-label" for="synopsis">Synopsis</label>
+        <select class="no-icon" id="synopsis" name="synopsis">
+          {% for v in received %}<option value="{{ v }}" {% if s.synopsis==v %}selected{% endif %}>{{ v }}</option>{% endfor %}
+        </select>
+      </div>
+      <div>
+        <label class="f-label" for="semi_final_thesis">Semi-Final Thesis</label>
+        <select class="no-icon" id="semi_final_thesis" name="semi_final_thesis">
+          {% for v in received %}<option value="{{ v }}" {% if s.semi_final_thesis==v %}selected{% endif %}>{{ v }}</option>{% endfor %}
+        </select>
+      </div>
+      <div>
+        <label class="f-label" for="final_thesis">Final Thesis</label>
+        <select class="no-icon" id="final_thesis" name="final_thesis">
+          {% for v in received %}<option value="{{ v }}" {% if s.final_thesis==v %}selected{% endif %}>{{ v }}</option>{% endfor %}
+        </select>
+      </div>
+      <div>
+        <label class="f-label" for="thesis_forward_coe">Thesis Forward (COE) Date</label>
+        <input class="no-icon" type="date" id="thesis_forward_coe" name="thesis_forward_coe" value="{{ s.coe_iso }}">
+      </div>
+    </div>
+    <div class="row" style="margin-top:18px">
+      <button type="submit" class="btn primary">Save Changes</button>
+    </div>
+  </form>
+</div>
+
+<div class="card section">
+  <div class="section-head">
+    <span class="section-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg></span>
+    <h3>Documents <span class="hint">({{ docs|length }})</span></h3>
+  </div>
+  <form method="post" action="{{ url_for('admin_student_upload_doc', sid=s.id) }}" enctype="multipart/form-data" style="margin-bottom:18px">
+    <div class="row">
+      <div style="flex:2;min-width:200px">
+        <label class="f-label" for="doc_label">Document label</label>
+        <input class="no-icon" type="text" id="doc_label" name="doc_label" placeholder="e.g. GS-01 Form" required>
+      </div>
+      <div style="flex:2;min-width:200px">
+        <label class="f-label" for="docfile">File (PDF / DOC / JPG / PNG)</label>
+        <input class="no-icon" type="file" id="docfile" name="file" required>
+      </div>
+      <div style="align-self:end">
+        <button type="submit" class="btn primary sm">Add Document</button>
+      </div>
+    </div>
+  </form>
+  {% if docs %}
+  <div class="doc-list">
+    {% for d in docs %}
+    <div class="doc-row">
+      <span class="doc-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg></span>
+      <div class="doc-meta">
+        <div class="doc-name">{{ d.doc_label }} — {{ d.file_name }}</div>
+        <div class="doc-sub">Uploaded by {{ d.uploaded_by }} &middot; {{ d.uploaded_at }}{% if d.size %} &middot; {{ (d.size/1024)|round(1) }} KB{% endif %}</div>
+      </div>
+      <a class="btn ghost sm" href="{{ url_for('admin_doc_download', doc_id=d.id) }}">Download</a>
+      <form method="post" action="{{ url_for('admin_doc_delete', doc_id=d.id) }}" style="margin:0"
+            onsubmit="return confirm('Delete this document?')">
+        <button type="submit" class="btn danger sm">Delete</button>
+      </form>
+    </div>
+    {% endfor %}
+  </div>
+  {% else %}
+  <div class="empty"><p>No documents yet.</p></div>
+  {% endif %}
+</div>
+{% endblock %}

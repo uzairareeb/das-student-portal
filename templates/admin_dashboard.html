@@ -1,0 +1,145 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <h2>Students</h2>
+    <p>{{ shown }} of {{ total }} students shown</p>
+  </div>
+  <div class="row">
+    <a class="btn ghost sm" href="{{ url_for('admin_student_new') }}">+ Add Student</a>
+    <a class="btn ghost sm" href="{{ url_for('admin_import') }}">Import</a>
+    <a class="btn ghost sm" href="{{ export_url }}">Export Excel</a>
+    <a class="btn ghost sm" href="{{ url_for('admin_logout') }}">Logout</a>
+  </div>
+</div>
+
+<div class="stats">
+  <div class="stat">
+    <span class="section-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg></span>
+    <div><div class="n">{{ total }}</div><div class="t">Total students</div></div>
+  </div>
+  {% for st in status_list %}
+  <div class="stat">
+    {% if st in ['Continue', 'Viva Done', 'Pass Out'] %}
+    <span class="section-icon ok"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg></span>
+    {% elif st in ['Viva Pending', 'Defense Pending'] %}
+    <span class="section-icon warn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="6" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg></span>
+    {% else %}
+    <span class="section-icon bad"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg></span>
+    {% endif %}
+    <div><div class="n">{{ stats.get(st, 0) }}</div><div class="t">{{ st }}</div></div>
+  </div>
+  {% endfor %}
+</div>
+
+<div class="card section">
+  <form method="get" action="{{ url_for('admin_dashboard') }}">
+    <div class="filters">
+      <div>
+        <label class="f-label" for="q">Search (Name / Reg.No / CNIC)</label>
+        <input class="no-icon" type="text" id="q" name="q" value="{{ f.get('q','') }}" placeholder="Type to search...">
+      </div>
+      <div>
+        <label class="f-label" for="session">Session</label>
+        <select class="no-icon" id="session" name="session">
+          <option value="">All</option>
+          {% for v in sessions %}<option value="{{ v }}" {% if f.get('session')==v %}selected{% endif %}>{{ v }}</option>{% endfor %}
+        </select>
+      </div>
+      <div>
+        <label class="f-label" for="degree">Degree</label>
+        <select class="no-icon" id="degree" name="degree">
+          <option value="">All</option>
+          {% for v in degrees %}<option value="{{ v }}" {% if f.get('degree')==v %}selected{% endif %}>{{ v }}</option>{% endfor %}
+        </select>
+      </div>
+      <div>
+        <label class="f-label" for="status">Status</label>
+        <select class="no-icon" id="status" name="status">
+          <option value="">All</option>
+          {% for v in status_list %}<option value="{{ v }}" {% if f.get('status')==v %}selected{% endif %}>{{ v }}</option>{% endfor %}
+        </select>
+      </div>
+      <div>
+        <label class="f-label" for="gender">Gender</label>
+        <select class="no-icon" id="gender" name="gender">
+          <option value="">All</option>
+          {% for v in genders %}<option value="{{ v }}" {% if f.get('gender')==v %}selected{% endif %}>{{ v }}</option>{% endfor %}
+        </select>
+      </div>
+      <div>
+        <label class="f-label" for="folder_file">Folder/File</label>
+        <select class="no-icon" id="folder_file" name="folder_file">
+          <option value="">All</option>
+          {% for v in folders %}<option value="{{ v }}" {% if f.get('folder_file')==v %}selected{% endif %}>{{ v }}</option>{% endfor %}
+        </select>
+      </div>
+    </div>
+    <div class="row" style="margin-top:14px">
+      <button type="submit" class="btn primary sm">Apply Filters</button>
+      <a class="btn ghost sm" href="{{ url_for('admin_dashboard') }}">Clear</a>
+    </div>
+  </form>
+</div>
+
+<div class="card section">
+  <div class="section-head">
+    <span class="section-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg></span>
+    <h3>Student List</h3>
+  </div>
+  {% if students %}
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th><th>Reg.No</th><th>Gender</th><th>Degree</th><th>Session</th>
+          <th>Folder/File</th><th>Comments (Missing)</th><th>Synopsis</th>
+          <th>Semi-Final</th><th>Final Thesis</th><th>Thesis Forward (COE)</th>
+          <th>Status</th><th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for s in students %}
+        <tr>
+          <td>{{ s.name }}</td>
+          <td>{{ s.reg_no }}</td>
+          <td>{{ s.gender or '—' }}</td>
+          <td>{{ s.degree or '—' }}</td>
+          <td>{{ s.session or '—' }}</td>
+          <td>
+            {% if s.folder_file == 'Completed' %}<span class="pill q">Completed</span>
+            {% else %}<span class="pill nq">Not Completed</span>{% endif %}
+          </td>
+          <td class="comments-cell">{{ s.comments_missing or '—' }}</td>
+          <td>
+            {% if s.synopsis == 'Received' %}<span class="pill q">Received</span>
+            {% else %}<span class="pill nq">Not Received</span>{% endif %}
+          </td>
+          <td>
+            {% if s.semi_final_thesis == 'Received' %}<span class="pill q">Received</span>
+            {% else %}<span class="pill nq">Not Received</span>{% endif %}
+          </td>
+          <td>
+            {% if s.final_thesis == 'Received' %}<span class="pill q">Received</span>
+            {% else %}<span class="pill nq">Not Received</span>{% endif %}
+          </td>
+          <td>{{ s.coe_display }}</td>
+          <td>
+            {% if s.status in ['Continue', 'Viva Done', 'Pass Out'] %}<span class="pill q">{{ s.status }}</span>
+            {% elif s.status in ['Viva Pending', 'Defense Pending'] %}<span class="pill warn">{{ s.status }}</span>
+            {% else %}<span class="pill nq">{{ s.status }}</span>{% endif %}
+          </td>
+          <td><a class="btn ghost sm" href="{{ url_for('admin_student_profile', sid=s.id) }}">Profile</a></td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="empty">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>
+    <p>No students found. Add one manually or import an Excel file.</p>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}
