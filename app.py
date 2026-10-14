@@ -185,7 +185,7 @@ def init_db():
             cnic TEXT,
             name TEXT NOT NULL,
             father_name TEXT,
-            reg_no TEXT NOT NULL UNIQUE,
+            reg_no TEXT NOT NULL,
             gender TEXT,
             degree TEXT,
             session TEXT,
@@ -219,7 +219,7 @@ def init_db():
             value TEXT
         )
     """)
-    _migrate_cnic_not_unique(db)
+    _migrate_drop_unique_constraints(db)
     # Admin password comes from the env var (source of truth), stored hashed.
     pw_hash = generate_password_hash(
         os.environ.get("ADMIN_PASSWORD", "admin123") or "admin123")
@@ -234,18 +234,21 @@ def init_db():
     db.close()
 
 
-def _migrate_cnic_not_unique(db):
-    """Oct 2026: CNIC is no longer UNIQUE -- imports must keep every row
-    as-is, even with duplicate CNICs. Drops the old unique constraint
-    (Postgres) or rebuilds the table without it (SQLite). Safe to rerun."""
+def _migrate_drop_unique_constraints(db):
+    """Oct 2026: imports must keep every file row as its own record --
+    neither CNIC nor Reg.No is UNIQUE anymore. Drops the old unique
+    constraints (Postgres) or rebuilds the table without them (SQLite).
+    Safe to rerun."""
     try:
         if USE_PG:
             db.execute("ALTER TABLE students DROP CONSTRAINT IF EXISTS students_cnic_key")
+            db.execute("ALTER TABLE students DROP CONSTRAINT IF EXISTS students_reg_no_key")
             return
         row = db.fetchone(
             "SELECT sql FROM sqlite_master WHERE type='table' AND name='students'")
         ddl = (row["sql"] if isinstance(row, dict) else row[0]) if row else ""
-        if "cnic TEXT UNIQUE" not in " ".join(ddl.split()):
+        norm = " ".join(ddl.split())
+        if "cnic TEXT UNIQUE" not in norm and "reg_no TEXT NOT NULL UNIQUE" not in norm:
             return
         db.execute("DROP TABLE IF EXISTS students_new")
         old_cols = [r[1] for r in db.fetchall("PRAGMA table_info(students)")]
@@ -261,7 +264,7 @@ def _migrate_cnic_not_unique(db):
                 cnic TEXT,
                 name TEXT NOT NULL,
                 father_name TEXT,
-                reg_no TEXT NOT NULL UNIQUE,
+                reg_no TEXT NOT NULL,
                 gender TEXT,
                 degree TEXT,
                 session TEXT,
@@ -669,11 +672,10 @@ def admin_import_upload():
             "session", "folder_file", "comments_missing", "synopsis",
             "semi_final_thesis", "final_thesis", "thesis_forward_coe",
             "status", "password_hash", "created_at", "updated_at"]
-    upd = ", ".join(f"{c}=EXCLUDED.{c}" for c in cols
-                    if c not in ("reg_no", "password_hash"))
+    # Every file row becomes its own record (plain INSERT, no merging):
+    # the file is imported exactly as-is, even with duplicate Reg.No/CNIC.
     one_ph = ", ".join(["?"] * len(cols))
-    one_upsert = (f"INSERT INTO students ({', '.join(cols)}) VALUES ({one_ph})"
-                  f" ON CONFLICT(reg_no) DO UPDATE SET {upd}")
+    one_insert = f"INSERT INTO students ({', '.join(cols)}) VALUES ({one_ph}"
 
     # --- parse + validate every row first (no DB writes yet) ---
     records, skipped, skip_notes = [], 0, []
@@ -691,10 +693,10 @@ def admin_import_upload():
         name = rec.get("name", "")
         reg_no = rec.get("reg_no", "")
         cnic = norm_cnic(rec.get("cnic", ""))
-        if not name or not reg_no or not cnic:
+        if not name and not reg_no:
             skipped += 1
             if len(skip_notes) < 8:
-                skip_notes.append(f"row {i}: missing Name / Reg.No / CNIC")
+                skip_notes.append(f"row {i}: blank row (no Name / Reg.No)")
             continue
         rec["name"] = name
         rec["reg_no"] = reg_no
@@ -713,31 +715,17 @@ def admin_import_upload():
         values = tuple(rec.get(c) for c in cols[:-3]) + (None, now, now)
         records.append((i, reg_no, values))
 
-    # Which reg_nos already exist? (single query, for new-vs-updated counts)
-    existing = set()
-    for r in db.fetchall("SELECT reg_no FROM students"):
-        v = r["reg_no"] if isinstance(r, dict) else r[0]
-        if v:
-            existing.add(v)
-
-    def _tally(reg_no):
-        if reg_no in existing:
-            return False
-        existing.add(reg_no)
-        return True
-
     def _one(vals):
-        db.execute(one_upsert, vals)
+        db.execute(one_insert, vals)
 
     def _chunk(chunk_vals):
         n = len(chunk_vals)
         ph = ", ".join(["(" + ", ".join(["?"] * len(cols)) + ")"] * n)
-        sql = (f"INSERT INTO students ({', '.join(cols)}) VALUES {ph}"
-               f" ON CONFLICT(reg_no) DO UPDATE SET {upd}")
+        sql = f"INSERT INTO students ({', '.join(cols)}) VALUES {ph}"
         flat = [v for vals in chunk_vals for v in vals]
         db.execute(sql, flat)
 
-    inserted = updated = 0
+    added = 0
     first_error = ""
     sp_seq = [0]
 
@@ -751,11 +739,10 @@ def admin_import_upload():
         except Exception:
             pass
 
-    # Batched upserts keep large imports inside serverless time limits.
+    # Batched inserts keep large imports inside serverless time limits.
     # Each batch is isolated in a savepoint; if it fails, we retry its
     # rows one-by-one (each in its own savepoint) so a single bad row
-    # (e.g. duplicate CNIC) can neither poison the transaction nor
-    # abort the whole import with a 500 error.
+    # can neither poison the transaction nor abort the whole import.
     CHUNK = 100
     for start in range(0, len(records), CHUNK):
         chunk = records[start:start + CHUNK]
@@ -764,26 +751,19 @@ def admin_import_upload():
             db.execute(f"SAVEPOINT {sp}")
             _chunk([vals for _, _, vals in chunk])
             db.execute(f"RELEASE SAVEPOINT {sp}")
-            for _, reg_no, _ in chunk:
-                if _tally(reg_no):
-                    inserted += 1
-                else:
-                    updated += 1
+            added += len(chunk)
         except Exception:
             _rollback(sp)
-            # Batch failed (often just the same Reg.No twice in one batch):
-            # retry row-by-row, each in its own savepoint. A batch-level
-            # failure alone is not surfaced -- only real per-row errors are.
+            # Batch failed: retry row-by-row, each in its own savepoint.
+            # A batch-level failure alone is not surfaced -- only real
+            # per-row errors are.
             for row_no, reg_no, vals in chunk:
                 sp2 = _sp()
                 try:
                     db.execute(f"SAVEPOINT {sp2}")
                     _one(vals)
                     db.execute(f"RELEASE SAVEPOINT {sp2}")
-                    if _tally(reg_no):
-                        inserted += 1
-                    else:
-                        updated += 1
+                    added += 1
                 except Exception as e2:
                     _rollback(sp2)
                     skipped += 1
@@ -792,7 +772,7 @@ def admin_import_upload():
                     if len(skip_notes) < 8:
                         skip_notes.append(f"row {row_no} ({reg_no}: save failed)")
     db.commit()
-    msg = (f"Import complete: {inserted} new, {updated} updated, {skipped} skipped.")
+    msg = f"Import complete: {added} added, {skipped} skipped."
     if skip_notes:
         msg += " Skipped: " + "; ".join(skip_notes)
         msg += "." if skipped <= len(skip_notes) else "..."
