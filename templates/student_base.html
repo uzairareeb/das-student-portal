@@ -1,5 +1,6 @@
 {% extends "base.html" %}
 {% block body_class %}has-sidebar{% endblock %}
+{% block container_extra %} wide{% endblock %}
 {% block sidebar %}
 <aside class="sidebar student-sidebar" id="sidebar">
   <div class="side-brand">
@@ -24,7 +25,7 @@
     </a>
     <a href="{{ url_for('student_record') }}" class="{% if request.endpoint == 'student_record' %}active{% endif %}">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
-      Academic Record
+      My Profile
     </a>
   </nav>
   <div class="side-foot">
