@@ -5,12 +5,12 @@
     <h2>Add Student</h2>
     <p>The student gets a portal password automatically: their CNIC digits.</p>
   </div>
-  <a class="btn ghost sm" href="{{ url_for('admin_dashboard') }}">&larr; Back to List</a>
+  <a class="btn ghost sm" href="{{ url_for('admin_students') }}">&larr; Back to List</a>
 </div>
 
 <div class="card section">
   <form method="post">
-    <div class="form-grid">
+    <div class="form-grid form-wide">
       <div>
         <label class="f-label" for="name">Name *</label>
         <input class="no-icon" type="text" id="name" name="name" value="{{ form.get('name','') }}" required>
@@ -83,7 +83,7 @@
     </div>
     <div class="row" style="margin-top:18px">
       <button type="submit" class="btn primary">Save Student</button>
-      <a class="btn ghost" href="{{ url_for('admin_dashboard') }}">Cancel</a>
+      <a class="btn ghost" href="{{ url_for('admin_students') }}">Cancel</a>
     </div>
   </form>
 </div>

@@ -10,11 +10,11 @@
     </div>
   </div>
   <nav class="side-nav">
-    <a id="nav-dashboard" href="{{ url_for('admin_dashboard') }}" class="{% if request.path == '/admin/dashboard' %}active{% endif %}">
+    <a id="nav-dashboard" href="{{ url_for('admin_dashboard') }}" class="{% if request.endpoint == 'admin_dashboard' %}active{% endif %}">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/></svg>
       Dashboard
     </a>
-    <a id="nav-list" href="{{ url_for('admin_dashboard') }}#student-list">
+    <a id="nav-list" href="{{ url_for('admin_students') }}" class="{% if request.endpoint == 'admin_students' %}active{% endif %}">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
       Student List
     </a>
@@ -41,11 +41,6 @@
 {% block page_scripts %}
 <script>
   (function () {
-    // highlight "Student List" when arriving via the #student-list anchor
-    if (window.location.hash === '#student-list') {
-      var d = document.getElementById('nav-dashboard'), l = document.getElementById('nav-list');
-      if (d && l) { d.classList.remove('active'); l.classList.add('active'); }
-    }
     // mobile sidebar toggle
     var t = document.getElementById('sideToggle');
     if (t) t.addEventListener('click', function () {

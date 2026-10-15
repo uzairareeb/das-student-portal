@@ -12,7 +12,7 @@
       {% else %}<span class="pill nq">{{ s.status }}</span>{% endif %}
     </div>
     <div class="sp-actions">
-      <a class="btn light sm" href="{{ url_for('admin_dashboard') }}">&larr; Back to List</a>
+      <a class="btn light sm" href="{{ url_for('admin_students') }}">&larr; Back to List</a>
       <form method="post" action="{{ url_for('admin_student_delete', sid=s.id) }}" style="margin:0"
             onsubmit="return confirm('Delete {{ s.name }} and ALL their documents? This cannot be undone.')">
         <button type="submit" class="btn outline-w sm">Delete Student</button>
