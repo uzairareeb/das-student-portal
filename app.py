@@ -1249,12 +1249,45 @@ def dept_logout():
 @dept_required
 def dept_dashboard():
     dept = current_dept()
-    uploads = [dict(r) for r in get_db().fetchall(
+    db = get_db()
+    uploads = [dict(r) for r in db.fetchall(
         "SELECT id, file_name, row_count, status, admin_comment, created_at,"
         " reviewed_at FROM dept_uploads WHERE department_id=?"
         " ORDER BY id DESC", (dept["id"],))]
+    def _n(sql, params):
+        row = db.fetchone(sql, params)
+        return (row["n"] if isinstance(row, dict) else row[0]) if row else 0
+    stats = {
+        "students": _n("SELECT COUNT(*) AS n FROM students WHERE department=?",
+                       (dept["name"],)),
+        "viva_done": _n("SELECT COUNT(*) AS n FROM viva_records v"
+                        " JOIN students s ON s.id=v.student_id"
+                        " WHERE s.department=? AND v.result='Pass'",
+                        (dept["name"],)),
+        "viva_pending": _n("SELECT COUNT(*) AS n FROM viva_records v"
+                           " JOIN students s ON s.id=v.student_id"
+                           " WHERE s.department=? AND v.result='Pending'",
+                           (dept["name"],)),
+        "uploads_pending": _n("SELECT COUNT(*) AS n FROM dept_uploads"
+                              " WHERE department_id=? AND status='pending'",
+                              (dept["id"],)),
+    }
     return render_template("dept_dashboard.html", uni=UNI_NAME,
-                           title=PORTAL_TITLE, dept=dept, uploads=uploads)
+                           title=PORTAL_TITLE, dept=dept, uploads=uploads,
+                           stats=stats)
+
+
+@app.route("/dept/students")
+@dept_required
+def dept_students():
+    """Read-only list of the department's approved students."""
+    dept = current_dept()
+    students = [dict(r) for r in get_db().fetchall(
+        "SELECT name, reg_no, cnic, gender, degree, session, folder_file,"
+        " synopsis, semi_final_thesis, final_thesis, status"
+        " FROM students WHERE department=? ORDER BY name", (dept["name"],))]
+    return render_template("dept_students.html", uni=UNI_NAME,
+                           title=PORTAL_TITLE, dept=dept, students=students)
 
 
 @app.route("/dept/upload", methods=["POST"])
@@ -1292,6 +1325,26 @@ def dept_upload():
     flash(f"Sent for DAS review: {len(records)} student row(s)."
           f" You will see the decision here.")
     return redirect(url_for("dept_dashboard"))
+
+
+@app.route("/dept/uploads/<int:uid>/download")
+@dept_required
+def dept_upload_download(uid):
+    """Download one of the department's own submitted files (e.g. to fix
+    and re-upload after a rejection)."""
+    dept = current_dept()
+    row = get_db().fetchone(
+        "SELECT * FROM dept_uploads WHERE id=? AND department_id=?",
+        (uid, dept["id"]))
+    if not row:
+        flash("Upload not found.")
+        return redirect(url_for("dept_dashboard"))
+    u = dict(row)
+    return Response(doc_bytes(u),
+                    mimetype="application/vnd.openxmlformats-officedocument."
+                             "spreadsheetml.sheet",
+                    headers={"Content-Disposition":
+                             f'attachment; filename="{safe_filename(u.get("file_name"))}"'})
 
 
 @app.route("/dept/template")
