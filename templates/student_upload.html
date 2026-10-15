@@ -24,6 +24,32 @@
 
 <div class="card section">
   <div class="section-head">
+    <span class="section-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg></span>
+    <h3>Current Document Status <span class="hint">(office record)</span></h3>
+  </div>
+  <div class="live-status">
+    <div class="ls-item">
+      <div class="ls-k">Synopsis</div>
+      {% if s.synopsis == 'Received' %}<span class="pill q">Received</span>{% else %}<span class="pill nq">Not Received</span>{% endif %}
+    </div>
+    <div class="ls-item">
+      <div class="ls-k">Semi-Final Thesis</div>
+      {% if s.semi_final_thesis == 'Received' %}<span class="pill q">Received</span>{% else %}<span class="pill nq">Not Received</span>{% endif %}
+    </div>
+    <div class="ls-item">
+      <div class="ls-k">Final Thesis</div>
+      {% if s.final_thesis == 'Received' %}<span class="pill q">Received</span>{% else %}<span class="pill nq">Not Received</span>{% endif %}
+    </div>
+    <div class="ls-item">
+      <div class="ls-k">Folder / File</div>
+      {% if s.folder_file == 'Completed' %}<span class="pill q">Completed</span>{% else %}<span class="pill nq">Not Completed</span>{% endif %}
+    </div>
+  </div>
+  <p class="hint" style="margin:12px 0 0">This is the live status from the DAS office record — it updates as the office processes your submissions.</p>
+</div>
+
+<div class="card section">
+  <div class="section-head">
     <span class="section-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg></span>
     <h3>Required Documents — {% if is_phd %}PhD{% else %}MPhil{% endif %} ({{ doc_list|length }} items, in sequence)</h3>
   </div>
