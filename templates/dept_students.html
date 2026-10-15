@@ -5,6 +5,18 @@
     <h2>My Students</h2>
     <p>{{ total }} approved student record(s) from {{ dept.name }} — read-only</p>
   </div>
+  <a class="btn ghost sm" href="{{ url_for('dept_students_export') }}">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+    Export Excel
+  </a>
+</div>
+
+<div class="card section" style="margin-bottom:16px">
+  <form method="get" class="row" style="gap:10px">
+    <input class="no-icon" type="text" name="q" value="{{ q }}" placeholder="Search by name or Reg.No" style="max-width:320px">
+    <button type="submit" class="btn primary sm">Search</button>
+    {% if q %}<a class="btn ghost sm" href="{{ url_for('dept_students') }}">Clear</a>{% endif %}
+  </form>
 </div>
 
 <div class="card section table-card">
@@ -34,9 +46,9 @@
   </div>
   {% if pages > 1 %}
   <div class="pagination">
-    {% if page > 1 %}<a class="btn ghost sm" href="{{ url_for('dept_students', page=page-1) }}">&larr; Prev</a>{% endif %}
+    {% if page > 1 %}<a class="btn ghost sm" href="{{ url_for('dept_students', page=page-1, q=q) }}">&larr; Prev</a>{% endif %}
     <span class="hint">Page {{ page }} of {{ pages }}</span>
-    {% if page < pages %}<a class="btn ghost sm" href="{{ url_for('dept_students', page=page+1) }}">Next &rarr;</a>{% endif %}
+    {% if page < pages %}<a class="btn ghost sm" href="{{ url_for('dept_students', page=page+1, q=q) }}">Next &rarr;</a>{% endif %}
   </div>
   {% endif %}
   {% else %}
