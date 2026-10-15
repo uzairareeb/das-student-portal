@@ -240,7 +240,7 @@ td.comments-cell { white-space: normal; min-width: 180px; max-width: 260px; }
 }
 
 /* ---------- admin: wide list, bulk actions, pagination ---------- */
-.wrap.wide { max-width: 100%; padding-left: 16px; padding-right: 16px; }
+/* (wide variant defined below) */
 .bulk-bar { display: flex; align-items: center; gap: 12px; margin-bottom: 14px; }
 .danger-zone { display: flex; align-items: center; gap: 12px; margin-top: 16px; padding-top: 16px; border-top: 1px dashed var(--line); }
 table.wide-table { font-size: 13px; }
@@ -383,7 +383,7 @@ body.has-sidebar .page-shell { margin-left: 252px; }
 
 /* ---------- breathing room: side margins everywhere ---------- */
 .wrap { max-width: 1180px; margin: 0 auto; padding: 0 30px; }
-.wrap.wide { max-width: 100%; padding-left: 30px; padding-right: 30px; }
+.wrap.wide { max-width: none; margin: 0; padding-left: 30px; padding-right: 30px; }
 .container { padding: 46px 0 76px; min-height: 70vh; }
 .card { padding: 32px; }
 .page-head { margin-bottom: 26px; }
