@@ -31,7 +31,13 @@
     <span class="section-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg></span>
     <h3>Send File for Review</h3>
   </div>
-  <p class="hint" style="margin-top:0">Use the template from the sidebar — it includes one filled example row showing the expected format. Every row becomes its own student record after DAS approval.</p>
+  <p class="hint" style="margin-top:0">Use the template below — it includes one filled example row showing the expected format. Every row becomes its own student record after DAS approval.</p>
+  <div class="row" style="margin-bottom:14px">
+    <a class="btn ghost sm" href="{{ url_for('dept_template') }}">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+      Download Excel Template
+    </a>
+  </div>
   <form method="post" action="{{ url_for('dept_upload') }}" enctype="multipart/form-data">
     <div class="dropzone" id="dz">
       <span class="dz-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg></span>

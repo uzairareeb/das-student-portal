@@ -3,18 +3,18 @@
 <div class="page-head">
   <div>
     <h2>My Students</h2>
-    <p>{{ students|length }} approved student record(s) from {{ dept.name }} — read-only</p>
+    <p>{{ total }} approved student record(s) from {{ dept.name }} — read-only</p>
   </div>
 </div>
 
-<div class="card section">
+<div class="card section table-card">
   {% if students %}
   <div class="table-scroll">
-    <table class="data-table">
+    <table class="data-table wide-table">
       <thead>
         <tr>
-          <th>Name</th><th>Reg.No</th><th>CNIC</th><th>Gender</th><th>Degree</th>
-          <th>Session</th><th>Folder/File</th><th>Synopsis</th><th>Final Thesis</th><th>Status</th>
+          <th>Name</th><th>Reg.No</th><th>Degree</th><th>Session</th>
+          <th>Folder/File</th><th>Status</th><th></th>
         </tr>
       </thead>
       <tbody>
@@ -22,19 +22,23 @@
         <tr>
           <td><strong>{{ s.name }}</strong></td>
           <td class="nowrap">{{ s.reg_no }}</td>
-          <td class="nowrap">{{ s.cnic or '—' }}</td>
-          <td>{{ s.gender or '—' }}</td>
-          <td>{{ s.degree or '—' }}</td>
-          <td>{{ s.session or '—' }}</td>
+          <td class="degree-cell">{{ s.degree or '—' }}</td>
+          <td class="nowrap">{{ s.session or '—' }}</td>
           <td>{% if s.folder_file == 'Completed' %}<span class="pill q">Completed</span>{% else %}<span class="pill nq">Not Completed</span>{% endif %}</td>
-          <td>{% if s.synopsis == 'Received' %}<span class="pill q">Received</span>{% else %}<span class="pill nq">Not Received</span>{% endif %}</td>
-          <td>{% if s.final_thesis == 'Received' %}<span class="pill q">Received</span>{% else %}<span class="pill nq">Not Received</span>{% endif %}</td>
           <td>{{ s.status }}</td>
+          <td class="nowrap"><a class="btn ghost sm" href="{{ url_for('dept_student_profile', sid=s.id) }}">Profile</a></td>
         </tr>
         {% endfor %}
       </tbody>
     </table>
   </div>
+  {% if pages > 1 %}
+  <div class="pagination">
+    {% if page > 1 %}<a class="btn ghost sm" href="{{ url_for('dept_students', page=page-1) }}">&larr; Prev</a>{% endif %}
+    <span class="hint">Page {{ page }} of {{ pages }}</span>
+    {% if page < pages %}<a class="btn ghost sm" href="{{ url_for('dept_students', page=page+1) }}">Next &rarr;</a>{% endif %}
+  </div>
+  {% endif %}
   {% else %}
   <div class="empty"><p>No students yet — your approved uploads will appear here.</p></div>
   {% endif %}
