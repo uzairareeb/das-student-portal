@@ -1280,14 +1280,44 @@ def dept_dashboard():
 @app.route("/dept/students")
 @dept_required
 def dept_students():
-    """Read-only list of the department's approved students."""
+    """Read-only paginated list of the department's approved students."""
     dept = current_dept()
-    students = [dict(r) for r in get_db().fetchall(
-        "SELECT name, reg_no, cnic, gender, degree, session, folder_file,"
-        " synopsis, semi_final_thesis, final_thesis, status"
-        " FROM students WHERE department=? ORDER BY name", (dept["name"],))]
+    db = get_db()
+    page = max(1, int(request.args.get("page", 1) or 1))
+    per = 15
+    row = db.fetchone("SELECT COUNT(*) AS n FROM students WHERE department=?",
+                      (dept["name"],))
+    total = (row["n"] if isinstance(row, dict) else row[0]) if row else 0
+    pages = max(1, (total + per - 1) // per)
+    page = min(page, pages)
+    students = [dict(r) for r in db.fetchall(
+        "SELECT id, name, reg_no, degree, session, status, folder_file"
+        " FROM students WHERE department=? ORDER BY name LIMIT ? OFFSET ?",
+        (dept["name"], per, (page - 1) * per))]
     return render_template("dept_students.html", uni=UNI_NAME,
-                           title=PORTAL_TITLE, dept=dept, students=students)
+                           title=PORTAL_TITLE, dept=dept, students=students,
+                           page=page, pages=pages, total=total)
+
+
+@app.route("/dept/student/<int:sid>")
+@dept_required
+def dept_student_profile(sid):
+    """Full read-only profile of one of the department's students —
+    shows the uploaded data plus every update made by the DAS office."""
+    dept = current_dept()
+    s = get_student(sid)
+    if not s or s.get("department") != dept["name"]:
+        flash("Student not found.")
+        return redirect(url_for("dept_students"))
+    s["coe_display"] = fmt_coe(s.get("thesis_forward_coe"))
+    docs = get_docs(sid)
+    vivas = [dict(r) for r in get_db().fetchall(
+        "SELECT examiner_name, examiner_affiliation, viva_date, result,"
+        " remarks FROM viva_records WHERE student_id=? ORDER BY id DESC",
+        (sid,))]
+    return render_template("dept_student_profile.html", uni=UNI_NAME,
+                           title=PORTAL_TITLE, dept=dept, s=s, docs=docs,
+                           vivas=vivas)
 
 
 @app.route("/dept/upload", methods=["POST"])
