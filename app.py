@@ -1828,8 +1828,22 @@ def student_dashboard():
         return redirect(url_for("student_login"))
     s["coe_display"] = fmt_coe(s.get("thesis_forward_coe"))
     docs = get_docs(s["id"])
+    vivas = [dict(r) for r in get_db().fetchall(
+        "SELECT examiner_name, examiner_affiliation, viva_date, result,"
+        " remarks FROM viva_records WHERE student_id=? ORDER BY id DESC",
+        (s["id"],))]
+    timeline = [
+        {"label": "Synopsis", "done": s.get("synopsis") == "Received"},
+        {"label": "Semi-Final Thesis",
+         "done": s.get("semi_final_thesis") == "Received"},
+        {"label": "Final Thesis", "done": s.get("final_thesis") == "Received"},
+        {"label": "Viva Scheduled", "done": bool(vivas)},
+        {"label": "Viva Passed",
+         "done": any(v.get("result") == "Pass" for v in vivas)},
+    ]
     return render_template("student_dashboard.html", uni=UNI_NAME,
-                           title=PORTAL_TITLE, s=s, docs=docs)
+                           title=PORTAL_TITLE, s=s, docs=docs, vivas=vivas,
+                           timeline=timeline)
 
 
 @app.route("/student/change-password", methods=["POST"])
