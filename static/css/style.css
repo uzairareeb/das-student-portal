@@ -468,3 +468,23 @@ code { background: var(--bg-soft); padding: 2px 8px; border-radius: 6px; font-si
   .report-cols { grid-template-columns: 1fr; }
   .reject-form { flex-direction: column; }
 }
+
+/* ---------- student viva + timeline ---------- */
+.alert { border-radius: 14px; padding: 14px 18px; margin-bottom: 20px; font-size: 14.5px; border: 1px solid; }
+.alert-ok { background: #eef9f0; border-color: #bfe6c8; color: #1d6b32; }
+.alert-warn { background: #fff8e8; border-color: #f0dfae; color: #8a6d1a; }
+.timeline { display: flex; gap: 0; padding: 8px 0 4px; overflow-x: auto; }
+.t-step { flex: 1; min-width: 120px; display: flex; flex-direction: column; align-items: center; gap: 10px; position: relative; text-align: center; }
+.t-step::before { content: ""; position: absolute; top: 15px; left: -50%; width: 100%; height: 2px; background: var(--line); }
+.t-step:first-child::before { display: none; }
+.t-step.done::before { background: var(--ok); }
+.t-dot { width: 32px; height: 32px; border-radius: 50%; border: 2px solid var(--line); background: #fff; display: inline-flex; align-items: center; justify-content: center; position: relative; z-index: 1; color: #fff; }
+.t-step.done .t-dot { background: var(--ok); border-color: var(--ok); }
+.t-dot svg { width: 16px; height: 16px; }
+.t-label { font-size: 12.5px; font-weight: 700; color: var(--muted); }
+.t-step.done .t-label { color: var(--ink); }
+.viva-sep { margin-bottom: 14px; padding-bottom: 14px; border-bottom: 1px dashed var(--line); }
+/* ---------- live document status (student upload) ---------- */
+.live-status { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 12px; }
+.live-status .ls-item { background: var(--bg-soft); border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; }
+.live-status .ls-k { font-size: 12px; font-weight: 700; color: var(--muted); margin-bottom: 6px; }
