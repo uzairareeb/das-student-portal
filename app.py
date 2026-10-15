@@ -256,6 +256,18 @@ def init_db():
         )
     """)
     db.execute(f"""
+        CREATE TABLE IF NOT EXISTS dept_notifications (
+            {id_pg if USE_PG else id_lite},
+            department_id INTEGER NOT NULL REFERENCES departments(id),
+            kind TEXT,
+            title TEXT,
+            message TEXT,
+            link TEXT,
+            is_read INTEGER DEFAULT 0,
+            created_at TEXT
+        )
+    """)
+    db.execute(f"""
         CREATE TABLE IF NOT EXISTS activity_log (
             {id_pg if USE_PG else id_lite},
             actor TEXT,
@@ -780,6 +792,26 @@ STUDENT_INSERT_COLS = ["cnic", "name", "father_name", "reg_no", "gender",
     "status", "department", "password_hash", "created_at", "updated_at"]
 
 
+def notify_dept(department_id, kind, title, message="", link=""):
+    """Create an in-portal notification for a department."""
+    try:
+        get_db().execute(
+            "INSERT INTO dept_notifications (department_id, kind, title,"
+            " message, link, created_at) VALUES (?,?,?,?,?,?)",
+            (department_id, kind, title, message, link,
+             datetime.now().strftime("%Y-%m-%d %H:%M")))
+        get_db().commit()
+    except Exception:
+        pass
+
+
+def dept_unread_count(department_id):
+    row = get_db().fetchone(
+        "SELECT COUNT(*) AS n FROM dept_notifications"
+        " WHERE department_id=? AND is_read=0", (department_id,))
+    return (row["n"] if isinstance(row, dict) else row[0]) if row else 0
+
+
 def log_activity(actor, action, detail=""):
     """Append to the activity log. Never breaks the request."""
     try:
@@ -1105,6 +1137,10 @@ def admin_upload_approve(uid):
     log_activity("admin", "upload_approve",
                  f"{u['dept_name']}: {added} student(s) added from"
                  f" {u['file_name']}")
+    notify_dept(u["department_id"], "upload", "Upload approved",
+                f"{added} student record(s) from {u['file_name']}"
+                " were added to the system.",
+                url_for("dept_dashboard"))
     flash(f"Approved — {added} student record(s) from {u['dept_name']}"
           f" are now in the system.")
     return redirect(url_for("admin_uploads"))
@@ -1135,6 +1171,8 @@ def admin_upload_reject(uid):
     db.commit()
     log_activity("admin", "upload_reject",
                  f"{u['dept_name']}: {comment[:120]}")
+    notify_dept(u["department_id"], "upload", "Upload rejected — action needed",
+                comment, url_for("dept_dashboard"))
     flash(f"Rejected with your comment — {u['dept_name']} will see it on"
           f" their portal and can fix and re-upload.")
     return redirect(url_for("admin_uploads"))
@@ -1176,6 +1214,16 @@ def admin_reports():
         status_list=STATUS_LIST, sessions=distinct_values("session"),
         degrees=distinct_values("degree"), genders=GENDER_OPTS,
         folders=FOLDER_OPTS)
+
+
+@app.context_processor
+def _inject_dept_notif():
+    try:
+        if request.path.startswith("/dept") and "dept_id" in session:
+            return {"dept_unread": dept_unread_count(session["dept_id"])}
+    except Exception:
+        pass
+    return {}
 
 
 @app.context_processor
@@ -1285,18 +1333,25 @@ def dept_students():
     db = get_db()
     page = max(1, int(request.args.get("page", 1) or 1))
     per = 15
-    row = db.fetchone("SELECT COUNT(*) AS n FROM students WHERE department=?",
-                      (dept["name"],))
+    q = (request.args.get("q") or "").strip()
+    op = "ILIKE" if USE_PG else "LIKE"
+    where = "department=?"
+    params = [dept["name"]]
+    if q:
+        where += f" AND (name {op} ? OR reg_no {op} ?)"
+        params += [f"%{q}%", f"%{q}%"]
+    row = db.fetchone(f"SELECT COUNT(*) AS n FROM students WHERE {where}",
+                      tuple(params))
     total = (row["n"] if isinstance(row, dict) else row[0]) if row else 0
     pages = max(1, (total + per - 1) // per)
     page = min(page, pages)
     students = [dict(r) for r in db.fetchall(
-        "SELECT id, name, reg_no, degree, session, status, folder_file"
-        " FROM students WHERE department=? ORDER BY name LIMIT ? OFFSET ?",
-        (dept["name"], per, (page - 1) * per))]
+        f"SELECT id, name, reg_no, degree, session, status, folder_file"
+        f" FROM students WHERE {where} ORDER BY name LIMIT ? OFFSET ?",
+        tuple(params) + (per, (page - 1) * per))]
     return render_template("dept_students.html", uni=UNI_NAME,
                            title=PORTAL_TITLE, dept=dept, students=students,
-                           page=page, pages=pages, total=total)
+                           page=page, pages=pages, total=total, q=q)
 
 
 @app.route("/dept/student/<int:sid>")
@@ -1377,6 +1432,112 @@ def dept_upload_download(uid):
                              f'attachment; filename="{safe_filename(u.get("file_name"))}"'})
 
 
+@app.route("/dept/notifications")
+@dept_required
+def dept_notifications():
+    """In-portal notifications for the department."""
+    dept = current_dept()
+    db = get_db()
+    notes = [dict(r) for r in db.fetchall(
+        "SELECT * FROM dept_notifications WHERE department_id=?"
+        " ORDER BY id DESC LIMIT 50", (dept["id"],))]
+    db.execute("UPDATE dept_notifications SET is_read=1"
+               " WHERE department_id=?", (dept["id"],))
+    db.commit()
+    return render_template("dept_notifications.html", uni=UNI_NAME,
+                           title=PORTAL_TITLE, dept=dept, notes=notes)
+
+
+@app.route("/dept/viva/calendar")
+@dept_required
+def dept_viva_calendar():
+    """Month calendar of the department's viva schedule."""
+    import calendar as calmod
+    dept = current_dept()
+    today = datetime.now()
+    try:
+        year = int(request.args.get("y", today.year))
+        month = int(request.args.get("m", today.month))
+    except ValueError:
+        year, month = today.year, today.month
+    if month < 1:
+        month, year = 12, year - 1
+    if month > 12:
+        month, year = 1, year + 1
+    vivas = [dict(r) for r in get_db().fetchall(
+        "SELECT v.viva_date, s.name, s.reg_no, v.result FROM viva_records v"
+        " JOIN students s ON s.id=v.student_id"
+        " WHERE s.department=? AND v.viva_date IS NOT NULL"
+        " AND v.viva_date LIKE ? ORDER BY v.viva_date",
+        (dept["name"], f"{year}-{month:02d}%"))]
+    by_day = {}
+    for v in vivas:
+        try:
+            day = int(v["viva_date"].split("-")[2])
+            by_day.setdefault(day, []).append(v)
+        except (ValueError, IndexError):
+            pass
+    weeks = calmod.monthcalendar(year, month)
+    prev_m, prev_y = (12, year - 1) if month == 1 else (month - 1, year)
+    next_m, next_y = (1, year + 1) if month == 12 else (month + 1, year)
+    upcoming = [dict(r) for r in get_db().fetchall(
+        "SELECT v.viva_date, s.name, s.reg_no, v.result, v.examiner_name"
+        " FROM viva_records v JOIN students s ON s.id=v.student_id"
+        " WHERE s.department=? AND v.viva_date >= ?"
+        " ORDER BY v.viva_date LIMIT 10",
+        (dept["name"], today.strftime("%Y-%m-%d")))]
+    return render_template("dept_viva_calendar.html", uni=UNI_NAME,
+                           title=PORTAL_TITLE, dept=dept, weeks=weeks,
+                           by_day=by_day, year=year, month=month,
+                           month_name=calmod.month_name[month],
+                           prev_m=prev_m, prev_y=prev_y,
+                           next_m=next_m, next_y=next_y,
+                           upcoming=upcoming)
+
+
+@app.route("/dept/students/export")
+@dept_required
+def dept_students_export():
+    """Excel export of the department's own students."""
+    from openpyxl import Workbook
+    from openpyxl.styles import Font, PatternFill, Alignment
+    dept = current_dept()
+    students = [dict(r) for r in get_db().fetchall(
+        "SELECT * FROM students WHERE department=? ORDER BY name",
+        (dept["name"],))]
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Students"
+    headers = ["Name", "Reg.No", "CNIC", "Gender", "Degree", "Session",
+               "Folder/File", "Synopsis", "Semi-Final Thesis", "Final Thesis",
+               "Thesis Forward (COE)", "Status"]
+    ws.append(headers)
+    for cell in ws[1]:
+        cell.font = Font(bold=True, color="FFFFFF")
+        cell.fill = PatternFill("solid", fgColor="2D3290")
+        cell.alignment = Alignment(horizontal="center", vertical="center",
+                                   wrap_text=True)
+    for s in students:
+        ws.append([s.get("name"), s.get("reg_no"), s.get("cnic"),
+                   s.get("gender"), s.get("degree"), s.get("session"),
+                   s.get("folder_file"), s.get("synopsis"),
+                   s.get("semi_final_thesis"), s.get("final_thesis"),
+                   parse_coe(s.get("thesis_forward_coe")) or "",
+                   s.get("status")])
+    widths = [24, 16, 18, 10, 22, 12, 14, 12, 16, 14, 18, 16]
+    for i, w in enumerate(widths, start=1):
+        ws.column_dimensions[ws.cell(row=1, column=i).column_letter].width = w
+    buf = io.BytesIO()
+    wb.save(buf)
+    buf.seek(0)
+    resp = Response(buf.getvalue(),
+                    mimetype="application/vnd.openxmlformats-officedocument."
+                             "spreadsheetml.sheet")
+    resp.headers["Content-Disposition"] = \
+        "attachment; filename=my_students_export.xlsx"
+    return resp
+
+
 @app.route("/dept/template")
 @dept_required
 def dept_template():
@@ -1440,6 +1601,9 @@ def dept_viva():
         log_activity(f"dept:{dept['name']}", "viva_add",
                      f"{st['name']} ({st['reg_no']}): {examiner},"
                      f" {viva_date or 'no date'}, {result}")
+        notify_dept(dept["id"], "viva", "Viva scheduled",
+                    f"{st['name']} ({st['reg_no']}) — viva recorded.",
+                    url_for("dept_viva"))
         flash("Viva record saved.")
         return redirect(url_for("dept_viva"))
     students = [dict(r) for r in db.fetchall(
@@ -1718,6 +1882,21 @@ def admin_student_save(sid):
         flash(f"Could not save (maybe duplicate Reg.No or CNIC): {e}")
         return redirect(url_for("admin_student_profile", sid=sid))
     log_activity("admin", "student_edit", f"id={sid} ({name}) record updated")
+    try:
+        _dep_row = db.fetchone("SELECT department FROM students WHERE id=?", (sid,))
+        _dept_name = (_dep_row["department"] if isinstance(_dep_row, dict)
+                      else _dep_row[0]) if _dep_row else None
+        if _dept_name:
+            _d = db.fetchone("SELECT id FROM departments WHERE name=?",
+                             (_dept_name,))
+            if _d:
+                _did = _d["id"] if isinstance(_d, dict) else _d[0]
+                notify_dept(_did, "student", "Record updated by DAS",
+                            f"{name} ({reg_no}) — the DAS office updated"
+                            " this student record.",
+                            url_for("dept_student_profile", sid=sid))
+    except Exception:
+        pass
     flash("Student record updated.")
     return redirect(url_for("admin_student_profile", sid=sid))
 
