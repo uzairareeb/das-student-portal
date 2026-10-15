@@ -1,11 +1,10 @@
-{% extends "base.html" %}
+{% extends "student_base.html" %}
 {% block content %}
 <div class="page-head">
   <div>
     <h2>Upload Your Complete File</h2>
     <p>{{ s.name }} &middot; {{ s.reg_no }} &middot; {{ s.degree or '—' }}</p>
   </div>
-  <a class="btn ghost sm" href="{{ url_for('student_dashboard') }}">&larr; Back to Profile</a>
 </div>
 
 <div class="card section instr-card">
