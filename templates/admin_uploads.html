@@ -1,0 +1,72 @@
+{% extends "admin_base.html" %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <h2>Department Uploads</h2>
+    <p>Review files departments sent — nothing enters the system until you approve it</p>
+  </div>
+</div>
+
+<div class="card section">
+  <div class="section-head">
+    <span class="section-icon warn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="6" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg></span>
+    <h3>Waiting for Review <span class="hint">({{ pending|length }})</span></h3>
+  </div>
+  {% if pending %}
+  <div class="upload-list">
+    {% for u in pending %}
+    <div class="upload-card">
+      <div class="upload-main">
+        <div class="upload-title">{{ u.dept_name }}</div>
+        <div class="upload-sub">{{ u.file_name }} &middot; {{ u.row_count }} rows &middot; sent {{ u.created_at }}</div>
+      </div>
+      <div class="upload-actions">
+        <a class="btn ghost sm" href="{{ url_for('admin_upload_download', uid=u.id) }}">Download File</a>
+        <form method="post" action="{{ url_for('admin_upload_approve', uid=u.id) }}" style="margin:0"
+              onsubmit="return confirm('Approve this file? All {{ u.row_count }} rows will be added as student records.')">
+          <button type="submit" class="btn primary sm">Approve &amp; Add</button>
+        </form>
+      </div>
+      <form method="post" action="{{ url_for('admin_upload_reject', uid=u.id) }}" class="reject-form">
+        <input type="text" name="comment" placeholder="If rejecting: what is missing or wrong? Write it here…" required>
+        <button type="submit" class="btn danger sm"
+                onclick="return confirm('Reject this file with your comment?')">Reject</button>
+      </form>
+    </div>
+    {% endfor %}
+  </div>
+  {% else %}
+  <div class="empty"><p>Nothing waiting — all department files have been reviewed.</p></div>
+  {% endif %}
+</div>
+
+<div class="card section">
+  <div class="section-head">
+    <span class="section-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg></span>
+    <h3>Reviewed</h3>
+  </div>
+  {% if reviewed %}
+  <div class="table-scroll">
+    <table class="data-table">
+      <thead>
+        <tr><th>Department</th><th>File</th><th>Rows</th><th>Decision</th><th>Comment</th><th>Reviewed</th></tr>
+      </thead>
+      <tbody>
+        {% for u in reviewed %}
+        <tr>
+          <td>{{ u.dept_name }}</td>
+          <td>{{ u.file_name }}</td>
+          <td>{{ u.row_count }}</td>
+          <td>{% if u.status == 'approved' %}<span class="pill q">Approved</span>{% else %}<span class="pill nq">Rejected</span>{% endif %}</td>
+          <td>{{ u.admin_comment or '—' }}</td>
+          <td class="nowrap">{{ u.reviewed_at or '—' }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="empty"><p>No reviewed uploads yet.</p></div>
+  {% endif %}
+</div>
+{% endblock %}

@@ -1,0 +1,43 @@
+{% extends "admin_base.html" %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <h2>Activity Log</h2>
+    <p>Who did what, when — {{ total }} recorded actions</p>
+  </div>
+</div>
+
+<div class="card section">
+  {% if rows %}
+  <div class="table-scroll">
+    <table class="data-table">
+      <thead>
+        <tr><th>When</th><th>Who</th><th>Action</th><th>Details</th></tr>
+      </thead>
+      <tbody>
+        {% for r in rows %}
+        <tr>
+          <td class="nowrap">{{ r.created_at }}</td>
+          <td>
+            {% if r.actor == 'admin' %}<span class="pill">Admin</span>
+            {% else %}<span class="pill q">{{ r.actor }}</span>{% endif %}
+          </td>
+          <td><code>{{ r.action }}</code></td>
+          <td>{{ r.detail or '—' }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% if pages > 1 %}
+  <div class="pagination">
+    {% if page > 1 %}<a class="btn ghost sm" href="{{ url_for('admin_activity') }}?page={{ page - 1 }}">&larr; Prev</a>{% endif %}
+    <span class="hint">Page {{ page }} of {{ pages }}</span>
+    {% if page < pages %}<a class="btn ghost sm" href="{{ url_for('admin_activity') }}?page={{ page + 1 }}">Next &rarr;</a>{% endif %}
+  </div>
+  {% endif %}
+  {% else %}
+  <div class="empty"><p>No activity recorded yet.</p></div>
+  {% endif %}
+</div>
+{% endblock %}

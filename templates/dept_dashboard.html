@@ -1,0 +1,99 @@
+{% extends "dept_base.html" %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <h2>{{ dept.name }}</h2>
+    <p>Upload your student data for DAS verification &middot; nothing is added until approved</p>
+  </div>
+  <a class="btn ghost sm" href="{{ url_for('dept_template') }}">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+    Download Template
+  </a>
+</div>
+
+<div class="card section">
+  <div class="section-head">
+    <span class="section-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg></span>
+    <h3>Send File for Review</h3>
+  </div>
+  <p class="hint" style="margin-top:0">Use the template above — it includes one filled example row showing the expected format. Every row becomes its own student record after DAS approval.</p>
+  <form method="post" action="{{ url_for('dept_upload') }}" enctype="multipart/form-data">
+    <div class="dropzone" id="dz">
+      <span class="dz-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg></span>
+      <p><strong>Drop your .xlsx file here</strong> or click to browse</p>
+      <input type="file" name="file" id="fileInput" accept=".xlsx" hidden required>
+      <p class="hint file-name" id="fileName"></p>
+    </div>
+    <div class="row" style="margin-top:16px">
+      <button type="submit" class="btn primary">Send for DAS Review</button>
+    </div>
+  </form>
+</div>
+
+<div class="card section">
+  <div class="section-head">
+    <span class="section-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></span>
+    <h3>Your Submissions</h3>
+  </div>
+  {% if uploads %}
+  <div class="table-scroll">
+    <table class="data-table">
+      <thead>
+        <tr><th>File</th><th>Rows</th><th>Sent</th><th>Status</th><th>DAS Message</th></tr>
+      </thead>
+      <tbody>
+        {% for u in uploads %}
+        <tr>
+          <td>{{ u.file_name }}</td>
+          <td>{{ u.row_count }}</td>
+          <td class="nowrap">{{ u.created_at }}</td>
+          <td>
+            {% if u.status == 'pending' %}<span class="pill warn">Pending Review</span>
+            {% elif u.status == 'approved' %}<span class="pill q">Approved</span>
+            {% else %}<span class="pill nq">Needs Fixing</span>{% endif %}
+          </td>
+          <td>
+            {% if u.status == 'rejected' and u.admin_comment %}
+              <div class="admin-note">{{ u.admin_comment }}</div>
+              <p class="hint" style="margin:6px 0 0">Fix the file and upload it again above.</p>
+            {% elif u.status == 'approved' %}
+              <span class="hint">Added to the system.</span>
+            {% else %}
+              <span class="hint">Waiting for DAS office.</span>
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="empty"><p>No submissions yet — download the template and send your first file.</p></div>
+  {% endif %}
+</div>
+{% endblock %}
+{% block page_scripts %}
+<script>
+  (function () {
+    var dz = document.getElementById('dz'), fi = document.getElementById('fileInput'),
+        fn = document.getElementById('fileName');
+    if (!dz || !fi) return;
+    dz.addEventListener('click', function () { fi.click(); });
+    fi.addEventListener('change', function () {
+      fn.textContent = fi.files.length ? fi.files[0].name : '';
+    });
+    ['dragover', 'dragenter'].forEach(function (ev) {
+      dz.addEventListener(ev, function (e) { e.preventDefault(); dz.classList.add('drag'); });
+    });
+    ['dragleave', 'drop'].forEach(function (ev) {
+      dz.addEventListener(ev, function (e) { e.preventDefault(); dz.classList.remove('drag'); });
+    });
+    dz.addEventListener('drop', function (e) {
+      if (e.dataTransfer.files.length) {
+        fi.files = e.dataTransfer.files;
+        fn.textContent = e.dataTransfer.files[0].name;
+      }
+    });
+  })();
+</script>
+{% endblock %}

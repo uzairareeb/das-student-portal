@@ -1,0 +1,102 @@
+{% extends "dept_base.html" %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <h2>Viva Tracking</h2>
+    <p>Assign examiners, set viva dates and record results for your department's students</p>
+  </div>
+</div>
+
+<div class="card section">
+  <div class="section-head">
+    <span class="section-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg></span>
+    <h3>Add Viva Record</h3>
+  </div>
+  {% if students %}
+  <form method="post">
+    <div class="form-grid">
+      <div>
+        <label class="f-label" for="student_id">Student *</label>
+        <select class="no-icon" id="student_id" name="student_id" required>
+          <option value="">— Select student —</option>
+          {% for st in students %}
+          <option value="{{ st.id }}">{{ st.name }} ({{ st.reg_no }})</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div>
+        <label class="f-label" for="examiner_name">Examiner Name *</label>
+        <input class="no-icon" type="text" id="examiner_name" name="examiner_name" required
+               placeholder="e.g. Prof. Dr. Ahmed Khan">
+      </div>
+      <div>
+        <label class="f-label" for="examiner_affiliation">Examiner Affiliation</label>
+        <input class="no-icon" type="text" id="examiner_affiliation" name="examiner_affiliation"
+               placeholder="e.g. University of the Punjab">
+      </div>
+      <div>
+        <label class="f-label" for="viva_date">Viva Date</label>
+        <input class="no-icon" type="date" id="viva_date" name="viva_date">
+      </div>
+      <div>
+        <label class="f-label" for="result">Result</label>
+        <select class="no-icon" id="result" name="result">
+          {% for r in results %}<option value="{{ r }}">{{ r }}</option>{% endfor %}
+        </select>
+      </div>
+      <div class="full">
+        <label class="f-label" for="remarks">Remarks</label>
+        <input class="no-icon" type="text" id="remarks" name="remarks"
+               placeholder="Any notes about the viva">
+      </div>
+    </div>
+    <div class="row" style="margin-top:16px">
+      <button type="submit" class="btn primary">Save Viva Record</button>
+    </div>
+  </form>
+  {% else %}
+  <div class="empty"><p>No students from your department in the system yet — viva records will appear here once DAS approves your uploads.</p></div>
+  {% endif %}
+</div>
+
+<div class="card section">
+  <div class="section-head">
+    <span class="section-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg></span>
+    <h3>Viva Records <span class="hint">({{ vivas|length }})</span></h3>
+  </div>
+  {% if vivas %}
+  <div class="table-scroll">
+    <table class="data-table">
+      <thead>
+        <tr><th>Student</th><th>Reg.No</th><th>Examiner</th><th>Viva Date</th><th>Result</th><th>Remarks</th><th></th></tr>
+      </thead>
+      <tbody>
+        {% for v in vivas %}
+        <tr>
+          <td>{{ v.student_name }}</td>
+          <td class="nowrap">{{ v.reg_no }}</td>
+          <td>{{ v.examiner_name }}{% if v.examiner_affiliation %}<br><span class="hint">{{ v.examiner_affiliation }}</span>{% endif %}</td>
+          <td class="nowrap">{{ v.viva_date or '—' }}</td>
+          <td>
+            {% if v.result == 'Pass' %}<span class="pill q">Pass</span>
+            {% elif v.result == 'Fail' %}<span class="pill nq">Fail</span>
+            {% elif v.result == 'Rescheduled' %}<span class="pill warn">Rescheduled</span>
+            {% else %}<span class="pill">Pending</span>{% endif %}
+          </td>
+          <td>{{ v.remarks or '—' }}</td>
+          <td>
+            <form method="post" action="{{ url_for('dept_viva_delete', vid=v.id) }}" style="margin:0"
+                  onsubmit="return confirm('Delete this viva record?')">
+              <button type="submit" class="btn danger sm">Delete</button>
+            </form>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="empty"><p>No viva records yet.</p></div>
+  {% endif %}
+</div>
+{% endblock %}

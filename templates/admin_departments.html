@@ -1,0 +1,73 @@
+{% extends "admin_base.html" %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <h2>Departments</h2>
+    <p>Create portal logins for departments — share the email and password with them</p>
+  </div>
+</div>
+
+<div class="card section">
+  <div class="section-head">
+    <span class="section-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="20" y1="8" x2="20" y2="14"/><line x1="23" y1="11" x2="17" y2="11"/></svg></span>
+    <h3>Add Department</h3>
+  </div>
+  <form method="post">
+    <div class="form-grid">
+      <div>
+        <label class="f-label" for="name">Department Name *</label>
+        <input class="no-icon" type="text" id="name" name="name" required
+               placeholder="e.g. Department of Zoology">
+      </div>
+      <div>
+        <label class="f-label" for="email">Login Email *</label>
+        <input class="no-icon" type="email" id="email" name="email" required
+               placeholder="zoology@example.edu">
+      </div>
+      <div>
+        <label class="f-label" for="password">Password *</label>
+        <input class="no-icon" type="password" id="password" name="password" required
+               placeholder="Set a password for them">
+      </div>
+    </div>
+    <div class="row" style="margin-top:16px">
+      <button type="submit" class="btn primary">Create Department Login</button>
+    </div>
+  </form>
+  <p class="hint">They sign in at <strong>/dept</strong> on this portal with this email and password.</p>
+</div>
+
+<div class="card section">
+  <div class="section-head">
+    <span class="section-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></span>
+    <h3>Department Logins <span class="hint">({{ depts|length }})</span></h3>
+  </div>
+  {% if depts %}
+  <div class="table-scroll">
+    <table class="data-table">
+      <thead>
+        <tr><th>Department</th><th>Email</th><th>Created</th><th>Pending Uploads</th><th></th></tr>
+      </thead>
+      <tbody>
+        {% for d in depts %}
+        <tr>
+          <td><strong>{{ d.name }}</strong></td>
+          <td>{{ d.email }}</td>
+          <td class="nowrap">{{ d.created_at }}</td>
+          <td>{% if d.pending_n %}<span class="pill warn">{{ d.pending_n }} waiting</span>{% else %}<span class="hint">—</span>{% endif %}</td>
+          <td>
+            <form method="post" action="{{ url_for('admin_department_delete', did=d.id) }}" style="margin:0"
+                  onsubmit="return confirm('Delete {{ d.name }} and its uploads?')">
+              <button type="submit" class="btn danger sm">Delete</button>
+            </form>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="empty"><p>No departments yet — create the first login above.</p></div>
+  {% endif %}
+</div>
+{% endblock %}

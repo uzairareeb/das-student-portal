@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+{% block body_class %}dept-portal{% endblock %}
+{% block sidebar %}
+{% if dept %}
+<nav class="dept-nav">
+  <div class="wrap dept-nav-inner">
+    <span class="dept-brand">
+      <span class="mark"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 10L12 5 2 10l10 5 10-5z"/><path d="M6 12v5c0 1.7 2.7 3 6 3s6-1.3 6-3v-5"/><line x1="22" y1="10" x2="22" y2="16"/></svg></span>
+      {{ dept.name }}
+    </span>
+    <div class="dept-links">
+      <a href="{{ url_for('dept_dashboard') }}" class="{% if request.endpoint == 'dept_dashboard' %}active{% endif %}">Uploads</a>
+      <a href="{{ url_for('dept_viva') }}" class="{% if request.endpoint == 'dept_viva' %}active{% endif %}">Viva Tracking</a>
+      <a href="{{ url_for('dept_template') }}">Template</a>
+      <a href="{{ url_for('dept_logout') }}" class="danger-link">Logout</a>
+    </div>
+  </div>
+</nav>
+{% endif %}
+{% endblock %}
