@@ -1000,6 +1000,41 @@ def admin_department_delete(did):
         flash(f"Department '{d['name']}' and its uploads were deleted.")
     return redirect(url_for("admin_departments"))
 
+@app.route("/admin/department/<int:did>/edit", methods=["GET", "POST"])
+@admin_required
+def admin_department_edit(did):
+    """Update a department login (name/email; password only if re-entered)."""
+    db = get_db()
+    row = db.fetchone("SELECT * FROM departments WHERE id=?", (did,))
+    if not row:
+        flash("Department not found.")
+        return redirect(url_for("admin_departments"))
+    d = dict(row)
+    if request.method == "POST":
+        name = request.form.get("name", "").strip()
+        email = request.form.get("email", "").strip().lower()
+        password = request.form.get("password", "")
+        if not name or not email:
+            flash("Department name and email are required.")
+            return redirect(url_for("admin_department_edit", did=did))
+        try:
+            if password:
+                db.execute("UPDATE departments SET name=?, email=?,"
+                           " password_hash=? WHERE id=?",
+                           (name, email, generate_password_hash(password), did))
+            else:
+                db.execute("UPDATE departments SET name=?, email=? WHERE id=?",
+                           (name, email, did))
+            db.commit()
+            log_activity("admin", "department_edit", f"{name} <{email}>")
+            flash(f"Department '{name}' updated.")
+        except Exception:
+            flash("Could not update — the name or email may already exist.")
+        return redirect(url_for("admin_departments"))
+    return render_template("admin_department_edit.html", uni=UNI_NAME,
+                           title=PORTAL_TITLE, d=d)
+
+
 
 # ==================== UPLOAD REVIEW QUEUE (admin) ====================
 
@@ -1135,28 +1170,12 @@ def admin_activity():
 @app.route("/admin/reports")
 @admin_required
 def admin_reports():
-    """Meeting-ready summary: filter by session/degree/status, print it."""
-    f = request.args
-    students = query_students(f)
-    for s in students:
-        s["coe_display"] = fmt_coe(s.get("thesis_forward_coe"))
-    by_status, by_degree, by_session = {}, {}, {}
-    for s in students:
-        st = s.get("status") or "Continue"
-        by_status[st] = by_status.get(st, 0) + 1
-        dg = s.get("degree") or "—"
-        by_degree[dg] = by_degree.get(dg, 0) + 1
-        se = s.get("session") or "—"
-        by_session[se] = by_session.get(se, 0) + 1
+    """Filter the student list and export it as Excel or PDF."""
     return render_template(
         "admin_reports.html", uni=UNI_NAME, title=PORTAL_TITLE,
-        students=students, total=len(students),
-        by_status=sorted(by_status.items(), key=lambda x: -x[1]),
-        by_degree=sorted(by_degree.items(), key=lambda x: -x[1]),
-        by_session=sorted(by_session.items(), key=lambda x: -x[1]),
         status_list=STATUS_LIST, sessions=distinct_values("session"),
-        degrees=distinct_values("degree"), f=f,
-        today=datetime.now().strftime("%d %b %Y"))
+        degrees=distinct_values("degree"), genders=GENDER_OPTS,
+        folders=FOLDER_OPTS)
 
 
 @app.context_processor
@@ -1367,6 +1386,45 @@ def dept_viva_delete(vid):
                      f"viva record #{vid} removed")
         flash("Viva record deleted.")
     return redirect(url_for("dept_viva"))
+
+
+
+@app.route("/dept/viva/<int:vid>/edit", methods=["GET", "POST"])
+@dept_required
+def dept_viva_edit(vid):
+    """Edit a viva record (examiner, date, result, remarks)."""
+    dept = current_dept()
+    db = get_db()
+    row = db.fetchone(
+        "SELECT v.*, s.name AS student_name, s.reg_no FROM viva_records v"
+        " JOIN students s ON s.id=v.student_id"
+        " WHERE v.id=? AND s.department=?", (vid, dept["name"]))
+    if not row:
+        flash("Viva record not found.")
+        return redirect(url_for("dept_viva"))
+    v = dict(row)
+    if request.method == "POST":
+        examiner = request.form.get("examiner_name", "").strip()
+        affiliation = request.form.get("examiner_affiliation", "").strip()
+        viva_date = request.form.get("viva_date", "").strip()
+        result = request.form.get("result", "Pending")
+        remarks = request.form.get("remarks", "").strip()
+        if not examiner:
+            flash("Examiner name is required.")
+            return redirect(url_for("dept_viva_edit", vid=vid))
+        db.execute(
+            "UPDATE viva_records SET examiner_name=?, examiner_affiliation=?,"
+            " viva_date=?, result=?, remarks=?, updated_by=? WHERE id=?",
+            (examiner, affiliation, viva_date or None, result, remarks,
+             dept["name"], vid))
+        db.commit()
+        log_activity(f"dept:{dept['name']}", "viva_edit",
+                     f"record #{vid} ({v['student_name']}) updated")
+        flash("Viva record updated.")
+        return redirect(url_for("dept_viva"))
+    return render_template("dept_viva_edit.html", uni=UNI_NAME,
+                           title=PORTAL_TITLE, dept=dept, v=v,
+                           results=VIVA_RESULTS)
 
 
 @app.route("/admin/import")
