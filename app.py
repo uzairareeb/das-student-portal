@@ -1846,6 +1846,35 @@ def student_dashboard():
                            timeline=timeline)
 
 
+@app.route("/student/record")
+@student_required
+def student_record():
+    """Dedicated academic record page."""
+    s = current_student()
+    if not s:
+        session.pop("student_id", None)
+        return redirect(url_for("student_login"))
+    s["coe_display"] = fmt_coe(s.get("thesis_forward_coe"))
+    return render_template("student_record.html", uni=UNI_NAME,
+                           title=PORTAL_TITLE, s=s)
+
+
+@app.route("/student/viva")
+@student_required
+def student_viva():
+    """Dedicated viva details page — always visible, with an empty state."""
+    s = current_student()
+    if not s:
+        session.pop("student_id", None)
+        return redirect(url_for("student_login"))
+    vivas = [dict(r) for r in get_db().fetchall(
+        "SELECT examiner_name, examiner_affiliation, viva_date, result,"
+        " remarks FROM viva_records WHERE student_id=? ORDER BY id DESC",
+        (s["id"],))]
+    return render_template("student_viva.html", uni=UNI_NAME,
+                           title=PORTAL_TITLE, s=s, vivas=vivas)
+
+
 @app.route("/student/change-password", methods=["POST"])
 @student_required
 def student_change_password():
