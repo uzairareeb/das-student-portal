@@ -506,6 +506,50 @@ def admin_logout():
 @app.route("/admin/dashboard")
 @admin_required
 def admin_dashboard():
+    """Overview only: stats, charts, recent activity. The full student
+    list lives on its own dedicated page (/admin/students)."""
+    db = get_db()
+    total = count_students({})
+    stat_rows = db.fetchall(
+        "SELECT status, COUNT(*) AS n FROM students GROUP BY status")
+    stats = {}
+    for r in stat_rows:
+        r = dict(r)
+        stats[r.get("status") or "Continue"] = r["n"]
+    deg_rows = db.fetchall(
+        "SELECT degree, COUNT(*) AS n FROM students GROUP BY degree"
+        " ORDER BY n DESC LIMIT 8")
+    degrees = [(dict(r).get("degree") or "—", dict(r)["n"]) for r in deg_rows]
+    ses_rows = db.fetchall(
+        "SELECT session, COUNT(*) AS n FROM students GROUP BY session"
+        " ORDER BY n DESC LIMIT 8")
+    sessions = [(dict(r).get("session") or "—", dict(r)["n"]) for r in ses_rows]
+    doc_total = db.fetchone("SELECT COUNT(*) AS n FROM documents")
+    doc_total = (doc_total["n"] if isinstance(doc_total, dict)
+                 else doc_total[0]) if doc_total else 0
+    with_docs = db.fetchone(
+        "SELECT COUNT(DISTINCT student_id) AS n FROM documents")
+    with_docs = (with_docs["n"] if isinstance(with_docs, dict)
+                 else with_docs[0]) if with_docs else 0
+    recent = db.fetchall(
+        "SELECT d.doc_label, d.file_name, d.uploaded_at, d.uploaded_by,"
+        " s.name AS student_name, s.reg_no, d.id AS doc_id"
+        " FROM documents d JOIN students s ON s.id=d.student_id"
+        " ORDER BY d.id DESC LIMIT 5")
+    recent = [dict(r) for r in recent]
+    return render_template(
+        "admin_dashboard.html", uni=UNI_NAME, title=PORTAL_TITLE,
+        total=total, stats=stats, status_list=STATUS_LIST,
+        status_counts=[stats.get(st, 0) for st in STATUS_LIST],
+        degrees=degrees, sessions=sessions,
+        doc_total=doc_total, with_docs=with_docs, recent=recent)
+
+
+@app.route("/admin/students")
+@admin_required
+def admin_students():
+    """Dedicated full student list page: filters, table, pagination,
+    bulk actions, Excel/PDF export."""
     try:
         page = max(int(request.args.get("page", 1) or 1), 1)
     except (TypeError, ValueError):
@@ -518,31 +562,28 @@ def admin_dashboard():
     for s in students:
         s["coe_display"] = fmt_coe(s.get("thesis_forward_coe"))
     total = count_students({})
-    stat_rows = get_db().fetchall(
-        "SELECT status, COUNT(*) AS n FROM students GROUP BY status")
-    stats = {}
-    for r in stat_rows:
-        r = dict(r)
-        stats[r.get("status") or "Continue"] = r["n"]
     base_args = {k: v for k, v in request.args.items() if k != "page"}
     export_url = url_for("admin_export")
+    export_pdf_url = url_for("admin_export_pdf")
     if base_args:
-        export_url += "?" + urlencode(base_args)
+        qs = "?" + urlencode(base_args)
+        export_url += qs
+        export_pdf_url += qs
 
     def page_url(p):
         a = dict(base_args)
         a["page"] = p
-        return url_for("admin_dashboard") + "?" + urlencode(a)
+        return url_for("admin_students") + "?" + urlencode(a)
 
     return render_template(
-        "admin_dashboard.html", uni=UNI_NAME, title=PORTAL_TITLE,
+        "admin_students.html", uni=UNI_NAME, title=PORTAL_TITLE,
         students=students, shown=len(students), total=total,
         filtered_total=filtered_total, page=page, pages=pages,
         page_url=page_url, per_page=PER_PAGE,
-        stats=stats, status_list=STATUS_LIST,
         sessions=distinct_values("session"), degrees=distinct_values("degree"),
-        genders=GENDER_OPTS, folders=FOLDER_OPTS,
-        f=request.args, export_url=export_url)
+        genders=GENDER_OPTS, folders=FOLDER_OPTS, status_list=STATUS_LIST,
+        f=request.args, export_url=export_url,
+        export_pdf_url=export_pdf_url)
 
 
 @app.route("/admin/export")
@@ -582,6 +623,89 @@ def admin_export():
                              "spreadsheetml.sheet")
     resp.headers["Content-Disposition"] = \
         "attachment; filename=das_students_export.xlsx"
+    return resp
+
+
+@app.route("/admin/export-pdf")
+@admin_required
+def admin_export_pdf():
+    """Well-organized landscape PDF of the (filtered) student list."""
+    from reportlab.lib import colors
+    from reportlab.lib.pagesizes import A4, landscape
+    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+    from reportlab.lib.units import mm
+    from reportlab.platypus import (SimpleDocTemplate, Table, TableStyle,
+                                    Paragraph, Spacer)
+    students = query_students(request.args)
+    buf = io.BytesIO()
+    doc = SimpleDocTemplate(
+        buf, pagesize=landscape(A4),
+        leftMargin=10 * mm, rightMargin=10 * mm,
+        topMargin=12 * mm, bottomMargin=12 * mm,
+        title="DAS Students Export",
+        author="Advanced Studies Office")
+    styles = getSampleStyleSheet()
+    title_style = ParagraphStyle("Title2", parent=styles["Title"],
+                                 fontSize=16, textColor=colors.HexColor("#2d3290"),
+                                 spaceAfter=4)
+    sub_style = ParagraphStyle("Sub", parent=styles["Normal"], fontSize=9,
+                               textColor=colors.HexColor("#667085"), spaceAfter=10)
+    cell = ParagraphStyle("cell", parent=styles["Normal"], fontSize=7,
+                          leading=8.5)
+    head_cell = ParagraphStyle("hcell", parent=styles["Normal"], fontSize=7,
+                               leading=8.5, textColor=colors.white,
+                               fontName="Helvetica-Bold")
+    story = [Paragraph("Student Records — Advanced Studies Office", title_style),
+             Paragraph(f"{len(students)} student(s) &middot; generated "
+                       f"{datetime.now().strftime('%d %b %Y, %H:%M')}", sub_style)]
+    headers = ["Name", "Reg.No", "Gender", "Degree", "Session", "Folder/File",
+               "Comments", "Synopsis", "Semi-Final", "Final Thesis",
+               "COE Date", "Status"]
+    widths = [32 * mm, 26 * mm, 14 * mm, 34 * mm, 20 * mm, 22 * mm,
+              34 * mm, 18 * mm, 18 * mm, 18 * mm, 20 * mm, 21 * mm]
+    data = [[Paragraph(h, head_cell) for h in headers]]
+    for s in students:
+        data.append([
+            Paragraph(s.get("name") or "—", cell),
+            Paragraph(s.get("reg_no") or "—", cell),
+            Paragraph(s.get("gender") or "—", cell),
+            Paragraph(s.get("degree") or "—", cell),
+            Paragraph(s.get("session") or "—", cell),
+            Paragraph(s.get("folder_file") or "—", cell),
+            Paragraph(s.get("comments_missing") or "—", cell),
+            Paragraph(s.get("synopsis") or "—", cell),
+            Paragraph(s.get("semi_final_thesis") or "—", cell),
+            Paragraph(s.get("final_thesis") or "—", cell),
+            Paragraph(fmt_coe(s.get("thesis_forward_coe")), cell),
+            Paragraph(s.get("status") or "—", cell),
+        ])
+    tbl = Table(data, colWidths=widths, repeatRows=1)
+    tbl.setStyle(TableStyle([
+        ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#2d3290")),
+        ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
+        ("FONTSIZE", (0, 0), (-1, -1), 7),
+        ("ALIGN", (0, 0), (-1, 0), "CENTER"),
+        ("VALIGN", (0, 0), (-1, -1), "TOP"),
+        ("GRID", (0, 0), (-1, -1), 0.4, colors.HexColor("#d5d9e8")),
+        ("ROWBACKGROUNDS", (0, 1), (-1, -1),
+         [colors.white, colors.HexColor("#f4f5fb")]),
+        ("TOPPADDING", (0, 0), (-1, -1), 3),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 3),
+        ("LEFTPADDING", (0, 0), (-1, -1), 4),
+        ("RIGHTPADDING", (0, 0), (-1, -1), 4),
+    ]))
+    story.append(tbl)
+    story.append(Spacer(1, 8))
+    story.append(Paragraph(
+        f"Page <page> &middot; Advanced Studies Office — Student Data Management System",
+        ParagraphStyle("foot", parent=styles["Normal"], fontSize=7,
+                       textColor=colors.HexColor("#667085"),
+                       alignment=1)))
+    doc.build(story)
+    buf.seek(0)
+    resp = Response(buf.getvalue(), mimetype="application/pdf")
+    resp.headers["Content-Disposition"] = \
+        "attachment; filename=das_students_export.pdf"
     return resp
 
 
@@ -779,7 +903,7 @@ def admin_import_upload():
     if first_error and skipped:
         msg += f" (first error: {first_error})"
     flash(msg)
-    return redirect(url_for("admin_dashboard"))
+    return redirect(url_for("admin_students"))
 
 
 def get_student(sid):
@@ -910,14 +1034,14 @@ def admin_students_delete_selected():
     ids = [int(x) for x in request.form.getlist("sel") if x.isdigit()]
     if not ids:
         flash("No students selected.")
-        return redirect(url_for("admin_dashboard"))
+        return redirect(url_for("admin_students"))
     db = get_db()
     ph = ", ".join(["?"] * len(ids))
     db.execute(f"DELETE FROM documents WHERE student_id IN ({ph})", ids)
     db.execute(f"DELETE FROM students WHERE id IN ({ph})", ids)
     db.commit()
     flash(f"Deleted {len(ids)} student(s) and their documents.")
-    return redirect(url_for("admin_dashboard"))
+    return redirect(url_for("admin_students"))
 
 
 @app.route("/admin/students/delete-all", methods=["POST"])
@@ -928,7 +1052,7 @@ def admin_students_delete_all():
     db.execute("DELETE FROM students")
     db.commit()
     flash("All student data has been deleted.")
-    return redirect(url_for("admin_dashboard"))
+    return redirect(url_for("admin_students"))
 
 
 @app.route("/admin/student/<int:sid>/delete", methods=["POST"])
@@ -939,7 +1063,7 @@ def admin_student_delete(sid):
     db.execute("DELETE FROM students WHERE id=?", (sid,))
     db.commit()
     flash("Student and their documents deleted.")
-    return redirect(url_for("admin_dashboard"))
+    return redirect(url_for("admin_students"))
 
 
 ADMIN_DOC_EXTS = {"pdf", "doc", "docx", "jpg", "jpeg", "png"}
@@ -972,7 +1096,7 @@ def admin_doc_delete(doc_id):
     get_db().commit()
     flash("Document deleted.")
     return redirect(url_for("admin_student_profile", sid=sid)) if sid \
-        else redirect(url_for("admin_dashboard"))
+        else redirect(url_for("admin_students"))
 
 
 # ---------------- student portal ----------------
