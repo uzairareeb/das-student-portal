@@ -1,16 +1,42 @@
-{% extends "base.html" %}
+{% extends "admin_base.html" %}
 {% block content %}
-<div class="page-head">
-  <div>
-    <h2>{{ s.name }}</h2>
-    <p>{{ s.reg_no }} &middot; {{ s.degree or '—' }} &middot; Session {{ s.session or '—' }}</p>
+{% set parts = s.name.split(' ') %}
+<div class="sp-hero">
+  <div class="sp-hero-top">
+    <span class="sp-avatar">{{ parts[0][0] }}{% if parts|length > 1 %}{{ parts[1][0] }}{% endif %}</span>
+    <div>
+      <h2>{{ s.name }}</h2>
+      <p class="sp-sub">{{ s.reg_no }} &middot; {{ s.degree or '—' }} &middot; Session {{ s.session or '—' }}</p>
+      {% if s.status in ['Continue', 'Viva Done', 'Pass Out'] %}<span class="pill q">{{ s.status }}</span>
+      {% elif s.status in ['Viva Pending', 'Defense Pending'] %}<span class="pill warn">{{ s.status }}</span>
+      {% else %}<span class="pill nq">{{ s.status }}</span>{% endif %}
+    </div>
+    <div class="sp-actions">
+      <a class="btn light sm" href="{{ url_for('admin_dashboard') }}">&larr; Back to List</a>
+      <form method="post" action="{{ url_for('admin_student_delete', sid=s.id) }}" style="margin:0"
+            onsubmit="return confirm('Delete {{ s.name }} and ALL their documents? This cannot be undone.')">
+        <button type="submit" class="btn outline-w sm">Delete Student</button>
+      </form>
+    </div>
   </div>
-  <div class="row">
-    <a class="btn ghost sm" href="{{ url_for('admin_dashboard') }}">&larr; Back to List</a>
-    <form method="post" action="{{ url_for('admin_student_delete', sid=s.id) }}" style="margin:0"
-          onsubmit="return confirm('Delete {{ s.name }} and ALL their documents? This cannot be undone.')">
-      <button type="submit" class="btn danger sm">Delete Student</button>
-    </form>
+</div>
+
+<div class="sp-stats">
+  <div class="sp-stat">
+    <div class="k">Documents</div>
+    <div class="v">{{ docs|length }} on record</div>
+  </div>
+  <div class="sp-stat">
+    <div class="k">Synopsis</div>
+    <div class="v">{% if s.synopsis == 'Received' %}<span class="pill q">Received</span>{% else %}<span class="pill nq">Not Received</span>{% endif %}</div>
+  </div>
+  <div class="sp-stat">
+    <div class="k">Final Thesis</div>
+    <div class="v">{% if s.final_thesis == 'Received' %}<span class="pill q">Received</span>{% else %}<span class="pill nq">Not Received</span>{% endif %}</div>
+  </div>
+  <div class="sp-stat">
+    <div class="k">Folder / File</div>
+    <div class="v">{% if s.folder_file == 'Completed' %}<span class="pill q">Completed</span>{% else %}<span class="pill nq">Not Completed</span>{% endif %}</div>
   </div>
 </div>
 
@@ -19,31 +45,15 @@
     <span class="section-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></span>
     <h3>Complete Record</h3>
   </div>
-  <div class="profile-grid">
-    <div>CNIC</div><div>{{ s.cnic }}</div>
-    <div>Name</div><div>{{ s.name }}</div>
-    <div>Father Name</div><div>{{ s.father_name or '—' }}</div>
-    <div>Registration No.</div><div>{{ s.reg_no }}</div>
-    <div>Gender</div><div>{{ s.gender or '—' }}</div>
-    <div>Degree</div><div>{{ s.degree or '—' }}</div>
-    <div>Session</div><div>{{ s.session or '—' }}</div>
-    <div>Folder/File (With GS-Forms)</div>
-    <div>{% if s.folder_file == 'Completed' %}<span class="pill q">Completed</span>{% else %}<span class="pill nq">Not Completed</span>{% endif %}</div>
-    <div>Comments (Missing)</div><div>{{ s.comments_missing or '—' }}</div>
-    <div>Synopsis</div>
-    <div>{% if s.synopsis == 'Received' %}<span class="pill q">Received</span>{% else %}<span class="pill nq">Not Received</span>{% endif %}</div>
-    <div>Semi-Final Thesis</div>
-    <div>{% if s.semi_final_thesis == 'Received' %}<span class="pill q">Received</span>{% else %}<span class="pill nq">Not Received</span>{% endif %}</div>
-    <div>Final Thesis</div>
-    <div>{% if s.final_thesis == 'Received' %}<span class="pill q">Received</span>{% else %}<span class="pill nq">Not Received</span>{% endif %}</div>
-    <div>Thesis Forward (COE)</div><div>{{ s.coe_display }}</div>
-    <div>Status</div>
-    <div>
-      {% if s.status in ['Continue', 'Viva Done', 'Pass Out'] %}<span class="pill q">{{ s.status }}</span>
-      {% elif s.status in ['Viva Pending', 'Defense Pending'] %}<span class="pill warn">{{ s.status }}</span>
-      {% else %}<span class="pill nq">{{ s.status }}</span>{% endif %}
-    </div>
-  </div>
+  <dl class="record-list">
+    <div><dt>CNIC</dt><dd>{{ s.cnic or '—' }}</dd></div>
+    <div><dt>Father Name</dt><dd>{{ s.father_name or '—' }}</dd></div>
+    <div><dt>Registration No.</dt><dd>{{ s.reg_no }}</dd></div>
+    <div><dt>Gender</dt><dd>{{ s.gender or '—' }}</dd></div>
+    <div><dt>Comments (Missing)</dt><dd>{{ s.comments_missing or '—' }}</dd></div>
+    <div><dt>Semi-Final Thesis</dt><dd>{% if s.semi_final_thesis == 'Received' %}<span class="pill q">Received</span>{% else %}<span class="pill nq">Not Received</span>{% endif %}</dd></div>
+    <div><dt>Thesis Forward (COE)</dt><dd>{{ s.coe_display }}</dd></div>
+  </dl>
 </div>
 
 <div class="card section">
@@ -66,8 +76,8 @@
         <input class="no-icon" type="text" id="reg_no" name="reg_no" value="{{ s.reg_no }}" required>
       </div>
       <div>
-        <label class="f-label" for="cnic">CNIC *</label>
-        <input class="no-icon" type="text" id="cnic" name="cnic" value="{{ s.cnic }}" required>
+        <label class="f-label" for="cnic">CNIC</label>
+        <input class="no-icon" type="text" id="cnic" name="cnic" value="{{ s.cnic or '' }}">
       </div>
       <div>
         <label class="f-label" for="gender">Gender</label>

@@ -9,7 +9,9 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
 </head>
-<body>
+<body class="{% block body_class %}{% endblock %}">
+  {% block sidebar %}{% endblock %}
+  <div class="page-shell">
   <header class="topbar">
     <div class="wrap">
       <div class="brand">
@@ -30,5 +32,7 @@
   <footer class="site-foot">
     <div class="wrap">&copy; 2026 Advanced Studies Office — Student Data Management System</div>
   </footer>
+  </div>
+  {% block page_scripts %}{% endblock %}
 </body>
 </html>

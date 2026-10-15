@@ -1,11 +1,10 @@
-{% extends "base.html" %}
+{% extends "admin_base.html" %}
 {% block content %}
 <div class="page-head">
   <div>
     <h2>Import Students</h2>
-    <p>Upload an Excel (.xlsx) file. Existing Registration Nos. are updated, new ones are added.</p>
+    <p>Upload an Excel (.xlsx) file. Every row is added as its own record — exactly as in the file.</p>
   </div>
-  <a class="btn ghost sm" href="{{ url_for('admin_dashboard') }}">&larr; Back to List</a>
 </div>
 
 <div class="card section">
@@ -46,13 +45,13 @@
     <h3>Import Rules</h3>
   </div>
   <ul class="hint" style="margin:0;padding-left:20px">
-    <li><strong>Required columns:</strong> Name, Registration No., CNIC.</li>
+    <li><strong>Required columns:</strong> Name, Registration No.</li>
     <li><strong>Expected columns:</strong> CNIC, Name, Father Name, Registration No., Gender, Degree, Session, Folder/File (With GS-Forms), Comments (Missing), Synopsis, Semi-Final Thesis, Final Thesis, Thesis Forward (COE), Status.</li>
     <li><strong>Status</strong> must be one of: {{ status_list|join(', ') }}.</li>
     <li><strong>Folder/File:</strong> Completed / Not Completed. <strong>Synopsis / Semi-Final / Final Thesis:</strong> Received / Not Received.</li>
     <li><strong>Thesis Forward (COE):</strong> a date (e.g. 10-May-2026 or 2026-05-10).</li>
-    <li>New students get a portal password automatically: <strong>their CNIC digits</strong>.</li>
-    <li>Rows missing Name / Reg.No / CNIC are skipped and reported.</li>
+    <li>Every row is imported <strong>as-is</strong> — duplicate Registration Nos. or CNICs each become their own record. Only fully blank rows are skipped.</li>
+    <li>New students get a portal password automatically: <strong>their CNIC digits</strong> (used on first login).</li>
   </ul>
 </div>
 {% endblock %}
