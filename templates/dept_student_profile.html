@@ -1,17 +1,45 @@
 {% extends "dept_base.html" %}
 {% block content %}
-<div class="page-head">
-  <div>
-    <h2>{{ s.name }}</h2>
-    <p>{{ s.reg_no }} &middot; {{ s.degree or '—' }} &middot; Session {{ s.session or '—' }}</p>
+{% set parts = s.name.split(' ') %}
+<div class="sp-hero">
+  <div class="sp-hero-top">
+    <span class="sp-avatar">{{ parts[0][0] }}{% if parts|length > 1 %}{{ parts[1][0] }}{% endif %}</span>
+    <div>
+      <h2>{{ s.name }}</h2>
+      <p class="sp-sub">{{ s.reg_no }} &middot; {{ s.degree or '—' }} &middot; Session {{ s.session or '—' }}{% if s.department %} &middot; {{ s.department }}{% endif %}</p>
+      {% if s.status in ['Continue', 'Viva Done', 'Pass Out'] %}<span class="pill q">{{ s.status }}</span>
+      {% elif s.status in ['Viva Pending', 'Defense Pending'] %}<span class="pill warn">{{ s.status }}</span>
+      {% else %}<span class="pill nq">{{ s.status }}</span>{% endif %}
+    </div>
+    <div class="sp-actions">
+      <a class="btn outline-w sm" href="{{ url_for('dept_students') }}">&larr; Back to My Students</a>
+    </div>
   </div>
-  <a class="btn ghost sm" href="{{ url_for('dept_students') }}">&larr; Back to My Students</a>
+</div>
+
+<div class="sp-stats">
+  <div class="sp-stat">
+    <div class="k">Synopsis</div>
+    <div class="v">{% if s.synopsis == 'Received' %}<span class="pill q">Received</span>{% else %}<span class="pill nq">Not Received</span>{% endif %}</div>
+  </div>
+  <div class="sp-stat">
+    <div class="k">Semi-Final Thesis</div>
+    <div class="v">{% if s.semi_final_thesis == 'Received' %}<span class="pill q">Received</span>{% else %}<span class="pill nq">Not Received</span>{% endif %}</div>
+  </div>
+  <div class="sp-stat">
+    <div class="k">Final Thesis</div>
+    <div class="v">{% if s.final_thesis == 'Received' %}<span class="pill q">Received</span>{% else %}<span class="pill nq">Not Received</span>{% endif %}</div>
+  </div>
+  <div class="sp-stat">
+    <div class="k">Folder / File</div>
+    <div class="v">{% if s.folder_file == 'Completed' %}<span class="pill q">Completed</span>{% else %}<span class="pill nq">Not Completed</span>{% endif %}</div>
+  </div>
 </div>
 
 <div class="card section">
   <div class="section-head">
     <span class="section-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></span>
-    <h3>Student Details <span class="hint">(as uploaded + DAS office updates)</span></h3>
+    <h3>Personal &amp; Academic Details</h3>
   </div>
   <dl class="record-list">
     <div><dt>Name</dt><dd>{{ s.name }}</dd></div>
@@ -21,15 +49,13 @@
     <div><dt>Gender</dt><dd>{{ s.gender or '—' }}</dd></div>
     <div><dt>Degree</dt><dd>{{ s.degree or '—' }}</dd></div>
     <div><dt>Session</dt><dd>{{ s.session or '—' }}</dd></div>
+    <div><dt>Department</dt><dd>{{ s.department or '—' }}</dd></div>
     <div><dt>Status</dt><dd>{{ s.status or '—' }}</dd></div>
-    <div><dt>Synopsis</dt><dd>{% if s.synopsis == 'Received' %}<span class="pill q">Received</span>{% else %}<span class="pill nq">Not Received</span>{% endif %}</dd></div>
-    <div><dt>Semi-Final Thesis</dt><dd>{% if s.semi_final_thesis == 'Received' %}<span class="pill q">Received</span>{% else %}<span class="pill nq">Not Received</span>{% endif %}</dd></div>
-    <div><dt>Final Thesis</dt><dd>{% if s.final_thesis == 'Received' %}<span class="pill q">Received</span>{% else %}<span class="pill nq">Not Received</span>{% endif %}</dd></div>
-    <div><dt>Folder / File</dt><dd>{% if s.folder_file == 'Completed' %}<span class="pill q">Completed</span>{% else %}<span class="pill nq">Not Completed</span>{% endif %}</dd></div>
     <div><dt>Comments (Missing)</dt><dd>{{ s.comments_missing or '—' }}</dd></div>
     <div><dt>Thesis Forward (COE)</dt><dd>{{ s.coe_display }}</dd></div>
     {% if s.updated_at %}<div><dt>Last Updated by DAS</dt><dd>{{ s.updated_at }}</dd></div>{% endif %}
   </dl>
+  <p class="hint">This record is maintained by the DAS office and updates automatically here.</p>
 </div>
 
 {% if vivas %}
@@ -56,7 +82,7 @@
 {% if docs %}
 <div class="card section">
   <div class="section-head">
-    <span class="section-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg></span>
+    <span class="section-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg></span>
     <h3>Documents <span class="hint">({{ docs|length }})</span></h3>
   </div>
   <div class="doc-list">
