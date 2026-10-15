@@ -1,0 +1,45 @@
+{% extends "dept_base.html" %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <h2>Edit Viva Record</h2>
+    <p>{{ v.student_name }} ({{ v.reg_no }})</p>
+  </div>
+  <a class="btn ghost sm" href="{{ url_for('dept_viva') }}">&larr; Back to Viva Tracking</a>
+</div>
+
+<div class="card section">
+  <form method="post">
+    <div class="form-grid">
+      <div>
+        <label class="f-label" for="examiner_name">Examiner Name *</label>
+        <input class="no-icon" type="text" id="examiner_name" name="examiner_name" required
+               value="{{ v.examiner_name }}">
+      </div>
+      <div>
+        <label class="f-label" for="examiner_affiliation">Examiner Affiliation</label>
+        <input class="no-icon" type="text" id="examiner_affiliation" name="examiner_affiliation"
+               value="{{ v.examiner_affiliation or '' }}">
+      </div>
+      <div>
+        <label class="f-label" for="viva_date">Viva Date</label>
+        <input class="no-icon" type="date" id="viva_date" name="viva_date" value="{{ v.viva_date or '' }}">
+      </div>
+      <div>
+        <label class="f-label" for="result">Result</label>
+        <select class="no-icon" id="result" name="result">
+          {% for r in results %}<option value="{{ r }}" {% if v.result == r %}selected{% endif %}>{{ r }}</option>{% endfor %}
+        </select>
+      </div>
+      <div class="full">
+        <label class="f-label" for="remarks">Remarks</label>
+        <input class="no-icon" type="text" id="remarks" name="remarks" value="{{ v.remarks or '' }}">
+      </div>
+    </div>
+    <div class="row" style="margin-top:16px">
+      <button type="submit" class="btn primary">Save Changes</button>
+      <a class="btn ghost" href="{{ url_for('dept_viva') }}">Cancel</a>
+    </div>
+  </form>
+</div>
+{% endblock %}

@@ -1,106 +1,72 @@
 {% extends "admin_base.html" %}
+{% block container_extra %} wide{% endblock %}
 {% block content %}
-<div class="page-head no-print">
+<div class="page-head">
   <div>
     <h2>Reports</h2>
-    <p>Meeting-ready summary — filter, then print</p>
+    <p>Filter the student list, then download it as Excel or PDF</p>
   </div>
-  <button class="btn primary sm" onclick="window.print()">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
-    Print Report
-  </button>
 </div>
 
-<div class="card section no-print">
-  <form method="get" action="{{ url_for('admin_reports') }}">
-    <div class="filter-grid">
+<div class="card section">
+  <div class="section-head">
+    <span class="section-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg></span>
+    <h3>Filters</h3>
+  </div>
+  <form method="get" id="reportForm">
+    <div class="filters">
+      <div class="full">
+        <label class="f-label" for="q">Search</label>
+        <input class="no-icon" type="text" id="q" name="q" placeholder="Name, Reg.No or CNIC">
+      </div>
       <div>
         <label class="f-label" for="session">Session</label>
         <select class="no-icon" id="session" name="session">
           <option value="">All</option>
-          {% for v in sessions %}<option value="{{ v }}" {% if f.get('session')==v %}selected{% endif %}>{{ v }}</option>{% endfor %}
+          {% for v in sessions %}<option value="{{ v }}">{{ v }}</option>{% endfor %}
         </select>
       </div>
       <div>
         <label class="f-label" for="degree">Degree</label>
         <select class="no-icon" id="degree" name="degree">
           <option value="">All</option>
-          {% for v in degrees %}<option value="{{ v }}" {% if f.get('degree')==v %}selected{% endif %}>{{ v }}</option>{% endfor %}
+          {% for v in degrees %}<option value="{{ v }}">{{ v }}</option>{% endfor %}
         </select>
       </div>
       <div>
         <label class="f-label" for="status">Status</label>
         <select class="no-icon" id="status" name="status">
           <option value="">All</option>
-          {% for v in status_list %}<option value="{{ v }}" {% if f.get('status')==v %}selected{% endif %}>{{ v }}</option>{% endfor %}
+          {% for v in status_list %}<option value="{{ v }}">{{ v }}</option>{% endfor %}
+        </select>
+      </div>
+      <div>
+        <label class="f-label" for="gender">Gender</label>
+        <select class="no-icon" id="gender" name="gender">
+          <option value="">All</option>
+          {% for v in genders %}<option value="{{ v }}">{{ v }}</option>{% endfor %}
+        </select>
+      </div>
+      <div>
+        <label class="f-label" for="folder_file">Folder/File</label>
+        <select class="no-icon" id="folder_file" name="folder_file">
+          <option value="">All</option>
+          {% for v in folders %}<option value="{{ v }}">{{ v }}</option>{% endfor %}
         </select>
       </div>
     </div>
-    <div class="row" style="margin-top:14px">
-      <button type="submit" class="btn primary sm">Generate Report</button>
-      <a class="btn ghost sm" href="{{ url_for('admin_reports') }}">Clear</a>
+    <div class="row" style="margin-top:18px">
+      <button type="submit" class="btn primary" formaction="{{ url_for('admin_export') }}">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+        Export Excel
+      </button>
+      <button type="submit" class="btn primary" formaction="{{ url_for('admin_export_pdf') }}">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+        Export PDF
+      </button>
+      <button type="reset" class="btn ghost">Clear</button>
     </div>
   </form>
-</div>
-
-<div class="report-doc">
-  <div class="report-head">
-    <h2>{{ uni }}</h2>
-    <p>{{ title }} — Student Summary Report</p>
-    <p class="hint">Generated {{ today }}
-      {% if f.get('session') %} &middot; Session: {{ f.get('session') }}{% endif %}
-      {% if f.get('degree') %} &middot; Degree: {{ f.get('degree') }}{% endif %}
-      {% if f.get('status') %} &middot; Status: {{ f.get('status') }}{% endif %}
-    </p>
-  </div>
-
-  <div class="report-stats">
-    <div class="report-stat"><div class="n">{{ total }}</div><div class="t">Total students</div></div>
-    {% for label, n in by_status %}
-    <div class="report-stat"><div class="n">{{ n }}</div><div class="t">{{ label }}</div></div>
-    {% endfor %}
-  </div>
-
-  <div class="report-cols">
-    <div>
-      <h4>By Degree</h4>
-      <table class="data-table compact">
-        <tbody>
-          {% for label, n in by_degree %}
-          <tr><td>{{ label }}</td><td class="num">{{ n }}</td></tr>
-          {% endfor %}
-        </tbody>
-      </table>
-    </div>
-    <div>
-      <h4>By Session</h4>
-      <table class="data-table compact">
-        <tbody>
-          {% for label, n in by_session %}
-          <tr><td>{{ label }}</td><td class="num">{{ n }}</td></tr>
-          {% endfor %}
-        </tbody>
-      </table>
-    </div>
-  </div>
-
-  <h4>Student List ({{ total }})</h4>
-  <table class="data-table compact">
-    <thead>
-      <tr><th>#</th><th>Name</th><th>Reg.No</th><th>Degree</th><th>Session</th><th>Status</th></tr>
-    </thead>
-    <tbody>
-      {% for s in students %}
-      <tr>
-        <td>{{ loop.index }}</td>
-        <td>{{ s.name }}</td>
-        <td class="nowrap">{{ s.reg_no }}</td>
-        <td>{{ s.degree or '—' }}</td>
-        <td>{{ s.session or '—' }}</td>
-        <td>{{ s.status }}</td>
-      </tr>
-      {% endfor %}
-    </tbody>
-  </table>
+  <p class="hint">The Excel and PDF exports respect the filters above — leave everything blank for the complete list.</p>
 </div>
 {% endblock %}

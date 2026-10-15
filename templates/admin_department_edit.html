@@ -1,0 +1,35 @@
+{% extends "admin_base.html" %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <h2>Edit Department</h2>
+    <p>Update the login for {{ d.name }}</p>
+  </div>
+  <a class="btn ghost sm" href="{{ url_for('admin_departments') }}">&larr; Back to Departments</a>
+</div>
+
+<div class="card section">
+  <form method="post">
+    <div class="form-grid">
+      <div>
+        <label class="f-label" for="name">Department Name *</label>
+        <input class="no-icon" type="text" id="name" name="name" required value="{{ d.name }}">
+      </div>
+      <div>
+        <label class="f-label" for="email">Login Email *</label>
+        <input class="no-icon" type="email" id="email" name="email" required value="{{ d.email }}">
+      </div>
+      <div>
+        <label class="f-label" for="password">New Password</label>
+        <input class="no-icon" type="password" id="password" name="password"
+               placeholder="Leave blank to keep the current password">
+      </div>
+    </div>
+    <div class="row" style="margin-top:16px">
+      <button type="submit" class="btn primary">Save Changes</button>
+      <a class="btn ghost" href="{{ url_for('admin_departments') }}">Cancel</a>
+    </div>
+  </form>
+  <p class="hint">Leave the password blank if you don't want to change it.</p>
+</div>
+{% endblock %}

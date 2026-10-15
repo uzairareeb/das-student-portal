@@ -57,10 +57,13 @@
           <td class="nowrap">{{ d.created_at }}</td>
           <td>{% if d.pending_n %}<span class="pill warn">{{ d.pending_n }} waiting</span>{% else %}<span class="hint">—</span>{% endif %}</td>
           <td>
-            <form method="post" action="{{ url_for('admin_department_delete', did=d.id) }}" style="margin:0"
-                  onsubmit="return confirm('Delete {{ d.name }} and its uploads?')">
-              <button type="submit" class="btn danger sm">Delete</button>
-            </form>
+            <div class="row" style="gap:8px">
+              <a class="btn ghost sm" href="{{ url_for('admin_department_edit', did=d.id) }}">Edit</a>
+              <form method="post" action="{{ url_for('admin_department_delete', did=d.id) }}" style="margin:0"
+                    onsubmit="return confirm('Delete {{ d.name }} and its uploads?')">
+                <button type="submit" class="btn danger sm">Delete</button>
+              </form>
+            </div>
           </td>
         </tr>
         {% endfor %}
