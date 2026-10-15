@@ -1,0 +1,42 @@
+{% extends "dept_base.html" %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <h2>My Students</h2>
+    <p>{{ students|length }} approved student record(s) from {{ dept.name }} — read-only</p>
+  </div>
+</div>
+
+<div class="card section">
+  {% if students %}
+  <div class="table-scroll">
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>Name</th><th>Reg.No</th><th>CNIC</th><th>Gender</th><th>Degree</th>
+          <th>Session</th><th>Folder/File</th><th>Synopsis</th><th>Final Thesis</th><th>Status</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for s in students %}
+        <tr>
+          <td><strong>{{ s.name }}</strong></td>
+          <td class="nowrap">{{ s.reg_no }}</td>
+          <td class="nowrap">{{ s.cnic or '—' }}</td>
+          <td>{{ s.gender or '—' }}</td>
+          <td>{{ s.degree or '—' }}</td>
+          <td>{{ s.session or '—' }}</td>
+          <td>{% if s.folder_file == 'Completed' %}<span class="pill q">Completed</span>{% else %}<span class="pill nq">Not Completed</span>{% endif %}</td>
+          <td>{% if s.synopsis == 'Received' %}<span class="pill q">Received</span>{% else %}<span class="pill nq">Not Received</span>{% endif %}</td>
+          <td>{% if s.final_thesis == 'Received' %}<span class="pill q">Received</span>{% else %}<span class="pill nq">Not Received</span>{% endif %}</td>
+          <td>{{ s.status }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="empty"><p>No students yet — your approved uploads will appear here.</p></div>
+  {% endif %}
+</div>
+{% endblock %}
