@@ -196,6 +196,7 @@ def init_db():
             final_thesis TEXT DEFAULT 'Not Received',
             thesis_forward_coe {"DATE" if USE_PG else "TEXT"},
             status TEXT DEFAULT 'Continue',
+            department TEXT,
             password_hash TEXT,
             created_at TEXT,
             updated_at TEXT
@@ -219,7 +220,52 @@ def init_db():
             value TEXT
         )
     """)
+    db.execute(f"""
+        CREATE TABLE IF NOT EXISTS departments (
+            {id_pg if USE_PG else id_lite},
+            name TEXT UNIQUE NOT NULL,
+            email TEXT UNIQUE NOT NULL,
+            password_hash TEXT NOT NULL,
+            created_at TEXT
+        )
+    """)
+    db.execute(f"""
+        CREATE TABLE IF NOT EXISTS dept_uploads (
+            {id_pg if USE_PG else id_lite},
+            department_id INTEGER NOT NULL REFERENCES departments(id),
+            file_name TEXT,
+            file_data {"BYTEA" if USE_PG else "BLOB"},
+            row_count INTEGER DEFAULT 0,
+            status TEXT DEFAULT 'pending',
+            admin_comment TEXT,
+            created_at TEXT,
+            reviewed_at TEXT
+        )
+    """)
+    db.execute(f"""
+        CREATE TABLE IF NOT EXISTS viva_records (
+            {id_pg if USE_PG else id_lite},
+            student_id INTEGER NOT NULL REFERENCES students(id),
+            examiner_name TEXT,
+            examiner_affiliation TEXT,
+            viva_date TEXT,
+            result TEXT DEFAULT 'Pending',
+            remarks TEXT,
+            updated_by TEXT,
+            created_at TEXT
+        )
+    """)
+    db.execute(f"""
+        CREATE TABLE IF NOT EXISTS activity_log (
+            {id_pg if USE_PG else id_lite},
+            actor TEXT,
+            action TEXT,
+            detail TEXT,
+            created_at TEXT
+        )
+    """)
     _migrate_drop_unique_constraints(db)
+    _migrate_add_department_column(db)
     # Admin password comes from the env var (source of truth), stored hashed.
     pw_hash = generate_password_hash(
         os.environ.get("ADMIN_PASSWORD", "admin123") or "admin123")
@@ -255,8 +301,8 @@ def _migrate_drop_unique_constraints(db):
         new_cols = ["id", "cnic", "name", "father_name", "reg_no", "gender",
                     "degree", "session", "folder_file", "comments_missing",
                     "synopsis", "semi_final_thesis", "final_thesis",
-                    "thesis_forward_coe", "status", "password_hash",
-                    "created_at", "updated_at"]
+                    "thesis_forward_coe", "status", "department",
+                    "password_hash", "created_at", "updated_at"]
         cols = [c for c in new_cols if c in old_cols]
         colstr = ", ".join(cols)
         db.execute("""CREATE TABLE students_new (
@@ -275,6 +321,7 @@ def _migrate_drop_unique_constraints(db):
                 final_thesis TEXT DEFAULT 'Not Received',
                 thesis_forward_coe TEXT,
                 status TEXT DEFAULT 'Continue',
+                department TEXT,
                 password_hash TEXT,
                 created_at TEXT,
                 updated_at TEXT
@@ -285,6 +332,23 @@ def _migrate_drop_unique_constraints(db):
     except Exception:
         # A migration must never break startup; worst case the old
         # constraint stays.
+        try:
+            db.conn.rollback()
+        except Exception:
+            pass
+
+
+def _migrate_add_department_column(db):
+    """Add students.department for department-portal uploads. Safe to rerun."""
+    try:
+        if USE_PG:
+            db.execute("ALTER TABLE students ADD COLUMN IF NOT EXISTS department TEXT")
+        else:
+            cols = [r[1] for r in db.fetchall("PRAGMA table_info(students)")]
+            if "department" not in cols:
+                db.execute("ALTER TABLE students ADD COLUMN department TEXT")
+        db.commit()
+    except Exception:
         try:
             db.conn.rollback()
         except Exception:
@@ -491,6 +555,7 @@ def admin_login():
     if request.method == "POST":
         if check_admin_password(request.form.get("password")):
             session["admin"] = True
+            log_activity("admin", "login", "admin portal sign-in")
             return redirect(url_for("admin_dashboard"))
         error = "Wrong password."
     return render_template("admin_login.html", uni=UNI_NAME, title=PORTAL_TITLE,
@@ -709,6 +774,601 @@ def admin_export_pdf():
     return resp
 
 
+STUDENT_INSERT_COLS = ["cnic", "name", "father_name", "reg_no", "gender",
+    "degree", "session", "folder_file", "comments_missing", "synopsis",
+    "semi_final_thesis", "final_thesis", "thesis_forward_coe",
+    "status", "department", "password_hash", "created_at", "updated_at"]
+
+
+def log_activity(actor, action, detail=""):
+    """Append to the activity log. Never breaks the request."""
+    try:
+        db = get_db()
+        now = datetime.now().strftime("%Y-%m-%d %H:%M")
+        db.execute(
+            "INSERT INTO activity_log (actor, action, detail, created_at)"
+            " VALUES (?, ?, ?, ?)",
+            (actor, action, (detail or "")[:500], now))
+        db.commit()
+    except Exception:
+        pass
+
+
+def parse_import_rows(file_storage):
+    """Parse an .xlsx upload into student record value-tuples.
+
+    Returns (records, skipped, skip_notes); records is a list of
+    (row_no, reg_no, values) aligned with STUDENT_INSERT_COLS
+    (department=None; the caller may override it).
+    Raises ValueError on structural problems.
+    """
+    try:
+        raw_rows = read_xlsx(file_storage)
+    except Exception as e:
+        raise ValueError(f"Could not read file: {e}")
+    if not raw_rows:
+        raise ValueError("No data rows found in the file.")
+    mapping = {}
+    for hdr in raw_rows[0].keys():
+        k = header_key(hdr)
+        if k and k not in mapping.values():
+            mapping[hdr] = k
+    if "name" not in mapping.values() or "reg_no" not in mapping.values():
+        raise ValueError(
+            "File must contain at least a Name column and a Registration No. column.")
+    now = datetime.now().strftime("%Y-%m-%d %H:%M")
+    # Every file row becomes its own record (plain INSERT, no merging):
+    # the file is imported exactly as-is, even with duplicate Reg.No/CNIC.
+    records, skipped, skip_notes = [], 0, []
+    for i, rr in enumerate(raw_rows, start=2):
+        rec = {}
+        for hdr, val in rr.items():
+            field = mapping.get(hdr)
+            if not field:
+                continue
+            if isinstance(val, datetime):
+                val = val.date().isoformat()
+            elif isinstance(val, date):
+                val = val.isoformat()
+            rec[field] = str(val).strip() if val is not None else ""
+        name = rec.get("name", "")
+        reg_no = rec.get("reg_no", "")
+        cnic = norm_cnic(rec.get("cnic", ""))
+        if not name and not reg_no:
+            skipped += 1
+            if len(skip_notes) < 8:
+                skip_notes.append(f"row {i}: blank row (no Name / Reg.No)")
+            continue
+        rec["name"] = name
+        rec["reg_no"] = reg_no
+        rec["cnic"] = cnic
+        rec["folder_file"] = pick(rec.get("folder_file"), FOLDER_OPTS,
+                                  "Not Completed")
+        rec["synopsis"] = pick(rec.get("synopsis"), RECEIVED_OPTS,
+                               "Not Received")
+        rec["semi_final_thesis"] = pick(rec.get("semi_final_thesis"),
+                                        RECEIVED_OPTS, "Not Received")
+        rec["final_thesis"] = pick(rec.get("final_thesis"), RECEIVED_OPTS,
+                                   "Not Received")
+        rec["status"] = pick(rec.get("status"), STATUS_LIST, "Continue")
+        cm = rec.get("comments_missing", "").strip()
+        rec["comments_missing"] = cm if cm else "N/A"
+        rec["thesis_forward_coe"] = parse_coe(rec.get("thesis_forward_coe")) or None
+        rec["department"] = None
+        # password_hash stays NULL: it is created lazily on the student's
+        # first portal login (default password = CNIC digits). Hashing every
+        # row up-front would take minutes for large files.
+        values = tuple(rec.get(c) for c in STUDENT_INSERT_COLS[:-3]) + (None, now, now)
+        records.append((i, reg_no, values))
+    return records, skipped, skip_notes
+
+
+def insert_student_records(db, records, department=None):
+    """Batched savepoint-isolated plain inserts.
+
+    Each batch is isolated in a savepoint; if it fails, its rows are
+    retried one-by-one so a single bad row can neither poison the
+    transaction nor abort the whole import.
+    Returns (added, skipped, skip_notes, first_error).
+    """
+    cols = STUDENT_INSERT_COLS
+    dep_idx = cols.index("department")
+    if department is not None:
+        records = [(rn, rg, tuple(department if j == dep_idx else v
+                                  for j, v in enumerate(vals)))
+                   for rn, rg, vals in records]
+    one_ph = ", ".join(["?"] * len(cols))
+    one_insert = f"INSERT INTO students ({', '.join(cols)}) VALUES ({one_ph})"
+
+    def _one(vals):
+        db.execute(one_insert, vals)
+
+    def _chunk(chunk_vals):
+        n = len(chunk_vals)
+        ph = ", ".join(["(" + ", ".join(["?"] * len(cols)) + ")"] * n)
+        sql = f"INSERT INTO students ({', '.join(cols)}) VALUES {ph}"
+        flat = [v for vals in chunk_vals for v in vals]
+        db.execute(sql, flat)
+
+    added, skipped, skip_notes, first_error = 0, 0, [], ""
+    sp_seq = [0]
+
+    def _sp():
+        sp_seq[0] += 1
+        return f"imp_sp{sp_seq[0]}"
+
+    def _rollback(sp):
+        try:
+            db.execute(f"ROLLBACK TO SAVEPOINT {sp}")
+        except Exception:
+            pass
+
+    CHUNK = 100
+    for start in range(0, len(records), CHUNK):
+        chunk = records[start:start + CHUNK]
+        sp = _sp()
+        try:
+            db.execute(f"SAVEPOINT {sp}")
+            _chunk([vals for _, _, vals in chunk])
+            db.execute(f"RELEASE SAVEPOINT {sp}")
+            added += len(chunk)
+        except Exception:
+            _rollback(sp)
+            for row_no, reg_no, vals in chunk:
+                sp2 = _sp()
+                try:
+                    db.execute(f"SAVEPOINT {sp2}")
+                    _one(vals)
+                    db.execute(f"RELEASE SAVEPOINT {sp2}")
+                    added += 1
+                except Exception as e2:
+                    _rollback(sp2)
+                    skipped += 1
+                    if not first_error:
+                        first_error = str(e2)[:160]
+                    if len(skip_notes) < 8:
+                        skip_notes.append(f"row {row_no} ({reg_no}): save failed")
+    return added, skipped, skip_notes, first_error
+
+
+def dept_required(view):
+    @wraps(view)
+    def wrapper(*a, **k):
+        if not session.get("dept_id"):
+            return redirect(url_for("dept_login"))
+        return view(*a, **k)
+    wrapper.__name__ = view.__name__
+    return wrapper
+
+
+def current_dept():
+    did = session.get("dept_id")
+    if not did:
+        return None
+    row = get_db().fetchone("SELECT * FROM departments WHERE id=?", (did,))
+    return dict(row) if row else None
+
+
+# ==================== DEPARTMENTS (admin-managed) ====================
+
+@app.route("/admin/departments", methods=["GET", "POST"])
+@admin_required
+def admin_departments():
+    """Create department portal logins. DAS shares the email + password
+    with each department; the department then uploads its own data."""
+    db = get_db()
+    if request.method == "POST":
+        name = request.form.get("name", "").strip()
+        email = request.form.get("email", "").strip().lower()
+        password = request.form.get("password", "")
+        if not name or not email or not password:
+            flash("Department name, email and password are all required.")
+        else:
+            try:
+                db.execute(
+                    "INSERT INTO departments (name, email, password_hash,"
+                    " created_at) VALUES (?, ?, ?, ?)",
+                    (name, email, generate_password_hash(password),
+                     datetime.now().strftime("%Y-%m-%d %H:%M")))
+                db.commit()
+                log_activity("admin", "department_add", f"{name} <{email}>")
+                flash(f"Department '{name}' created. Share the email and"
+                      f" password with them so they can sign in at /dept.")
+            except Exception:
+                flash("Could not create it — the name or email already exists.")
+        return redirect(url_for("admin_departments"))
+    depts = [dict(r) for r in db.fetchall(
+        "SELECT d.*, (SELECT COUNT(*) FROM dept_uploads u"
+        " WHERE u.department_id=d.id AND u.status='pending') AS pending_n"
+        " FROM departments d ORDER BY d.name")]
+    return render_template("admin_departments.html", uni=UNI_NAME,
+                           title=PORTAL_TITLE, depts=depts)
+
+
+@app.route("/admin/department/<int:did>/delete", methods=["POST"])
+@admin_required
+def admin_department_delete(did):
+    db = get_db()
+    row = db.fetchone("SELECT * FROM departments WHERE id=?", (did,))
+    if row:
+        d = dict(row)
+        db.execute("DELETE FROM dept_uploads WHERE department_id=?", (did,))
+        db.execute("DELETE FROM departments WHERE id=?", (did,))
+        db.commit()
+        log_activity("admin", "department_delete",
+                     f"{d['name']} <{d['email']}>")
+        flash(f"Department '{d['name']}' and its uploads were deleted.")
+    return redirect(url_for("admin_departments"))
+
+
+# ==================== UPLOAD REVIEW QUEUE (admin) ====================
+
+@app.route("/admin/uploads")
+@admin_required
+def admin_uploads():
+    """Files departments sent for verification. Nothing is added to the
+    system until DAS approves it here."""
+    db = get_db()
+    pending = [dict(r) for r in db.fetchall(
+        "SELECT u.id, u.file_name, u.row_count, u.status, u.created_at,"
+        " d.name AS dept_name FROM dept_uploads u"
+        " JOIN departments d ON d.id=u.department_id"
+        " WHERE u.status='pending' ORDER BY u.id DESC")]
+    reviewed = [dict(r) for r in db.fetchall(
+        "SELECT u.id, u.file_name, u.row_count, u.status, u.admin_comment,"
+        " u.created_at, u.reviewed_at, d.name AS dept_name FROM dept_uploads u"
+        " JOIN departments d ON d.id=u.department_id"
+        " WHERE u.status!='pending' ORDER BY u.id DESC LIMIT 50")]
+    return render_template("admin_uploads.html", uni=UNI_NAME,
+                           title=PORTAL_TITLE, pending=pending,
+                           reviewed=reviewed)
+
+
+@app.route("/admin/uploads/<int:uid>/download")
+@admin_required
+def admin_upload_download(uid):
+    row = get_db().fetchone(
+        "SELECT * FROM dept_uploads WHERE id=?", (uid,))
+    if not row:
+        flash("Upload not found.")
+        return redirect(url_for("admin_uploads"))
+    u = dict(row)
+    return Response(doc_bytes(u),
+                    mimetype="application/vnd.openxmlformats-officedocument."
+                             "spreadsheetml.sheet",
+                    headers={"Content-Disposition":
+                             f'attachment; filename="{safe_filename(u.get("file_name"))}"'})
+
+
+@app.route("/admin/uploads/<int:uid>/approve", methods=["POST"])
+@admin_required
+def admin_upload_approve(uid):
+    """Approve a department file: every row is inserted as its own
+    student record, tagged with the department name."""
+    db = get_db()
+    row = db.fetchone(
+        "SELECT u.*, d.name AS dept_name FROM dept_uploads u"
+        " JOIN departments d ON d.id=u.department_id WHERE u.id=?", (uid,))
+    if not row:
+        flash("Upload not found.")
+        return redirect(url_for("admin_uploads"))
+    u = dict(row)
+    if u["status"] != "pending":
+        flash("This upload was already reviewed.")
+        return redirect(url_for("admin_uploads"))
+    try:
+        records, skipped, _ = parse_import_rows(io.BytesIO(doc_bytes(u)))
+    except ValueError as e:
+        flash(f"Could not parse the file: {e}")
+        return redirect(url_for("admin_uploads"))
+    added, _, _, _ = insert_student_records(db, records,
+                                            department=u["dept_name"])
+    db.execute("UPDATE dept_uploads SET status='approved', reviewed_at=?"
+               " WHERE id=?",
+               (datetime.now().strftime("%Y-%m-%d %H:%M"), uid))
+    db.commit()
+    log_activity("admin", "upload_approve",
+                 f"{u['dept_name']}: {added} student(s) added from"
+                 f" {u['file_name']}")
+    flash(f"Approved — {added} student record(s) from {u['dept_name']}"
+          f" are now in the system.")
+    return redirect(url_for("admin_uploads"))
+
+
+@app.route("/admin/uploads/<int:uid>/reject", methods=["POST"])
+@admin_required
+def admin_upload_reject(uid):
+    """Reject with a comment — the department sees it and re-uploads."""
+    comment = request.form.get("comment", "").strip()
+    if not comment:
+        flash("Please write a comment explaining what needs fixing.")
+        return redirect(url_for("admin_uploads"))
+    db = get_db()
+    row = db.fetchone(
+        "SELECT u.*, d.name AS dept_name FROM dept_uploads u"
+        " JOIN departments d ON d.id=u.department_id WHERE u.id=?", (uid,))
+    if not row:
+        flash("Upload not found.")
+        return redirect(url_for("admin_uploads"))
+    u = dict(row)
+    if u["status"] != "pending":
+        flash("This upload was already reviewed.")
+        return redirect(url_for("admin_uploads"))
+    db.execute("UPDATE dept_uploads SET status='rejected', admin_comment=?,"
+               " reviewed_at=? WHERE id=?",
+               (comment, datetime.now().strftime("%Y-%m-%d %H:%M"), uid))
+    db.commit()
+    log_activity("admin", "upload_reject",
+                 f"{u['dept_name']}: {comment[:120]}")
+    flash(f"Rejected with your comment — {u['dept_name']} will see it on"
+          f" their portal and can fix and re-upload.")
+    return redirect(url_for("admin_uploads"))
+
+
+# ==================== ACTIVITY LOG (admin) ====================
+
+@app.route("/admin/activity")
+@admin_required
+def admin_activity():
+    """Who did what, when — transparency for every change."""
+    db = get_db()
+    try:
+        page = max(int(request.args.get("page", 1) or 1), 1)
+    except (TypeError, ValueError):
+        page = 1
+    per = 50
+    total_row = db.fetchone("SELECT COUNT(*) AS n FROM activity_log")
+    total = (total_row["n"] if isinstance(total_row, dict)
+             else total_row[0]) if total_row else 0
+    pages = max((total + per - 1) // per, 1)
+    page = min(page, pages)
+    rows = [dict(r) for r in db.fetchall(
+        "SELECT * FROM activity_log ORDER BY id DESC LIMIT ? OFFSET ?",
+        (per, (page - 1) * per))]
+    return render_template("admin_activity.html", uni=UNI_NAME,
+                           title=PORTAL_TITLE, rows=rows, total=total,
+                           page=page, pages=pages)
+
+
+# ==================== REPORTS (admin, printable) ====================
+
+@app.route("/admin/reports")
+@admin_required
+def admin_reports():
+    """Meeting-ready summary: filter by session/degree/status, print it."""
+    f = request.args
+    students = query_students(f)
+    for s in students:
+        s["coe_display"] = fmt_coe(s.get("thesis_forward_coe"))
+    by_status, by_degree, by_session = {}, {}, {}
+    for s in students:
+        st = s.get("status") or "Continue"
+        by_status[st] = by_status.get(st, 0) + 1
+        dg = s.get("degree") or "—"
+        by_degree[dg] = by_degree.get(dg, 0) + 1
+        se = s.get("session") or "—"
+        by_session[se] = by_session.get(se, 0) + 1
+    return render_template(
+        "admin_reports.html", uni=UNI_NAME, title=PORTAL_TITLE,
+        students=students, total=len(students),
+        by_status=sorted(by_status.items(), key=lambda x: -x[1]),
+        by_degree=sorted(by_degree.items(), key=lambda x: -x[1]),
+        by_session=sorted(by_session.items(), key=lambda x: -x[1]),
+        status_list=STATUS_LIST, sessions=distinct_values("session"),
+        degrees=distinct_values("degree"), f=f,
+        today=datetime.now().strftime("%d %b %Y"))
+
+
+@app.context_processor
+def inject_admin_counts():
+    """Pending-upload badge for the admin sidebar."""
+    if session.get("admin"):
+        try:
+            row = get_db().fetchone(
+                "SELECT COUNT(*) AS n FROM dept_uploads WHERE status='pending'")
+            n = (row["n"] if isinstance(row, dict) else row[0]) if row else 0
+            return {"pending_uploads": n}
+        except Exception:
+            pass
+    return {"pending_uploads": 0}
+
+
+# ==================== DEPARTMENT PORTAL ====================
+
+_EX_FIRST = ["Ahmed", "Fatima", "Bilal", "Ayesha", "Usman", "Maryam", "Ali",
+             "Sana", "Hassan", "Iqra", "Danish", "Hira", "Fahad", "Zainab"]
+_EX_LAST = ["Khan", "Ahmed", "Malik", "Raza", "Hussain", "Shah", "Iqbal",
+            "Butt", "Chaudhry", "Farooq"]
+_EX_DEGREES = ["MPhil Zoology", "MPhil Biochemistry",
+               "MPhil Food Science & Technology", "PhD Zoology"]
+
+
+def random_example_row():
+    """One random filled row so departments see the expected format."""
+    import random
+    fn, ln = random.choice(_EX_FIRST), random.choice(_EX_LAST)
+    father = random.choice(_EX_FIRST) + " " + random.choice(_EX_LAST)
+    cnic = "".join(random.choice("0123456789") for _ in range(13))
+    return [cnic, f"{fn} {ln}", father,
+            f"{random.randint(20, 25)}-CUVAS-{random.randint(1000, 9999):04d}",
+            random.choice(["Male", "Female"]), random.choice(_EX_DEGREES),
+            random.choice(["F. 23-25", "24-26 Fall", "S. 21-24"]),
+            "Not Completed", "N/A", "Not Received", "Not Received",
+            "Not Received", "", "Continue"]
+
+
+VIVA_RESULTS = ["Pending", "Pass", "Fail", "Rescheduled"]
+
+
+@app.route("/dept", methods=["GET", "POST"])
+def dept_login():
+    if session.get("dept_id"):
+        return redirect(url_for("dept_dashboard"))
+    if request.method == "POST":
+        email = request.form.get("email", "").strip().lower()
+        password = request.form.get("password", "")
+        row = get_db().fetchone(
+            "SELECT * FROM departments WHERE email=?", (email,))
+        if row and check_password_hash(dict(row)["password_hash"], password):
+            d = dict(row)
+            session["dept_id"] = d["id"]
+            log_activity(f"dept:{d['name']}", "login",
+                         "department portal sign-in")
+            return redirect(url_for("dept_dashboard"))
+        flash("Invalid email or password.")
+        return redirect(url_for("dept_login"))
+    return render_template("dept_login.html", uni=UNI_NAME, title=PORTAL_TITLE)
+
+
+@app.route("/dept/logout")
+def dept_logout():
+    session.pop("dept_id", None)
+    return redirect(url_for("dept_login"))
+
+
+@app.route("/dept/dashboard")
+@dept_required
+def dept_dashboard():
+    dept = current_dept()
+    uploads = [dict(r) for r in get_db().fetchall(
+        "SELECT id, file_name, row_count, status, admin_comment, created_at,"
+        " reviewed_at FROM dept_uploads WHERE department_id=?"
+        " ORDER BY id DESC", (dept["id"],))]
+    return render_template("dept_dashboard.html", uni=UNI_NAME,
+                           title=PORTAL_TITLE, dept=dept, uploads=uploads)
+
+
+@app.route("/dept/upload", methods=["POST"])
+@dept_required
+def dept_upload():
+    """Departments send their file for DAS verification — nothing is
+    added to the system until an admin approves it."""
+    dept = current_dept()
+    file = request.files.get("file")
+    if not file or not file.filename:
+        flash("Please choose a file to upload.")
+        return redirect(url_for("dept_dashboard"))
+    if not file.filename.lower().endswith(".xlsx"):
+        flash("Only Excel (.xlsx) files are allowed.")
+        return redirect(url_for("dept_dashboard"))
+    raw = file.read()
+    if not raw:
+        flash("The file is empty.")
+        return redirect(url_for("dept_dashboard"))
+    try:
+        records, skipped, _ = parse_import_rows(io.BytesIO(raw))
+    except ValueError as e:
+        flash(str(e))
+        return redirect(url_for("dept_dashboard"))
+    db = get_db()
+    now = datetime.now().strftime("%Y-%m-%d %H:%M")
+    db.execute(
+        "INSERT INTO dept_uploads (department_id, file_name, file_data,"
+        " row_count, status, created_at)"
+        " VALUES (?, ?, ?, ?, 'pending', ?)",
+        (dept["id"], file.filename, raw, len(records), now))
+    db.commit()
+    log_activity(f"dept:{dept['name']}", "upload",
+                 f"{len(records)} row(s) sent for review ({file.filename})")
+    flash(f"Sent for DAS review: {len(records)} student row(s)."
+          f" You will see the decision here.")
+    return redirect(url_for("dept_dashboard"))
+
+
+@app.route("/dept/template")
+@dept_required
+def dept_template():
+    """Sample template with one random filled example row."""
+    from openpyxl import Workbook
+    from openpyxl.styles import Font, PatternFill, Alignment
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Students"
+    ws.append(TEMPLATE_HEADERS)
+    for cell in ws[1]:
+        cell.font = Font(bold=True, color="FFFFFF")
+        cell.fill = PatternFill("solid", fgColor="2D3290")
+        cell.alignment = Alignment(horizontal="center", vertical="center",
+                                   wrap_text=True)
+    ws.append(random_example_row())
+    widths = [18, 22, 22, 16, 10, 22, 12, 18, 30, 12, 14, 14, 18, 16]
+    for i, w in enumerate(widths, start=1):
+        ws.column_dimensions[ws.cell(row=1, column=i).column_letter].width = w
+    buf = io.BytesIO()
+    wb.save(buf)
+    buf.seek(0)
+    resp = Response(buf.getvalue(),
+                    mimetype="application/vnd.openxmlformats-officedocument."
+                             "spreadsheetml.sheet")
+    resp.headers["Content-Disposition"] = \
+        "attachment; filename=department_upload_template.xlsx"
+    return resp
+
+
+@app.route("/dept/viva", methods=["GET", "POST"])
+@dept_required
+def dept_viva():
+    """Departments manage viva for their own students: examiner, date,
+    result."""
+    dept = current_dept()
+    db = get_db()
+    if request.method == "POST":
+        sid = request.form.get("student_id", "")
+        examiner = request.form.get("examiner_name", "").strip()
+        affiliation = request.form.get("examiner_affiliation", "").strip()
+        viva_date = request.form.get("viva_date", "").strip()
+        result = request.form.get("result", "Pending")
+        remarks = request.form.get("remarks", "").strip()
+        st = db.fetchone(
+            "SELECT * FROM students WHERE id=? AND department=?",
+            (sid, dept["name"]))
+        if not st or not examiner:
+            flash("Select one of your department's students and enter the"
+                  " examiner name.")
+            return redirect(url_for("dept_viva"))
+        now = datetime.now().strftime("%Y-%m-%d %H:%M")
+        db.execute(
+            "INSERT INTO viva_records (student_id, examiner_name,"
+            " examiner_affiliation, viva_date, result, remarks, updated_by,"
+            " created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+            (sid, examiner, affiliation, viva_date or None, result,
+             remarks, dept["name"], now))
+        db.commit()
+        st = dict(st)
+        log_activity(f"dept:{dept['name']}", "viva_add",
+                     f"{st['name']} ({st['reg_no']}): {examiner},"
+                     f" {viva_date or 'no date'}, {result}")
+        flash("Viva record saved.")
+        return redirect(url_for("dept_viva"))
+    students = [dict(r) for r in db.fetchall(
+        "SELECT id, name, reg_no FROM students WHERE department=?"
+        " ORDER BY name", (dept["name"],))]
+    vivas = [dict(r) for r in db.fetchall(
+        "SELECT v.*, s.name AS student_name, s.reg_no FROM viva_records v"
+        " JOIN students s ON s.id=v.student_id"
+        " WHERE s.department=? ORDER BY v.id DESC", (dept["name"],))]
+    return render_template("dept_viva.html", uni=UNI_NAME, title=PORTAL_TITLE,
+                           dept=dept, students=students, vivas=vivas,
+                           results=VIVA_RESULTS)
+
+
+@app.route("/dept/viva/<int:vid>/delete", methods=["POST"])
+@dept_required
+def dept_viva_delete(vid):
+    dept = current_dept()
+    db = get_db()
+    row = db.fetchone(
+        "SELECT v.id FROM viva_records v JOIN students s ON s.id=v.student_id"
+        " WHERE v.id=? AND s.department=?", (vid, dept["name"]))
+    if row:
+        db.execute("DELETE FROM viva_records WHERE id=?", (vid,))
+        db.commit()
+        log_activity(f"dept:{dept['name']}", "viva_delete",
+                     f"viva record #{vid} removed")
+        flash("Viva record deleted.")
+    return redirect(url_for("dept_viva"))
+
+
 @app.route("/admin/import")
 @admin_required
 def admin_import():
@@ -773,128 +1433,14 @@ def admin_import_upload():
         flash("Only Excel (.xlsx) files are allowed.")
         return redirect(url_for("admin_import"))
     try:
-        raw_rows = read_xlsx(file)
-    except Exception as e:
-        flash(f"Could not read file: {e}")
+        records, skipped, skip_notes = parse_import_rows(file)
+    except ValueError as e:
+        flash(str(e))
         return redirect(url_for("admin_import"))
-    if not raw_rows:
-        flash("No data rows found in the file.")
-        return redirect(url_for("admin_import"))
-
-    mapping = {}
-    for hdr in raw_rows[0].keys():
-        k = header_key(hdr)
-        if k and k not in mapping.values():
-            mapping[hdr] = k
-    if "name" not in mapping.values() or "reg_no" not in mapping.values():
-        flash("File must contain at least a Name column and a Registration No. column.")
-        return redirect(url_for("admin_import"))
-
     db = get_db()
-    now = datetime.now().strftime("%Y-%m-%d %H:%M")
-    cols = ["cnic", "name", "father_name", "reg_no", "gender", "degree",
-            "session", "folder_file", "comments_missing", "synopsis",
-            "semi_final_thesis", "final_thesis", "thesis_forward_coe",
-            "status", "password_hash", "created_at", "updated_at"]
-    # Every file row becomes its own record (plain INSERT, no merging):
-    # the file is imported exactly as-is, even with duplicate Reg.No/CNIC.
-    one_ph = ", ".join(["?"] * len(cols))
-    one_insert = f"INSERT INTO students ({', '.join(cols)}) VALUES ({one_ph}"
-
-    # --- parse + validate every row first (no DB writes yet) ---
-    records, skipped, skip_notes = [], 0, []
-    for i, rr in enumerate(raw_rows, start=2):
-        rec = {}
-        for hdr, val in rr.items():
-            field = mapping.get(hdr)
-            if not field:
-                continue
-            if isinstance(val, datetime):
-                val = val.date().isoformat()
-            elif isinstance(val, date):
-                val = val.isoformat()
-            rec[field] = str(val).strip() if val is not None else ""
-        name = rec.get("name", "")
-        reg_no = rec.get("reg_no", "")
-        cnic = norm_cnic(rec.get("cnic", ""))
-        if not name and not reg_no:
-            skipped += 1
-            if len(skip_notes) < 8:
-                skip_notes.append(f"row {i}: blank row (no Name / Reg.No)")
-            continue
-        rec["name"] = name
-        rec["reg_no"] = reg_no
-        rec["cnic"] = cnic
-        rec["folder_file"] = pick(rec.get("folder_file"), FOLDER_OPTS, "Not Completed")
-        rec["synopsis"] = pick(rec.get("synopsis"), RECEIVED_OPTS, "Not Received")
-        rec["semi_final_thesis"] = pick(rec.get("semi_final_thesis"), RECEIVED_OPTS, "Not Received")
-        rec["final_thesis"] = pick(rec.get("final_thesis"), RECEIVED_OPTS, "Not Received")
-        rec["status"] = pick(rec.get("status"), STATUS_LIST, "Continue")
-        cm = rec.get("comments_missing", "").strip()
-        rec["comments_missing"] = cm if cm else "N/A"
-        rec["thesis_forward_coe"] = parse_coe(rec.get("thesis_forward_coe")) or None
-        # password_hash stays NULL: it is created lazily on the student's
-        # first portal login (default password = CNIC digits). Hashing every
-        # row up-front would take minutes for large files.
-        values = tuple(rec.get(c) for c in cols[:-3]) + (None, now, now)
-        records.append((i, reg_no, values))
-
-    def _one(vals):
-        db.execute(one_insert, vals)
-
-    def _chunk(chunk_vals):
-        n = len(chunk_vals)
-        ph = ", ".join(["(" + ", ".join(["?"] * len(cols)) + ")"] * n)
-        sql = f"INSERT INTO students ({', '.join(cols)}) VALUES {ph}"
-        flat = [v for vals in chunk_vals for v in vals]
-        db.execute(sql, flat)
-
-    added = 0
-    first_error = ""
-    sp_seq = [0]
-
-    def _sp():
-        sp_seq[0] += 1
-        return f"imp_sp{sp_seq[0]}"
-
-    def _rollback(sp):
-        try:
-            db.execute(f"ROLLBACK TO SAVEPOINT {sp}")
-        except Exception:
-            pass
-
-    # Batched inserts keep large imports inside serverless time limits.
-    # Each batch is isolated in a savepoint; if it fails, we retry its
-    # rows one-by-one (each in its own savepoint) so a single bad row
-    # can neither poison the transaction nor abort the whole import.
-    CHUNK = 100
-    for start in range(0, len(records), CHUNK):
-        chunk = records[start:start + CHUNK]
-        sp = _sp()
-        try:
-            db.execute(f"SAVEPOINT {sp}")
-            _chunk([vals for _, _, vals in chunk])
-            db.execute(f"RELEASE SAVEPOINT {sp}")
-            added += len(chunk)
-        except Exception:
-            _rollback(sp)
-            # Batch failed: retry row-by-row, each in its own savepoint.
-            # A batch-level failure alone is not surfaced -- only real
-            # per-row errors are.
-            for row_no, reg_no, vals in chunk:
-                sp2 = _sp()
-                try:
-                    db.execute(f"SAVEPOINT {sp2}")
-                    _one(vals)
-                    db.execute(f"RELEASE SAVEPOINT {sp2}")
-                    added += 1
-                except Exception as e2:
-                    _rollback(sp2)
-                    skipped += 1
-                    if not first_error:
-                        first_error = str(e2)[:160]
-                    if len(skip_notes) < 8:
-                        skip_notes.append(f"row {row_no} ({reg_no}: save failed)")
+    added, skipped2, skip_notes2, first_error = insert_student_records(db, records)
+    skipped += skipped2
+    skip_notes += skip_notes2
     db.commit()
     msg = f"Import complete: {added} added, {skipped} skipped."
     if skip_notes:
@@ -902,6 +1448,8 @@ def admin_import_upload():
         msg += "." if skipped <= len(skip_notes) else "..."
     if first_error and skipped:
         msg += f" (first error: {first_error})"
+    log_activity("admin", "import",
+                 f"{added} added, {skipped} skipped via admin import")
     flash(msg)
     return redirect(url_for("admin_students"))
 
@@ -962,6 +1510,7 @@ def admin_student_new():
                                    status_list=STATUS_LIST,
                                    genders=GENDER_OPTS, folders=FOLDER_OPTS,
                                    received=RECEIVED_OPTS)
+        log_activity("admin", "student_add", f"{name} ({reg_no})")
         flash(f"Student {name} added. Default portal password: CNIC digits.")
         row = db.fetchone("SELECT id FROM students WHERE reg_no=?", (reg_no,))
         return redirect(url_for("admin_student_profile", sid=row["id"] if isinstance(row, dict) else row[0]))
@@ -981,8 +1530,11 @@ def admin_student_profile(sid):
     s["coe_display"] = fmt_coe(s.get("thesis_forward_coe"))
     s["coe_iso"] = parse_coe(s.get("thesis_forward_coe"))
     docs = get_docs(sid)
+    vivas = [dict(r) for r in get_db().fetchall(
+        "SELECT * FROM viva_records WHERE student_id=? ORDER BY id DESC",
+        (sid,))]
     return render_template("student_profile.html", uni=UNI_NAME,
-                           title=PORTAL_TITLE, s=s, docs=docs,
+                           title=PORTAL_TITLE, s=s, docs=docs, vivas=vivas,
                            status_list=STATUS_LIST, genders=GENDER_OPTS,
                            folders=FOLDER_OPTS, received=RECEIVED_OPTS)
 
@@ -1024,6 +1576,7 @@ def admin_student_save(sid):
     except Exception as e:
         flash(f"Could not save (maybe duplicate Reg.No or CNIC): {e}")
         return redirect(url_for("admin_student_profile", sid=sid))
+    log_activity("admin", "student_edit", f"id={sid} ({name}) record updated")
     flash("Student record updated.")
     return redirect(url_for("admin_student_profile", sid=sid))
 
@@ -1040,6 +1593,7 @@ def admin_students_delete_selected():
     db.execute(f"DELETE FROM documents WHERE student_id IN ({ph})", ids)
     db.execute(f"DELETE FROM students WHERE id IN ({ph})", ids)
     db.commit()
+    log_activity("admin", "student_bulk_delete", f"{len(ids)} student(s) deleted")
     flash(f"Deleted {len(ids)} student(s) and their documents.")
     return redirect(url_for("admin_students"))
 
@@ -1051,6 +1605,7 @@ def admin_students_delete_all():
     db.execute("DELETE FROM documents")
     db.execute("DELETE FROM students")
     db.commit()
+    log_activity("admin", "student_delete_all", "ALL students and documents deleted")
     flash("All student data has been deleted.")
     return redirect(url_for("admin_students"))
 
@@ -1062,6 +1617,7 @@ def admin_student_delete(sid):
     db.execute("DELETE FROM documents WHERE student_id=?", (sid,))
     db.execute("DELETE FROM students WHERE id=?", (sid,))
     db.commit()
+    log_activity("admin", "student_delete", f"id={sid} and documents deleted")
     flash("Student and their documents deleted.")
     return redirect(url_for("admin_students"))
 
@@ -1094,6 +1650,7 @@ def admin_doc_delete(doc_id):
     sid = (row["student_id"] if isinstance(row, dict) else row[0]) if row else None
     get_db().execute("DELETE FROM documents WHERE id=?", (doc_id,))
     get_db().commit()
+    log_activity("admin", "doc_delete", f"doc #{doc_id} deleted (student id={sid})")
     flash("Document deleted.")
     return redirect(url_for("admin_student_profile", sid=sid)) if sid \
         else redirect(url_for("admin_students"))
