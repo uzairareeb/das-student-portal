@@ -427,17 +427,6 @@ body.has-sidebar .page-shell { margin-left: 252px; }
 .side-nav a.active .side-badge { background: var(--primary); color: #fff; }
 
 /* ---------- department portal ---------- */
-.dept-nav { background: #fff; border-bottom: 1px solid var(--line); box-shadow: var(--shadow); }
-.dept-nav-inner { display: flex; align-items: center; gap: 26px; padding-top: 14px; padding-bottom: 14px; }
-.dept-brand { display: flex; align-items: center; gap: 10px; font-weight: 800; color: var(--ink); font-size: 15.5px; }
-.dept-brand .mark { width: 36px; height: 36px; border-radius: 10px; background: var(--primary); color: #fff; display: inline-flex; align-items: center; justify-content: center; }
-.dept-brand .mark svg { width: 20px; height: 20px; }
-.dept-links { margin-left: auto; display: flex; gap: 6px; align-items: center; }
-.dept-links a { padding: 9px 14px; border-radius: 9px; text-decoration: none; color: var(--muted); font-weight: 700; font-size: 13.5px; }
-.dept-links a:hover { background: var(--bg-soft); color: var(--ink); }
-.dept-links a.active { background: var(--primary); color: #fff; }
-.dept-links a.danger-link { color: var(--danger); }
-.dept-links a.danger-link:hover { background: #fdeceb; }
 .admin-note { background: #fff7e8; border: 1px solid #f3d9a4; border-radius: 10px; padding: 10px 12px; font-size: 13.5px; color: #7a5410; }
 
 /* ---------- upload review queue ---------- */
@@ -468,7 +457,7 @@ code { background: var(--bg-soft); padding: 2px 8px; border-radius: 6px; font-si
 
 /* ---------- print ---------- */
 @media print {
-  .sidebar, .topbar, .site-foot, .side-toggle, .dept-nav, .no-print { display: none !important; }
+  .sidebar, .topbar, .site-foot, .side-toggle, .no-print { display: none !important; }
   body.has-sidebar .page-shell { margin-left: 0; }
   .wrap, .wrap.wide { padding: 0; max-width: 100%; }
   .container { padding: 0; }
@@ -478,5 +467,4 @@ code { background: var(--bg-soft); padding: 2px 8px; border-radius: 6px; font-si
 @media (max-width: 760px) {
   .report-cols { grid-template-columns: 1fr; }
   .reject-form { flex-direction: column; }
-  .dept-nav-inner { flex-wrap: wrap; gap: 12px; }
 }
