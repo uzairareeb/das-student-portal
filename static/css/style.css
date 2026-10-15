@@ -398,3 +398,21 @@ body.has-sidebar .page-shell { margin-left: 252px; }
   .wrap, .wrap.wide { padding-left: 18px; padding-right: 18px; }
   .container { padding: 30px 0 56px; }
 }
+
+/* ---------- dashboard overview ---------- */
+.dash-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 22px; margin-bottom: 22px; }
+.dash-grid .section { margin-bottom: 0; }
+.chart-box { position: relative; height: 300px; }
+.health-row { display: flex; align-items: baseline; gap: 12px; margin-bottom: 10px; }
+.health-num { font-size: 34px; font-weight: 800; color: var(--primary); letter-spacing: -.5px; }
+.health-label { color: var(--muted); font-size: 14px; }
+.health-bar { height: 10px; border-radius: 999px; background: var(--line); overflow: hidden; margin-bottom: 10px; }
+.health-bar span { display: block; height: 100%; border-radius: 999px; background: linear-gradient(90deg, var(--primary), #6a70d8); }
+
+/* ---------- wide add-student form ---------- */
+.form-grid.form-wide { grid-template-columns: repeat(3, 1fr); gap: 0 20px; }
+.form-grid.form-wide .full { grid-column: 1 / -1; }
+@media (max-width: 1100px) {
+  .form-grid.form-wide { grid-template-columns: 1fr 1fr; }
+  .dash-grid { grid-template-columns: 1fr; }
+}
