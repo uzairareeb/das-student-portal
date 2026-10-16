@@ -252,7 +252,8 @@ def init_db():
             result TEXT DEFAULT 'Pending',
             remarks TEXT,
             updated_by TEXT,
-            created_at TEXT
+            created_at TEXT,
+            admin_seen INTEGER DEFAULT 0
         )
     """)
     db.execute(f"""
@@ -289,6 +290,7 @@ def init_db():
     """)
     _migrate_drop_unique_constraints(db)
     _migrate_add_department_column(db)
+    _migrate_add_viva_admin_seen(db)
     # Admin password comes from the env var (source of truth), stored hashed.
     pw_hash = generate_password_hash(
         os.environ.get("ADMIN_PASSWORD", "admin123") or "admin123")
@@ -359,6 +361,22 @@ def _migrate_drop_unique_constraints(db):
             db.conn.rollback()
         except Exception:
             pass
+
+
+def _migrate_add_viva_admin_seen(db):
+    """Add viva_records.admin_seen for the admin 'new viva' badge."""
+    try:
+        if USE_PG:
+            db.execute("ALTER TABLE viva_records ADD COLUMN IF NOT EXISTS"
+                       " admin_seen INTEGER DEFAULT 0")
+        else:
+            cols = [r[1] for r in db.fetchall("PRAGMA table_info(viva_records)")]
+            if "admin_seen" not in cols:
+                db.execute("ALTER TABLE viva_records ADD COLUMN"
+                           " admin_seen INTEGER DEFAULT 0")
+        db.commit()
+    except Exception:
+        pass
 
 
 def _migrate_add_department_column(db):
@@ -1283,6 +1301,12 @@ def query_vivas(args):
 @admin_required
 def admin_viva():
     """All viva records with filters + export."""
+    db = get_db()
+    try:
+        db.execute("UPDATE viva_records SET admin_seen=1 WHERE admin_seen=0")
+        db.commit()
+    except Exception:
+        pass
     vivas = query_vivas(request.args)
     return render_template(
         "admin_viva.html", uni=UNI_NAME, title=PORTAL_TITLE, vivas=vivas,
@@ -1424,16 +1448,20 @@ def _inject_dept_notif():
 
 @app.context_processor
 def inject_admin_counts():
-    """Pending-upload badge for the admin sidebar."""
+    """Pending-upload + new-viva badges for the admin sidebar."""
     if session.get("admin"):
         try:
-            row = get_db().fetchone(
+            db = get_db()
+            row = db.fetchone(
                 "SELECT COUNT(*) AS n FROM dept_uploads WHERE status='pending'")
             n = (row["n"] if isinstance(row, dict) else row[0]) if row else 0
-            return {"pending_uploads": n}
+            row = db.fetchone(
+                "SELECT COUNT(*) AS n FROM viva_records WHERE admin_seen=0")
+            nv = (row["n"] if isinstance(row, dict) else row[0]) if row else 0
+            return {"pending_uploads": n, "new_vivas": nv}
         except Exception:
             pass
-    return {"pending_uploads": 0}
+    return {"pending_uploads": 0, "new_vivas": 0}
 
 
 # ==================== DEPARTMENT PORTAL ====================
