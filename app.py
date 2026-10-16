@@ -1219,6 +1219,201 @@ def admin_activity():
 
 # ==================== REPORTS (admin, printable) ====================
 
+def query_vivas(args):
+    """Viva records with department/degree/result filters."""
+    where, params = [], []
+    dept = (args.get("department") or "").strip()
+    if dept:
+        where.append("s.department=?")
+        params.append(dept)
+    degree = (args.get("degree") or "").strip()
+    if degree:
+        where.append("s.degree=?")
+        params.append(degree)
+    result = (args.get("result") or "").strip()
+    if result:
+        where.append("v.result=?")
+        params.append(result)
+    q = (args.get("q") or "").strip()
+    if q:
+        op = "ILIKE" if USE_PG else "LIKE"
+        where.append(f"(s.name {op} ? OR s.reg_no {op} ? OR v.examiner_name {op} ?)")
+        params += [f"%{q}%", f"%{q}%", f"%{q}%"]
+    sql = ("SELECT v.*, s.name AS student_name, s.reg_no, s.degree,"
+           " s.department FROM viva_records v"
+           " JOIN students s ON s.id=v.student_id")
+    if where:
+        sql += " WHERE " + " AND ".join(where)
+    sql += " ORDER BY v.viva_date DESC NULLS LAST, v.id DESC" if USE_PG else \
+        " ORDER BY v.viva_date DESC, v.id DESC"
+    return [dict(r) for r in get_db().fetchall(sql, params)]
+
+
+@app.route("/admin/viva")
+@admin_required
+def admin_viva():
+    """All viva records with filters + export."""
+    vivas = query_vivas(request.args)
+    return render_template(
+        "admin_viva.html", uni=UNI_NAME, title=PORTAL_TITLE, vivas=vivas,
+        departments=[d["name"] for d in get_db().fetchall(
+            "SELECT name FROM departments ORDER BY name")],
+        degrees=distinct_values("degree"), results=VIVA_RESULTS,
+        f=request.args)
+
+
+@app.route("/admin/viva/bulk", methods=["GET", "POST"])
+@admin_required
+def admin_viva_bulk():
+    """Schedule viva for multiple students at once."""
+    db = get_db()
+    if request.method == "POST":
+        ids = [int(x) for x in request.form.getlist("sel") if x.isdigit()]
+        examiner = request.form.get("examiner_name", "").strip()
+        affiliation = request.form.get("examiner_affiliation", "").strip()
+        viva_date = request.form.get("viva_date", "").strip()
+        result = request.form.get("result", "Pending")
+        remarks = request.form.get("remarks", "").strip()
+        if not ids:
+            flash("No students selected.")
+            return redirect(url_for("admin_viva_bulk"))
+        if not examiner:
+            flash("Examiner name is required.")
+            return redirect(url_for("admin_viva_bulk"))
+        now = datetime.now().strftime("%Y-%m-%d %H:%M")
+        dept_ids = {}
+        for sid in ids:
+            st = get_student(sid)
+            if not st:
+                continue
+            db.execute(
+                "INSERT INTO viva_records (student_id, examiner_name,"
+                " examiner_affiliation, viva_date, result, remarks,"
+                " updated_by, created_at) VALUES (?,?,?,?,?,?,?,?)",
+                (sid, examiner, affiliation, viva_date or None, result,
+                 remarks, "admin", now))
+            dname = st.get("department")
+            if dname:
+                dept_ids.setdefault(dname, []).append(st)
+        db.commit()
+        # notify each affected department
+        for dname, students in dept_ids.items():
+            d = db.fetchone("SELECT id FROM departments WHERE name=?",
+                            (dname,))
+            if d:
+                did = d["id"] if isinstance(d, dict) else d[0]
+                names = ", ".join(s["name"] for s in students[:3])
+                more = f" +{len(students)-3} more" if len(students) > 3 else ""
+                notify_dept(did, "viva", f"Viva scheduled for {len(students)} student(s)",
+                            f"{names}{more} — examiner {examiner}"
+                            + (f" on {viva_date}" if viva_date else ""),
+                            url_for("dept_viva"))
+        log_activity("admin", "viva_bulk",
+                     f"{len(ids)} viva record(s) scheduled by admin")
+        flash(f"Viva scheduled for {len(ids)} student(s).")
+        return redirect(url_for("admin_viva"))
+    students = [dict(r) for r in db.fetchall(
+        "SELECT id, name, reg_no, degree, department FROM students"
+        " ORDER BY name LIMIT 500")]
+    return render_template("admin_viva_bulk.html", uni=UNI_NAME,
+                           title=PORTAL_TITLE, students=students,
+                           results=VIVA_RESULTS)
+
+
+@app.route("/admin/viva/export")
+@admin_required
+def admin_viva_export():
+    """Excel export of (filtered) viva records."""
+    from openpyxl import Workbook
+    from openpyxl.styles import Font, PatternFill, Alignment
+    vivas = query_vivas(request.args)
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Viva Records"
+    headers = ["Student", "Reg.No", "Degree", "Department", "Examiner",
+               "Affiliation", "Viva Date", "Result", "Remarks"]
+    ws.append(headers)
+    for cell in ws[1]:
+        cell.font = Font(bold=True, color="FFFFFF")
+        cell.fill = PatternFill("solid", fgColor="2D3290")
+        cell.alignment = Alignment(horizontal="center", vertical="center",
+                                   wrap_text=True)
+    for v in vivas:
+        ws.append([v.get("student_name"), v.get("reg_no"), v.get("degree"),
+                   v.get("department"), v.get("examiner_name"),
+                   v.get("examiner_affiliation"), v.get("viva_date"),
+                   v.get("result"), v.get("remarks")])
+    widths = [24, 16, 22, 18, 22, 20, 14, 12, 30]
+    for i, w in enumerate(widths, start=1):
+        ws.column_dimensions[ws.cell(row=1, column=i).column_letter].width = w
+    buf = io.BytesIO()
+    wb.save(buf)
+    buf.seek(0)
+    resp = Response(buf.getvalue(),
+                    mimetype="application/vnd.openxmlformats-officedocument."
+                             "spreadsheetml.sheet")
+    resp.headers["Content-Disposition"] = \
+        "attachment; filename=viva_records_export.xlsx"
+    return resp
+
+
+@app.route("/admin/viva/export-pdf")
+@admin_required
+def admin_viva_export_pdf():
+    """PDF export of (filtered) viva records."""
+    from reportlab.lib import colors
+    from reportlab.lib.pagesizes import A4, landscape
+    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+    from reportlab.lib.units import mm
+    from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
+    vivas = query_vivas(request.args)
+    buf = io.BytesIO()
+    doc = SimpleDocTemplate(buf, pagesize=landscape(A4),
+                            leftMargin=12*mm, rightMargin=12*mm,
+                            topMargin=14*mm, bottomMargin=14*mm,
+                            title="Viva Records", author=UNI_NAME)
+    styles = getSampleStyleSheet()
+    title_style = ParagraphStyle("Title2", parent=styles["Title"],
+                                 textColor=colors.HexColor("#2D3290"),
+                                 fontSize=18, spaceAfter=4*mm)
+    normal = ParagraphStyle("Cell", parent=styles["Normal"], fontSize=8,
+                            leading=10)
+    head = ParagraphStyle("Head", parent=normal, textColor=colors.white,
+                          fontName="Helvetica-Bold", alignment=1)
+    story = [Paragraph("Viva Records", title_style),
+             Paragraph(UNI_NAME, styles["Normal"]), Spacer(1, 6*mm)]
+    data = [[Paragraph(h, head) for h in
+             ["Student", "Reg.No", "Degree", "Department", "Examiner",
+              "Viva Date", "Result", "Remarks"]]]
+    for v in vivas:
+        data.append([Paragraph(str(v.get(k) or "—"), normal) for k in
+                     ("student_name", "reg_no", "degree", "department",
+                      "examiner_name", "viva_date", "result", "remarks")])
+    t = Table(data, repeatRows=1,
+              colWidths=[42*mm, 24*mm, 34*mm, 30*mm, 36*mm, 22*mm, 18*mm, 50*mm])
+    t.setStyle(TableStyle([
+        ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#2D3290")),
+        ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
+        ("FONTSIZE", (0, 0), (-1, -1), 8),
+        ("GRID", (0, 0), (-1, -1), .5, colors.HexColor("#dfe3f5")),
+        ("ROWBACKGROUNDS", (0, 1), (-1, -1),
+         [colors.white, colors.HexColor("#f6f8ff")]),
+        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+        ("TOPPADDING", (0, 0), (-1, -1), 4),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
+    ]))
+    story.append(t)
+    story.append(Spacer(1, 6*mm))
+    story.append(Paragraph(f"Total: {len(vivas)} viva record(s)",
+                           styles["Normal"]))
+    doc.build(story)
+    buf.seek(0)
+    resp = Response(buf.getvalue(), mimetype="application/pdf")
+    resp.headers["Content-Disposition"] = \
+        "attachment; filename=viva_records_export.pdf"
+    return resp
+
+
 @app.route("/admin/reports")
 @admin_required
 def admin_reports():
