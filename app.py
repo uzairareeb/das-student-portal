@@ -256,6 +256,17 @@ def init_db():
         )
     """)
     db.execute(f"""
+        CREATE TABLE IF NOT EXISTS admin_notifications (
+            {id_pg if USE_PG else id_lite},
+            kind TEXT,
+            title TEXT,
+            message TEXT,
+            link TEXT,
+            is_read INTEGER DEFAULT 0,
+            created_at TEXT
+        )
+    """)
+    db.execute(f"""
         CREATE TABLE IF NOT EXISTS dept_notifications (
             {id_pg if USE_PG else id_lite},
             department_id INTEGER NOT NULL REFERENCES departments(id),
@@ -819,6 +830,25 @@ def notify_dept(department_id, kind, title, message="", link=""):
         pass
 
 
+def notify_admin(kind, title, message="", link=""):
+    """Create an in-portal notification for the DAS admin."""
+    try:
+        get_db().execute(
+            "INSERT INTO admin_notifications (kind, title, message, link,"
+            " created_at) VALUES (?,?,?,?,?)",
+            (kind, title, message, link,
+             datetime.now().strftime("%Y-%m-%d %H:%M")))
+        get_db().commit()
+    except Exception:
+        pass
+
+
+def admin_unread_count():
+    row = get_db().fetchone(
+        "SELECT COUNT(*) AS n FROM admin_notifications WHERE is_read=0")
+    return (row["n"] if isinstance(row, dict) else row[0]) if row else 0
+
+
 def dept_unread_count(department_id):
     row = get_db().fetchone(
         "SELECT COUNT(*) AS n FROM dept_notifications"
@@ -1262,64 +1292,6 @@ def admin_viva():
         f=request.args)
 
 
-@app.route("/admin/viva/bulk", methods=["GET", "POST"])
-@admin_required
-def admin_viva_bulk():
-    """Schedule viva for multiple students at once."""
-    db = get_db()
-    if request.method == "POST":
-        ids = [int(x) for x in request.form.getlist("sel") if x.isdigit()]
-        examiner = request.form.get("examiner_name", "").strip()
-        affiliation = request.form.get("examiner_affiliation", "").strip()
-        viva_date = request.form.get("viva_date", "").strip()
-        result = request.form.get("result", "Pending")
-        remarks = request.form.get("remarks", "").strip()
-        if not ids:
-            flash("No students selected.")
-            return redirect(url_for("admin_viva_bulk"))
-        if not examiner:
-            flash("Examiner name is required.")
-            return redirect(url_for("admin_viva_bulk"))
-        now = datetime.now().strftime("%Y-%m-%d %H:%M")
-        dept_ids = {}
-        for sid in ids:
-            st = get_student(sid)
-            if not st:
-                continue
-            db.execute(
-                "INSERT INTO viva_records (student_id, examiner_name,"
-                " examiner_affiliation, viva_date, result, remarks,"
-                " updated_by, created_at) VALUES (?,?,?,?,?,?,?,?)",
-                (sid, examiner, affiliation, viva_date or None, result,
-                 remarks, "admin", now))
-            dname = st.get("department")
-            if dname:
-                dept_ids.setdefault(dname, []).append(st)
-        db.commit()
-        # notify each affected department
-        for dname, students in dept_ids.items():
-            d = db.fetchone("SELECT id FROM departments WHERE name=?",
-                            (dname,))
-            if d:
-                did = d["id"] if isinstance(d, dict) else d[0]
-                names = ", ".join(s["name"] for s in students[:3])
-                more = f" +{len(students)-3} more" if len(students) > 3 else ""
-                notify_dept(did, "viva", f"Viva scheduled for {len(students)} student(s)",
-                            f"{names}{more} — examiner {examiner}"
-                            + (f" on {viva_date}" if viva_date else ""),
-                            url_for("dept_viva"))
-        log_activity("admin", "viva_bulk",
-                     f"{len(ids)} viva record(s) scheduled by admin")
-        flash(f"Viva scheduled for {len(ids)} student(s).")
-        return redirect(url_for("admin_viva"))
-    students = [dict(r) for r in db.fetchall(
-        "SELECT id, name, reg_no, degree, department FROM students"
-        " ORDER BY name LIMIT 500")]
-    return render_template("admin_viva_bulk.html", uni=UNI_NAME,
-                           title=PORTAL_TITLE, students=students,
-                           results=VIVA_RESULTS)
-
-
 @app.route("/admin/viva/export")
 @admin_required
 def admin_viva_export():
@@ -1414,6 +1386,19 @@ def admin_viva_export_pdf():
     return resp
 
 
+@app.route("/admin/notifications")
+@admin_required
+def admin_notifications():
+    """In-portal notifications for the DAS admin."""
+    db = get_db()
+    notes = [dict(r) for r in db.fetchall(
+        "SELECT * FROM admin_notifications ORDER BY id DESC LIMIT 50")]
+    db.execute("UPDATE admin_notifications SET is_read=1")
+    db.commit()
+    return render_template("admin_notifications.html", uni=UNI_NAME,
+                           title=PORTAL_TITLE, notes=notes)
+
+
 @app.route("/admin/reports")
 @admin_required
 def admin_reports():
@@ -1430,6 +1415,8 @@ def _inject_dept_notif():
     try:
         if request.path.startswith("/dept") and "dept_id" in session:
             return {"dept_unread": dept_unread_count(session["dept_id"])}
+        if request.path.startswith("/admin") and session.get("admin_ok"):
+            return {"admin_unread": admin_unread_count()}
     except Exception:
         pass
     return {}
@@ -1797,6 +1784,75 @@ def dept_students_export():
     return resp
 
 
+@app.route("/dept/viva/bulk", methods=["GET", "POST"])
+@dept_required
+def dept_viva_bulk():
+    """Schedule viva for multiple students at once (this department only)."""
+    dept = current_dept()
+    db = get_db()
+    if request.method == "POST":
+        ids = [int(x) for x in request.form.getlist("sel") if x.isdigit()]
+        examiner = request.form.get("examiner_name", "").strip()
+        affiliation = request.form.get("examiner_affiliation", "").strip()
+        viva_date = request.form.get("viva_date", "").strip()
+        result = request.form.get("result", "Pending")
+        remarks = request.form.get("remarks", "").strip()
+        if not ids:
+            flash("No students selected.")
+            return redirect(url_for("dept_viva_bulk"))
+        if not examiner:
+            flash("Examiner name is required.")
+            return redirect(url_for("dept_viva_bulk"))
+        now = datetime.now().strftime("%Y-%m-%d %H:%M")
+        added, skipped = 0, []
+        for sid in ids:
+            st = db.fetchone(
+                "SELECT * FROM students WHERE id=? AND department=?",
+                (sid, dept["name"]))
+            if not st:
+                continue
+            st = dict(st)
+            if db.fetchone("SELECT id FROM viva_records WHERE student_id=?",
+                           (sid,)):
+                skipped.append(f"{st['name']} ({st['reg_no']})")
+                continue
+            db.execute(
+                "INSERT INTO viva_records (student_id, examiner_name,"
+                " examiner_affiliation, viva_date, result, remarks,"
+                " updated_by, created_at) VALUES (?,?,?,?,?,?,?,?)",
+                (sid, examiner, affiliation, viva_date or None, result,
+                 remarks, dept["name"], now))
+            added += 1
+        db.commit()
+        if added:
+            log_activity(f"dept:{dept['name']}", "viva_bulk",
+                         f"{added} viva record(s) scheduled")
+            notify_dept(dept["id"], "viva",
+                        f"Viva scheduled for {added} student(s)",
+                        f"Examiner {examiner}"
+                        + (f" on {viva_date}" if viva_date else ""),
+                        url_for("dept_viva"))
+            notify_admin("viva", f"Viva entry by {dept['name']}",
+                         f"{added} student(s) — examiner {examiner}"
+                         + (f" on {viva_date}" if viva_date else ""),
+                         url_for("admin_viva", department=dept["name"]))
+        msg = f"Viva scheduled for {added} student(s)." if added else \
+            "No new viva records created."
+        if skipped:
+            msg += " Already had viva (skipped): " + ", ".join(skipped) + \
+                " — edit existing records instead."
+        flash(msg)
+        return redirect(url_for("dept_viva"))
+    students = [dict(r) for r in db.fetchall(
+        "SELECT s.id, s.name, s.reg_no, s.degree FROM students s"
+        " LEFT JOIN viva_records v ON v.student_id=s.id"
+        " WHERE s.department=? AND v.id IS NULL ORDER BY s.name",
+        (dept["name"],))]
+    return render_template("dept_viva_bulk.html", uni=UNI_NAME,
+                           title=PORTAL_TITLE, dept=dept, students=students,
+                           results=VIVA_RESULTS)
+
+
 @app.route("/dept/template")
 @dept_required
 def dept_template():
@@ -1848,6 +1904,14 @@ def dept_viva():
             flash("Select one of your department's students and enter the"
                   " examiner name.")
             return redirect(url_for("dept_viva"))
+        existing = db.fetchone("SELECT id FROM viva_records WHERE student_id=?",
+                               (sid,))
+        if existing:
+            st = dict(st)
+            flash(f"Viva already exists for {st['name']} ({st['reg_no']}) —"
+                  " you can edit it from the list below, but cannot add"
+                  " another one.")
+            return redirect(url_for("dept_viva"))
         now = datetime.now().strftime("%Y-%m-%d %H:%M")
         db.execute(
             "INSERT INTO viva_records (student_id, examiner_name,"
@@ -1863,6 +1927,10 @@ def dept_viva():
         notify_dept(dept["id"], "viva", "Viva scheduled",
                     f"{st['name']} ({st['reg_no']}) — viva recorded.",
                     url_for("dept_viva"))
+        notify_admin("viva", f"Viva entry by {dept['name']}",
+                     f"{st['name']} ({st['reg_no']}) — examiner {examiner}"
+                     + (f" on {viva_date}" if viva_date else ""),
+                     url_for("admin_viva", department=dept["name"]))
         flash("Viva record saved.")
         return redirect(url_for("dept_viva"))
     students = [dict(r) for r in db.fetchall(
