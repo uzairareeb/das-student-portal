@@ -59,9 +59,8 @@
           <td>
             <div class="row" style="gap:8px">
               <a class="btn ghost sm" href="{{ url_for('admin_department_edit', did=d.id) }}">Edit</a>
-              <form method="post" action="{{ url_for('admin_department_delete', did=d.id) }}" style="margin:0"
-                    onsubmit="return confirm('Delete {{ d.name }} and its uploads?')">
-                <button type="submit" class="btn danger sm">Delete</button>
+              <form method="post" action="{{ url_for('admin_department_delete', did=d.id) }}" style="margin:0">
+                <button type="submit" class="btn danger sm" data-confirm="Delete {{ d.name }} and its uploads?">Delete</button>
               </form>
             </div>
           </td>

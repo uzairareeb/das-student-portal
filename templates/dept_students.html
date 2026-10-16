@@ -21,10 +21,12 @@
 
 <div class="card section table-card">
   {% if students %}
+  <form method="post" id="bulkForm" data-confirm-action="true">
   <div class="table-scroll">
     <table class="data-table wide-table">
       <thead>
         <tr>
+          <th class="cb"><input type="checkbox" id="selAll"></th>
           <th>Name</th><th>Reg.No</th><th>Degree</th><th>Session</th>
           <th>Folder/File</th><th>Status</th><th></th>
         </tr>
@@ -32,6 +34,7 @@
       <tbody>
         {% for s in students %}
         <tr>
+          <td class="cb"><input type="checkbox" name="sel" value="{{ s.id }}" class="selBox"></td>
           <td><strong>{{ s.name }}</strong></td>
           <td class="nowrap">{{ s.reg_no }}</td>
           <td class="degree-cell">{{ s.degree or '—' }}</td>
@@ -44,6 +47,15 @@
       </tbody>
     </table>
   </div>
+  <div class="row" style="margin-top:14px">
+    <button type="submit" class="btn danger sm" formaction="{{ url_for('dept_students_delete_selected') }}"
+            data-confirm="Delete the selected student(s) and all their documents and viva records?">Delete Selected</button>
+  </div>
+  </form>
+  <form method="post" action="{{ url_for('dept_students_delete_all') }}" style="margin:14px 0 0" data-confirm-action="true">
+    <button type="submit" class="btn danger sm"
+            data-confirm="Delete ALL {{ total }} student(s) of {{ dept.name }}? This cannot be undone.">Delete All Students</button>
+  </form>
   {% if pages > 1 %}
   <div class="pagination">
     {% if page > 1 %}<a class="btn ghost sm" href="{{ url_for('dept_students', page=page-1, q=q) }}">&larr; Prev</a>{% endif %}

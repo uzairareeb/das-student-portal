@@ -50,6 +50,14 @@
           {% for v in folders %}<option value="{{ v }}" {% if f.get('folder_file')==v %}selected{% endif %}>{{ v }}</option>{% endfor %}
         </select>
       </div>
+      <div>
+        <label class="f-label" for="department">Department</label>
+        <select class="no-icon" id="department" name="department">
+          <option value="">All</option>
+          <option value="__unassigned" {% if f.get('department')=='__unassigned' %}selected{% endif %}>— Unassigned —</option>
+          {% for v in departments %}<option value="{{ v }}" {% if f.get('department')==v %}selected{% endif %}>{{ v }}</option>{% endfor %}
+        </select>
+      </div>
     </div>
     <div class="row" style="margin-top:14px">
       <button type="submit" class="btn primary sm">Apply Filters</button>
@@ -76,8 +84,14 @@
   {% if students %}
   <form id="bulkForm" method="post" action="{{ url_for('admin_students_delete_selected') }}">
     <div class="bulk-bar">
-      <button type="submit" class="btn danger sm" onclick="return confirm('Delete the SELECTED students and all their documents? This cannot be undone.')">Delete Selected</button>
-      <span class="hint">Tick the boxes, then delete.</span>
+      <button type="submit" class="btn danger sm" data-confirm="Delete the SELECTED students and all their documents? This cannot be undone.">Delete Selected</button>
+      <select class="no-icon" name="assign_dept" aria-label="Department to assign" style="max-width:220px">
+        <option value="">Assign dept…</option>
+        <option value="__none">— Unassign —</option>
+        {% for v in departments %}<option value="{{ v }}">{{ v }}</option>{% endfor %}
+      </select>
+      <button type="submit" class="btn primary sm" formaction="{{ url_for('admin_students_assign_dept') }}" onclick="return document.querySelector('select[name=assign_dept]').value ? true : (alert('Please choose a department first.'), false)">Assign to Selected</button>
+      <span class="hint">Tick the boxes, then assign or delete.</span>
     </div>
     <div class="table-wrap">
       <table class="wide-table">
@@ -85,6 +99,7 @@
           <tr>
             <th class="cb"><input type="checkbox" id="selAll" title="Select all on this page"></th>
             <th>Name</th><th>Reg.No</th><th>Gender</th><th>Degree</th><th>Session</th>
+            <th>Department</th>
             <th>Folder/File</th><th>Comments (Missing)</th><th>Synopsis</th>
             <th>Semi-Final</th><th>Final Thesis</th><th>Thesis Forward (COE)</th>
             <th>Status</th><th></th>
@@ -99,6 +114,7 @@
             <td>{{ s.gender or '—' }}</td>
             <td class="degree-cell">{{ s.degree or '—' }}</td>
             <td>{{ s.session or '—' }}</td>
+            <td>{{ s.department or '—' }}</td>
             <td>
               {% if s.folder_file == 'Completed' %}<span class="pill q">Completed</span>
               {% else %}<span class="pill nq">Not Completed</span>{% endif %}
@@ -130,9 +146,8 @@
     </div>
   </form>
   <div class="danger-zone">
-    <form method="post" action="{{ url_for('admin_students_delete_all') }}" style="margin:0"
-          onsubmit="return confirm('DELETE ALL STUDENT DATA? Every student and every document will be permanently removed. This cannot be undone!')">
-      <button type="submit" class="btn danger sm">Delete All Students</button>
+    <form method="post" action="{{ url_for('admin_students_delete_all') }}" style="margin:0">
+      <button type="submit" class="btn danger sm" data-confirm="DELETE ALL STUDENT DATA? Every student and every document will be permanently removed. This cannot be undone!">Delete All Students</button>
     </form>
     <span class="hint">Removes every student record and all uploaded documents.</span>
   </div>

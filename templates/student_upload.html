@@ -56,6 +56,12 @@
     {% for item in doc_list %}<li>{{ item }}</li>{% endfor %}
   </ol>
   <form method="post" enctype="multipart/form-data">
+    <label class="f-label" for="doc_type">What are you uploading?</label>
+    <select class="no-icon" id="doc_type" name="doc_type" style="max-width:340px; margin-bottom:14px">
+      <option value="Complete File (Merged PDF)">Complete File (Merged PDF)</option>
+      <option value="Synopsis">Synopsis</option>
+      <option value="Thesis">Thesis</option>
+    </select>
     <label class="dropzone" id="dz">
       <input type="file" name="file" id="fileInput" accept=".pdf" required hidden>
       <span class="dz-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg></span>

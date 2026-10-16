@@ -34,5 +34,88 @@
   </footer>
   </div>
   {% block page_scripts %}{% endblock %}
+
+  <!-- confirmation modal -->
+  <div class="modal-backdrop" id="confirmModal" hidden>
+    <div class="modal" role="dialog" aria-modal="true">
+      <div class="modal-icon warn">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+      </div>
+      <h3>Please Confirm</h3>
+      <p id="confirmMsg"></p>
+      <div class="modal-actions">
+        <button type="button" class="btn ghost" id="confirmCancel">Cancel</button>
+        <button type="button" class="btn danger" id="confirmOk">Yes, Continue</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- success modal -->
+  <div class="modal-backdrop" id="successModal" hidden>
+    <div class="modal" role="dialog" aria-modal="true">
+      <svg class="tick" viewBox="0 0 52 52">
+        <circle class="tick-circle" cx="26" cy="26" r="24"/>
+        <path class="tick-check" d="M15 27l7.5 7.5L37 19"/>
+      </svg>
+      <h3>Work Done!</h3>
+      <p id="successMsg"></p>
+      <div class="modal-actions" style="justify-content:center">
+        <button type="button" class="btn primary" id="successOk">OK</button>
+      </div>
+    </div>
+  </div>
+
+  {% with msgs = get_flashed_messages() %}
+  {% if msgs %}<script>window._flashMessages = {{ msgs|tojson }};</script>{% endif %}
+  {% endwith %}
+  <script>
+  (function () {
+    /* ---- confirmation popup for destructive actions ---- */
+    var cModal = document.getElementById('confirmModal');
+    var cMsg = document.getElementById('confirmMsg');
+    var pendingForm = null, pendingAction = null;
+    document.addEventListener('click', function (e) {
+      var btn = e.target.closest('[data-confirm]');
+      if (!btn) return;
+      var form = btn.closest('form');
+      if (!form) return;
+      e.preventDefault();
+      e.stopPropagation();
+      cMsg.textContent = btn.getAttribute('data-confirm');
+      pendingForm = form;
+      pendingAction = btn.getAttribute('formaction');
+      cModal.hidden = false;
+    }, true);
+    document.getElementById('confirmOk').addEventListener('click', function () {
+      cModal.hidden = true;
+      if (pendingForm) {
+        if (pendingAction) pendingForm.setAttribute('action', pendingAction);
+        pendingForm.submit();
+      }
+      pendingForm = null; pendingAction = null;
+    });
+    document.getElementById('confirmCancel').addEventListener('click', function () {
+      cModal.hidden = true; pendingForm = null; pendingAction = null;
+    });
+    cModal.addEventListener('click', function (e) {
+      if (e.target === cModal) { cModal.hidden = true; pendingForm = null; pendingAction = null; }
+    });
+
+    /* ---- success popup with animated tick ---- */
+    var sModal = document.getElementById('successModal');
+    if (window._flashMessages && window._flashMessages.length) {
+      document.getElementById('successMsg').textContent = window._flashMessages.join(' ');
+      sModal.hidden = false;
+      var flash = document.querySelector('.flash');
+      if (flash) flash.style.display = 'none';
+    }
+    document.getElementById('successOk').addEventListener('click', function () {
+      sModal.hidden = true;
+    });
+    sModal.addEventListener('click', function (e) {
+      if (e.target === sModal) sModal.hidden = true;
+    });
+  })();
+  </script>
 </body>
 </html>

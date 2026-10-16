@@ -23,15 +23,14 @@
       </div>
       <div class="upload-actions">
         <a class="btn ghost sm" href="{{ url_for('admin_upload_download', uid=u.id) }}">Download File</a>
-        <form method="post" action="{{ url_for('admin_upload_approve', uid=u.id) }}" style="margin:0"
-              onsubmit="return confirm('Approve this file? All {{ u.row_count }} rows will be added as student records.')">
-          <button type="submit" class="btn primary sm">Approve &amp; Add</button>
+        <form method="post" action="{{ url_for('admin_upload_approve', uid=u.id) }}" style="margin:0">
+          <button type="submit" class="btn primary sm" data-confirm="Approve this file? All {{ u.row_count }} rows will be added as student records.">Approve &amp; Add</button>
         </form>
       </div>
       <form method="post" action="{{ url_for('admin_upload_reject', uid=u.id) }}" class="reject-form">
         <input type="text" name="comment" placeholder="If rejecting: what is missing or wrong? Write it here…" required>
         <button type="submit" class="btn danger sm"
-                onclick="return confirm('Reject this file with your comment?')">Reject</button>
+                data-confirm="Reject this file with your comment?">Reject</button>
       </form>
     </div>
     {% endfor %}

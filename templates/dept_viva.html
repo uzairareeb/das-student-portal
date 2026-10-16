@@ -87,9 +87,8 @@
           <td>
             <div class="row" style="gap:8px">
               <a class="btn ghost sm" href="{{ url_for('dept_viva_edit', vid=v.id) }}">Edit</a>
-              <form method="post" action="{{ url_for('dept_viva_delete', vid=v.id) }}" style="margin:0"
-                    onsubmit="return confirm('Delete this viva record?')">
-                <button type="submit" class="btn danger sm">Delete</button>
+              <form method="post" action="{{ url_for('dept_viva_delete', vid=v.id) }}" style="margin:0">
+                <button type="submit" class="btn danger sm" data-confirm="Delete this viva record?">Delete</button>
               </form>
             </div>
           </td>

@@ -13,9 +13,8 @@
     </div>
     <div class="sp-actions">
       <a class="btn light sm" href="{{ url_for('admin_students') }}">&larr; Back to List</a>
-      <form method="post" action="{{ url_for('admin_student_delete', sid=s.id) }}" style="margin:0"
-            onsubmit="return confirm('Delete {{ s.name }} and ALL their documents? This cannot be undone.')">
-        <button type="submit" class="btn outline-w sm">Delete Student</button>
+      <form method="post" action="{{ url_for('admin_student_delete', sid=s.id) }}" style="margin:0">
+        <button type="submit" class="btn outline-w sm" data-confirm="Delete {{ s.name }} and ALL their documents? This cannot be undone.">Delete Student</button>
       </form>
     </div>
   </div>
@@ -50,6 +49,7 @@
     <div><dt>Father Name</dt><dd>{{ s.father_name or '—' }}</dd></div>
     <div><dt>Registration No.</dt><dd>{{ s.reg_no }}</dd></div>
     <div><dt>Gender</dt><dd>{{ s.gender or '—' }}</dd></div>
+    <div><dt>Department</dt><dd>{{ s.department or '—' }}</dd></div>
     <div><dt>Comments (Missing)</dt><dd>{{ s.comments_missing or '—' }}</dd></div>
     <div><dt>Semi-Final Thesis</dt><dd>{% if s.semi_final_thesis == 'Received' %}<span class="pill q">Received</span>{% else %}<span class="pill nq">Not Received</span>{% endif %}</dd></div>
     <div><dt>Thesis Forward (COE)</dt><dd>{{ s.coe_display }}</dd></div>
@@ -93,6 +93,13 @@
       <div>
         <label class="f-label" for="session">Session</label>
         <input class="no-icon" type="text" id="session" name="session" value="{{ s.session or '' }}">
+      </div>
+      <div>
+        <label class="f-label" for="department">Department</label>
+        <select class="no-icon" id="department" name="department">
+          <option value="">— Unassigned —</option>
+          {% for v in departments %}<option value="{{ v }}" {% if s.department==v %}selected{% endif %}>{{ v }}</option>{% endfor %}
+        </select>
       </div>
       <div>
         <label class="f-label" for="status">Status</label>
@@ -189,9 +196,8 @@
         <div class="doc-sub">Uploaded by {{ d.uploaded_by }} &middot; {{ d.uploaded_at }}{% if d.size %} &middot; {{ (d.size/1024)|round(1) }} KB{% endif %}</div>
       </div>
       <a class="btn ghost sm" href="{{ url_for('admin_doc_download', doc_id=d.id) }}">Download</a>
-      <form method="post" action="{{ url_for('admin_doc_delete', doc_id=d.id) }}" style="margin:0"
-            onsubmit="return confirm('Delete this document?')">
-        <button type="submit" class="btn danger sm">Delete</button>
+      <form method="post" action="{{ url_for('admin_doc_delete', doc_id=d.id) }}" style="margin:0">
+        <button type="submit" class="btn danger sm" data-confirm="Delete this document?">Delete</button>
       </form>
     </div>
     {% endfor %}
