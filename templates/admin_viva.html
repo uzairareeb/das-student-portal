@@ -1,0 +1,85 @@
+{% extends "admin_base.html" %}
+{% block container_extra %} wide{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <h2>Viva Records</h2>
+    <p>{{ vivas|length }} viva record(s) — schedule, track and export</p>
+  </div>
+  <div class="row">
+    <a class="btn primary sm" href="{{ url_for('admin_viva_bulk') }}">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+      Bulk Viva Entry
+    </a>
+  </div>
+</div>
+
+<div class="card section">
+  <form method="get" class="filters">
+    <div>
+      <label class="f-label" for="q">Search</label>
+      <input class="no-icon" type="text" id="q" name="q" value="{{ f.get('q', '') }}" placeholder="Student, Reg.No, examiner">
+    </div>
+    <div>
+      <label class="f-label" for="department">Department</label>
+      <select class="no-icon" id="department" name="department">
+        <option value="">All</option>
+        {% for d in departments %}<option value="{{ d }}" {% if f.get('department') == d %}selected{% endif %}>{{ d }}</option>{% endfor %}
+      </select>
+    </div>
+    <div>
+      <label class="f-label" for="degree">Degree</label>
+      <select class="no-icon" id="degree" name="degree">
+        <option value="">All</option>
+        {% for d in degrees %}<option value="{{ d }}" {% if f.get('degree') == d %}selected{% endif %}>{{ d }}</option>{% endfor %}
+      </select>
+    </div>
+    <div>
+      <label class="f-label" for="result">Result</label>
+      <select class="no-icon" id="result" name="result">
+        <option value="">All</option>
+        {% for r in results %}<option value="{{ r }}" {% if f.get('result') == r %}selected{% endif %}>{{ r }}</option>{% endfor %}
+      </select>
+    </div>
+    <div class="filter-actions">
+      <button type="submit" class="btn primary sm">Apply</button>
+      <a class="btn ghost sm" href="{{ url_for('admin_viva') }}">Clear</a>
+    </div>
+    <div class="filter-actions">
+      <button type="submit" class="btn ghost sm" formaction="{{ url_for('admin_viva_export') }}">Export Excel</button>
+      <button type="submit" class="btn ghost sm" formaction="{{ url_for('admin_viva_export_pdf') }}">Export PDF</button>
+    </div>
+  </form>
+</div>
+
+<div class="card section table-card">
+  {% if vivas %}
+  <div class="table-scroll">
+    <table class="data-table wide-table">
+      <thead>
+        <tr>
+          <th>Student</th><th>Reg.No</th><th>Degree</th><th>Department</th>
+          <th>Examiner</th><th>Viva Date</th><th>Result</th><th>Remarks</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for v in vivas %}
+        <tr>
+          <td><strong>{{ v.student_name }}</strong></td>
+          <td class="nowrap">{{ v.reg_no }}</td>
+          <td class="degree-cell">{{ v.degree or '—' }}</td>
+          <td>{{ v.department or '—' }}</td>
+          <td>{{ v.examiner_name }}{% if v.examiner_affiliation %}<br><span class="hint">{{ v.examiner_affiliation }}</span>{% endif %}</td>
+          <td class="nowrap">{{ v.viva_date or '—' }}</td>
+          <td>{% if v.result == 'Pass' %}<span class="pill q">Pass</span>{% elif v.result == 'Fail' %}<span class="pill nq">Fail</span>{% else %}<span class="pill warn">Pending</span>{% endif %}</td>
+          <td class="comments-cell">{{ v.remarks or '—' }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="empty"><p>No viva records found. Use Bulk Viva Entry to schedule vivas.</p></div>
+  {% endif %}
+</div>
+{% endblock %}
