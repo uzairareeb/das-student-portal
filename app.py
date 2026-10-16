@@ -509,6 +509,12 @@ def _student_where(args):
         if v:
             where.append(f"{key}=?")
             params.append(v)
+    dept = (args.get("department") or "").strip()
+    if dept == "__unassigned":
+        where.append("(department IS NULL OR department='')")
+    elif dept:
+        where.append("department=?")
+        params.append(dept)
     return where, params
 
 
@@ -541,6 +547,13 @@ def distinct_values(col):
     rows = get_db().fetchall(
         f"SELECT DISTINCT {col} FROM students WHERE {col} IS NOT NULL AND {col}<>'' ORDER BY {col}")
     return [(r[col] if isinstance(r, dict) else r[0]) for r in rows]
+
+
+def dept_names():
+    """Department names from the departments table (exact match matters:
+    the dept portal filters students with department=<name>)."""
+    rows = get_db().fetchall("SELECT name FROM departments ORDER BY name")
+    return [(r["name"] if isinstance(r, dict) else r[0]) for r in rows]
 
 
 # ---------------- public ----------------
@@ -659,6 +672,7 @@ def admin_students():
         page_url=page_url, per_page=PER_PAGE,
         sessions=distinct_values("session"), degrees=distinct_values("degree"),
         genders=GENDER_OPTS, folders=FOLDER_OPTS, status_list=STATUS_LIST,
+        departments=dept_names(),
         f=request.args, export_url=export_url,
         export_pdf_url=export_pdf_url)
 
@@ -1354,6 +1368,56 @@ def dept_students():
                            page=page, pages=pages, total=total, q=q)
 
 
+@app.route("/dept/students/delete-selected", methods=["POST"])
+@dept_required
+def dept_students_delete_selected():
+    """Delete selected students — only from this department."""
+    dept = current_dept()
+    ids = [int(x) for x in request.form.getlist("sel") if x.isdigit()]
+    if not ids:
+        flash("No students selected.")
+        return redirect(url_for("dept_students"))
+    db = get_db()
+    ph = ", ".join(["?"] * len(ids))
+    # scope to this department's students only
+    rows = db.fetchall(
+        f"SELECT id FROM students WHERE department=? AND id IN ({ph})",
+        (dept["name"],) + tuple(ids))
+    scoped = [r["id"] if isinstance(r, dict) else r[0] for r in rows]
+    if not scoped:
+        flash("No students selected.")
+        return redirect(url_for("dept_students"))
+    ph2 = ", ".join(["?"] * len(scoped))
+    db.execute(f"DELETE FROM viva_records WHERE student_id IN ({ph2})", scoped)
+    db.execute(f"DELETE FROM documents WHERE student_id IN ({ph2})", scoped)
+    db.execute(f"DELETE FROM students WHERE id IN ({ph2})", scoped)
+    db.commit()
+    log_activity(f"dept:{dept['name']}", "student_bulk_delete",
+                 f"{len(scoped)} student(s) deleted")
+    flash(f"Deleted {len(scoped)} student(s) and their documents.")
+    return redirect(url_for("dept_students"))
+
+
+@app.route("/dept/students/delete-all", methods=["POST"])
+@dept_required
+def dept_students_delete_all():
+    """Delete ALL of this department's students."""
+    dept = current_dept()
+    db = get_db()
+    ids = [r["id"] if isinstance(r, dict) else r[0] for r in db.fetchall(
+        "SELECT id FROM students WHERE department=?", (dept["name"],))]
+    if ids:
+        ph = ", ".join(["?"] * len(ids))
+        db.execute(f"DELETE FROM viva_records WHERE student_id IN ({ph})", ids)
+        db.execute(f"DELETE FROM documents WHERE student_id IN ({ph})", ids)
+        db.execute(f"DELETE FROM students WHERE id IN ({ph})", ids)
+        db.commit()
+    log_activity(f"dept:{dept['name']}", "student_delete_all",
+                 "ALL department students and documents deleted")
+    flash("All your department's student data has been deleted.")
+    return redirect(url_for("dept_students"))
+
+
 @app.route("/dept/student/<int:sid>")
 @dept_required
 def dept_student_profile(sid):
@@ -1841,7 +1905,8 @@ def admin_student_profile(sid):
     return render_template("student_profile.html", uni=UNI_NAME,
                            title=PORTAL_TITLE, s=s, docs=docs, vivas=vivas,
                            status_list=STATUS_LIST, genders=GENDER_OPTS,
-                           folders=FOLDER_OPTS, received=RECEIVED_OPTS)
+                           folders=FOLDER_OPTS, received=RECEIVED_OPTS,
+                           departments=dept_names())
 
 
 @app.route("/admin/student/<int:sid>/save", methods=["POST"])
@@ -1859,12 +1924,15 @@ def admin_student_save(sid):
         return redirect(url_for("admin_student_profile", sid=sid))
     db = get_db()
     now = datetime.now().strftime("%Y-%m-%d %H:%M")
+    dept = (f.get("department") or "").strip()
+    if dept and dept not in set(dept_names()):
+        dept = (s.get("department") or "").strip()  # ignore tampered values
     try:
         db.execute(
             """UPDATE students SET cnic=?, name=?, father_name=?, reg_no=?,
                gender=?, degree=?, session=?, folder_file=?, comments_missing=?,
                synopsis=?, semi_final_thesis=?, final_thesis=?,
-               thesis_forward_coe=?, status=?, updated_at=?
+               thesis_forward_coe=?, status=?, department=?, updated_at=?
                WHERE id=?""",
             (cnic, name, f.get("father_name", "").strip(), reg_no,
              f.get("gender", "").strip(), f.get("degree", "").strip(),
@@ -1876,7 +1944,7 @@ def admin_student_save(sid):
              pick(f.get("final_thesis"), RECEIVED_OPTS, "Not Received"),
              parse_coe(f.get("thesis_forward_coe")) or None,
              pick(f.get("status"), STATUS_LIST, "Continue"),
-             now, sid))
+             dept, now, sid))
         db.commit()
     except Exception as e:
         flash(f"Could not save (maybe duplicate Reg.No or CNIC): {e}")
@@ -1910,6 +1978,7 @@ def admin_students_delete_selected():
         return redirect(url_for("admin_students"))
     db = get_db()
     ph = ", ".join(["?"] * len(ids))
+    db.execute(f"DELETE FROM viva_records WHERE student_id IN ({ph})", ids)
     db.execute(f"DELETE FROM documents WHERE student_id IN ({ph})", ids)
     db.execute(f"DELETE FROM students WHERE id IN ({ph})", ids)
     db.commit()
@@ -1918,10 +1987,40 @@ def admin_students_delete_selected():
     return redirect(url_for("admin_students"))
 
 
+@app.route("/admin/students/assign-dept", methods=["POST"])
+@admin_required
+def admin_students_assign_dept():
+    """Bulk-assign the selected students to a department (or unassign).
+    The dept portal filters students by exact department name, so only
+    names from the departments table are accepted."""
+    ids = [int(x) for x in request.form.getlist("sel") if x.isdigit()]
+    dept = (request.form.get("assign_dept") or "").strip()
+    if dept == "__none":
+        dept = ""
+    if dept and dept not in set(dept_names()):
+        flash("Please choose a department from the list.")
+        return redirect(url_for("admin_students"))
+    if not ids:
+        flash("No students selected — tick the boxes first.")
+        return redirect(url_for("admin_students"))
+    db = get_db()
+    now = datetime.now().strftime("%Y-%m-%d %H:%M")
+    ph = ", ".join(["?"] * len(ids))
+    db.execute(f"UPDATE students SET department=?, updated_at=? WHERE id IN ({ph})",
+               (dept, now, *ids))
+    db.commit()
+    log_activity("admin", "student_bulk_dept_assign",
+                 f"{len(ids)} student(s) -> '{dept or 'Unassigned'}'")
+    flash(f"{len(ids)} student(s) assigned to '{dept or 'Unassigned'}'. "
+          "They now appear in that department's portal.")
+    return redirect(url_for("admin_students"))
+
+
 @app.route("/admin/students/delete-all", methods=["POST"])
 @admin_required
 def admin_students_delete_all():
     db = get_db()
+    db.execute("DELETE FROM viva_records")
     db.execute("DELETE FROM documents")
     db.execute("DELETE FROM students")
     db.commit()
@@ -1934,6 +2033,7 @@ def admin_students_delete_all():
 @admin_required
 def admin_student_delete(sid):
     db = get_db()
+    db.execute("DELETE FROM viva_records WHERE student_id=?", (sid,))
     db.execute("DELETE FROM documents WHERE student_id=?", (sid,))
     db.execute("DELETE FROM students WHERE id=?", (sid,))
     db.commit()
@@ -2107,6 +2207,9 @@ def student_change_password():
     return redirect(url_for("student_dashboard"))
 
 
+STUDENT_DOC_TYPES = ["Complete File (Merged PDF)", "Synopsis", "Thesis"]
+
+
 @app.route("/student/upload", methods=["GET", "POST"])
 @student_required
 def student_upload():
@@ -2118,6 +2221,9 @@ def student_upload():
     is_phd = "phd" in (s.get("degree") or "").lower()
     if request.method == "POST":
         file = request.files.get("file")
+        doc_type = request.form.get("doc_type", "Complete File (Merged PDF)")
+        if doc_type not in STUDENT_DOC_TYPES:
+            doc_type = "Complete File (Merged PDF)"
         if not file or not file.filename:
             flash("Please choose a PDF file to upload.")
         elif not file.filename.lower().endswith(".pdf"):
@@ -2126,19 +2232,22 @@ def student_upload():
             data = file.read()
             if not data.startswith(b"%PDF"):
                 flash("This file does not look like a valid PDF.")
+            elif len(data) > 25 * 1024 * 1024:
+                flash("File is too large — maximum 25 MB.")
             else:
                 db = get_db()
                 db.execute(
                     """INSERT INTO documents (student_id, doc_label, file_name,
                        mime_type, file_data, uploaded_by, uploaded_at)
-                       VALUES (?, 'Complete File (Merged PDF)', ?, 'application/pdf',
-                       ?, 'student', ?)""",
-                    (s["id"], secure_filename(file.filename), data,
+                       VALUES (?, ?, ?, 'application/pdf', ?, 'student', ?)""",
+                    (s["id"], doc_type, secure_filename(file.filename), data,
                      datetime.now().strftime("%Y-%m-%d %H:%M")))
                 db.commit()
-                flash("Your complete file has been uploaded and saved to your "
-                      "office record. You can upload again if needed \u2014 old "
-                      "versions are kept.")
+                log_activity(f"student:{s['reg_no']}", "doc_upload",
+                             f"{doc_type} uploaded by student")
+                flash(f"Your {doc_type.lower()} has been uploaded and saved"
+                      " to your office record. You can upload again if"
+                      " needed \u2014 old versions are kept.")
         return redirect(url_for("student_upload"))
     uploads = [d for d in get_docs(s["id"]) if d.get("uploaded_by") == "student"]
     return render_template("student_upload.html", uni=UNI_NAME, title=PORTAL_TITLE,
