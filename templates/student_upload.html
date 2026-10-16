@@ -23,64 +23,50 @@
 
 <div class="card section">
   <div class="section-head">
-    <span class="section-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg></span>
-    <h3>Current Document Status <span class="hint">(office record)</span></h3>
-  </div>
-  <div class="live-status">
-    <div class="ls-item">
-      <div class="ls-k">Synopsis</div>
-      {% if s.synopsis == 'Received' %}<span class="pill q">Received</span>{% else %}<span class="pill nq">Not Received</span>{% endif %}
-    </div>
-    <div class="ls-item">
-      <div class="ls-k">Semi-Final Thesis</div>
-      {% if s.semi_final_thesis == 'Received' %}<span class="pill q">Received</span>{% else %}<span class="pill nq">Not Received</span>{% endif %}
-    </div>
-    <div class="ls-item">
-      <div class="ls-k">Final Thesis</div>
-      {% if s.final_thesis == 'Received' %}<span class="pill q">Received</span>{% else %}<span class="pill nq">Not Received</span>{% endif %}
-    </div>
-    <div class="ls-item">
-      <div class="ls-k">Folder / File</div>
-      {% if s.folder_file == 'Completed' %}<span class="pill q">Completed</span>{% else %}<span class="pill nq">Not Completed</span>{% endif %}
-    </div>
-  </div>
-  <p class="hint" style="margin:12px 0 0">This is the live status from the DAS office record — it updates as the office processes your submissions.</p>
-</div>
-
-<div class="card section">
-  <div class="section-head">
     <span class="section-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg></span>
     <h3>Required Documents — {% if is_phd %}PhD{% else %}MPhil{% endif %} ({{ doc_list|length }} items, in sequence)</h3>
   </div>
   <ol class="checklist">
     {% for item in doc_list %}<li>{{ item }}</li>{% endfor %}
   </ol>
+</div>
+
+{% for up in [('Complete File (Merged PDF)', 'complete', 'Upload your merged PDF — all required documents in one file'),
+              ('Synopsis', 'synopsis', 'Upload your synopsis as a PDF'),
+              ('Thesis', 'thesis', 'Upload your thesis as a PDF')] %}
+<div class="card section">
+  <div class="section-head">
+    <span class="section-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg></span>
+    <h3>Upload {{ up[0] }}</h3>
+  </div>
+  <p class="hint" style="margin-top:0">{{ up[2] }} — PDF only, max 25 MB.</p>
   <form method="post" enctype="multipart/form-data">
-    <label class="f-label" for="doc_type">What are you uploading?</label>
-    <select class="no-icon" id="doc_type" name="doc_type" style="max-width:340px; margin-bottom:14px">
-      <option value="Complete File (Merged PDF)">Complete File (Merged PDF)</option>
-      <option value="Synopsis">Synopsis</option>
-      <option value="Thesis">Thesis</option>
-    </select>
-    <label class="dropzone" id="dz">
-      <input type="file" name="file" id="fileInput" accept=".pdf" required hidden>
+    <input type="hidden" name="doc_type" value="{{ up[0] }}">
+    <label class="dropzone" id="dz-{{ up[1] }}">
+      <input type="file" name="file" id="fileInput-{{ up[1] }}" accept=".pdf" required hidden>
       <span class="dz-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg></span>
-      <span class="dz-text"><strong>Choose your merged PDF</strong> or drag it here</span>
-      <span class="dz-file" id="dzFile"></span>
+      <span class="dz-text"><strong>Choose your {{ up[0]|lower }} PDF</strong> or drag it here</span>
+      <span class="dz-file" id="dzFile-{{ up[1] }}"></span>
       <span class="dz-hint">PDF only, max 25 MB.</span>
     </label>
     <button type="submit" class="btn primary">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2 2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
-      Upload Complete File
+      Upload {{ up[0] }}
     </button>
   </form>
-  <script>
-    (function () {
-      var inp = document.getElementById('fileInput'), lbl = document.getElementById('dzFile');
-      inp.addEventListener('change', function () { if (inp.files.length) lbl.textContent = inp.files[0].name; });
-    })();
-  </script>
 </div>
+{% endfor %}
+<script>
+  (function () {
+    ['complete', 'synopsis', 'thesis'].forEach(function (k) {
+      var inp = document.getElementById('fileInput-' + k),
+          lbl = document.getElementById('dzFile-' + k);
+      if (inp && lbl) inp.addEventListener('change', function () {
+        if (inp.files.length) lbl.textContent = inp.files[0].name;
+      });
+    });
+  })();
+</script>
 
 <div class="card section">
   <div class="section-head">
