@@ -25,7 +25,8 @@
   </header>
   <main class="wrap container{% block container_extra %}{% endblock %}">
     {% with msgs = get_flashed_messages() %}
-      {% if msgs %}<div class="flash">{% for m in msgs %}<p><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>{{ m }}</p>{% endfor %}</div>{% endif %}
+      {% if msgs %}<div class="flash">{% for m in msgs %}<p><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>{{ m }}</p>{% endfor %}</div>
+      <script>window._flashMessages = {{ msgs|tojson }};</script>{% endif %}
     {% endwith %}
     {% block content %}{% endblock %}
   </main>
@@ -65,9 +66,6 @@
     </div>
   </div>
 
-  {% with msgs = get_flashed_messages() %}
-  {% if msgs %}<script>window._flashMessages = {{ msgs|tojson }};</script>{% endif %}
-  {% endwith %}
   <script>
   (function () {
     /* ---- confirmation popup for destructive actions ---- */
