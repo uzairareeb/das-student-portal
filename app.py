@@ -21,7 +21,7 @@ from functools import wraps
 from urllib.parse import urlencode
 
 from flask import (Flask, Response, flash, g, redirect, render_template,
-                   request, session, url_for)
+                   request, send_file, session, url_for)
 from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.utils import secure_filename
 
@@ -1353,6 +1353,192 @@ def query_vivas(args):
     return [dict(r) for r in get_db().fetchall(sql, params)]
 
 
+def build_viva_card(vid):
+    """Assemble viva result-card data for a viva record id. Returns None if
+    the record has no marks yet (card not available)."""
+    row = get_db().fetchone(
+        "SELECT v.*, s.name, s.father_name, s.reg_no, s.department,"
+        " s.degree, s.session FROM viva_records v"
+        " JOIN students s ON s.id=v.student_id WHERE v.id=?", (vid,))
+    if not row:
+        return None
+    v = dict(row)
+    if v.get("obtained_marks") is None:
+        return None
+    total = v.get("total_marks") or 120
+    obtained = v["obtained_marks"]
+    pct = round(obtained * 100.0 / total, 1) if total else 0
+    now = datetime.now()
+    return {
+        "name": v["name"], "father_name": v.get("father_name"),
+        "reg_no": v["reg_no"], "department": v.get("department"),
+        "degree": v.get("degree"), "session": v.get("session"),
+        "examiner_name": v.get("examiner_name"),
+        "examiner_affiliation": v.get("examiner_affiliation"),
+        "viva_date": v.get("viva_date"), "result": v.get("result"),
+        "total_marks": total, "obtained_marks": obtained,
+        "percentage": pct, "remarks": v.get("remarks"),
+        "year": now.year, "generated_on": now.strftime("%d %b %Y"),
+    }
+
+
+def build_viva_pdf(card):
+    """Viva result card PDF matching the web card design."""
+    from reportlab.lib import colors
+    from reportlab.pdfgen import canvas
+
+    SOLID = colors.HexColor("#2d3290")
+    DARK = colors.HexColor("#111111")
+    LBL_BG = colors.HexColor("#eef0fb")
+    LINE = colors.HexColor("#333333")
+    RED = colors.HexColor("#b3261e")
+    GREEN = colors.HexColor("#1a7a2e")
+
+    W, H = 780, 640
+    buf = io.BytesIO()
+    c = canvas.Canvas(buf, pagesize=(W, H))
+
+    bx, bw = 16, W - 32
+    btop, bbot = H - 16, 16
+    c.setStrokeColor(DARK)
+    c.setLineWidth(1.2)
+    c.rect(bx, bbot, bw, btop - bbot, stroke=1, fill=0)
+    # top accent band
+    c.setFillColor(SOLID)
+    c.rect(bx, btop - 6, bw, 6, stroke=0, fill=1)
+
+    # header: logo + university
+    lh = 52
+    lx, ly = bx + 18, btop - 22 - lh
+    logo_path = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                             "static", "img", "cuvas-logo.png")
+    if os.path.exists(logo_path):
+        c.drawImage(logo_path, lx, ly, lh * 1.8, lh, preserveAspectRatio=True)
+    c.setFont("Helvetica-Bold", 14)
+    c.setFillColor(DARK)
+    c.drawString(lx + lh * 1.8 + 14, ly + 26,
+                 "Cholistan University of Veterinary & Animal Sciences,")
+    c.drawString(lx + lh * 1.8 + 14, ly + 8, "Bahawalpur")
+    c.setFont("Helvetica-Bold", 10)
+    c.setFillColor(SOLID)
+    c.drawString(lx + lh * 1.8 + 14, ly - 8, "DIRECTORATE OF ADVANCED STUDIES")
+
+    # rule + title
+    c.setFillColor(SOLID)
+    c.rect(bx + 18, ly - 20, bw - 36, 3, stroke=0, fill=1)
+    cx = bx + bw / 2
+    c.setFillColor(DARK)
+    c.setFont("Helvetica-Bold", 16)
+    c.drawCentredString(cx, ly - 48, "Viva Voce Result Card")
+    c.setFillColor(SOLID)
+    c.setFont("Helvetica-Bold", 11)
+    deg_line = card["degree"] or ""
+    if card["session"]:
+        deg_line += f"  |  Session {card['session']}"
+    c.drawCentredString(cx, ly - 68, deg_line)
+
+    # helper for label/value rows
+    y = ly - 100
+    c.setFont("Helvetica", 11)
+    def field(x, yy, label, value):
+        c.setFont("Helvetica-Bold", 11)
+        c.setFillColor(DARK)
+        c.drawString(x, yy, label)
+        lw = c.stringWidth(label, "Helvetica-Bold", 11)
+        c.setFont("Helvetica", 11)
+        c.drawString(x + lw + 6, yy, str(value or "—"))
+
+    c.setFont("Helvetica-Bold", 11)
+    c.setFillColor(SOLID)
+    c.drawString(bx + 18, y, "STUDENT INFORMATION")
+    y -= 20
+    col2 = bx + 18 + (bw - 36) / 2
+    field(bx + 18, y, "Name:", card["name"])
+    field(col2, y, "Father's Name:", card["father_name"])
+    y -= 20
+    field(bx + 18, y, "Registration No:", card["reg_no"])
+    field(col2, y, "Department:", card["department"])
+    y -= 20
+    field(bx + 18, y, "Degree Program:", card["degree"])
+    field(col2, y, "Session:", card["session"])
+
+    y -= 32
+    c.setFont("Helvetica-Bold", 11)
+    c.setFillColor(SOLID)
+    c.drawString(bx + 18, y, "VIVA DETAILS")
+    y -= 20
+    field(bx + 18, y, "Examiner:", card["examiner_name"])
+    field(col2, y, "Affiliation:", card["examiner_affiliation"])
+    y -= 20
+    field(bx + 18, y, "Viva Date:", card["viva_date"])
+    field(col2, y, "Conducted By:", (card["department"] or "") + " Department")
+
+    # result table
+    y -= 36
+    tx, tw = bx + 18, bw - 36
+    rows = [
+        ("Total Marks", str(card["total_marks"]),
+         "Obtained Marks", str(card["obtained_marks"])),
+        ("Percentage", f"{card['percentage']}%",
+         "Result", card["result"]),
+    ]
+    rh = 30
+    cw = tw / 4
+    for ri, (l1, v1, l2, v2) in enumerate(rows):
+        yy = y - ri * rh
+        for ci, (lab, val) in enumerate([(l1, v1), (l2, v2)]):
+            x0 = tx + ci * 2 * cw
+            c.setFillColor(LBL_BG)
+            c.rect(x0, yy - rh, cw, rh, stroke=0, fill=1)
+            c.setFillColor(DARK)
+            c.setFont("Helvetica-Bold", 11)
+            c.drawString(x0 + 10, yy - 20, lab)
+            c.setFont("Helvetica", 11)
+            if lab == "Result":
+                c.setFillColor(GREEN if val == "Pass" else RED)
+                c.setFont("Helvetica-Bold", 11)
+            c.drawString(x0 + cw + 10, yy - 20, val)
+            c.setFillColor(DARK)
+    c.setStrokeColor(LINE)
+    c.setLineWidth(0.8)
+    for ri in range(3):
+        yy = y - ri * rh
+        c.line(tx, yy, tx + tw, yy)
+    for ci in range(5):
+        x0 = tx + ci * cw
+        c.line(x0, y, x0, y - 2 * rh)
+    c.line(tx + tw, y, tx + tw, y - 2 * rh)
+
+    # result stamp
+    y = y - 2 * rh - 44
+    stamp_w, stamp_h = 190, 44
+    c.setFillColor(GREEN if card["result"] == "Pass" else RED)
+    c.roundRect(cx - stamp_w / 2, y - stamp_h, stamp_w, stamp_h, 8,
+                stroke=0, fill=1)
+    c.setFillColor(colors.white)
+    c.setFont("Helvetica-Bold", 20)
+    c.drawCentredString(cx, y - stamp_h + 15, card["result"].upper())
+
+    # note + footer
+    c.setFillColor(colors.HexColor("#3c4257"))
+    c.setFont("Helvetica-Oblique", 9)
+    c.drawCentredString(cx, bbot + 52,
+        "NOTE: This is a system generated result card. Errors and omissions"
+        " are excepted.")
+    c.setFillColor(SOLID)
+    c.rect(bx, bbot, bw, 34, stroke=0, fill=1)
+    c.setFillColor(colors.white)
+    c.setFont("Helvetica", 10)
+    c.drawCentredString(cx, bbot + 13,
+        f"© {card['year']} Cholistan University of Veterinary & Animal"
+        f" Sciences, Bahawalpur  |  Generated on {card['generated_on']}")
+
+    c.showPage()
+    c.save()
+    buf.seek(0)
+    return buf
+
+
 @app.route("/admin/viva")
 @admin_required
 def admin_viva():
@@ -1484,6 +1670,33 @@ def admin_notifications():
     db.commit()
     return render_template("admin_notifications.html", uni=UNI_NAME,
                            title=PORTAL_TITLE, notes=notes)
+
+
+@app.route("/admin/viva/card/<int:vid>")
+@admin_required
+def admin_viva_card(vid):
+    """View viva result card (admin)."""
+    card = build_viva_card(vid)
+    if not card:
+        flash("Result card is available once marks are entered.")
+        return redirect(url_for("admin_viva"))
+    return render_template("viva_card.html", uni=UNI_NAME, title=PORTAL_TITLE,
+                           base="admin_base.html", card=card,
+                           back_url=url_for("admin_viva"),
+                           pdf_url=url_for("admin_viva_card_pdf", vid=vid))
+
+
+@app.route("/admin/viva/card/<int:vid>/pdf")
+@admin_required
+def admin_viva_card_pdf(vid):
+    """Download viva result card PDF (admin)."""
+    card = build_viva_card(vid)
+    if not card:
+        flash("Result card is available once marks are entered.")
+        return redirect(url_for("admin_viva"))
+    buf = build_viva_pdf(card)
+    return send_file(buf, mimetype="application/pdf", as_attachment=True,
+                     download_name=f"Viva_Result_Card_{card['reg_no']}.pdf")
 
 
 @app.route("/admin/reports")
@@ -1956,6 +2169,47 @@ def dept_viva_bulk():
     return render_template("dept_viva_bulk.html", uni=UNI_NAME,
                            title=PORTAL_TITLE, dept=dept, students=students,
                            results=VIVA_RESULTS)
+
+
+@app.route("/dept/viva/card/<int:vid>")
+@dept_required
+def dept_viva_card(vid):
+    """View viva result card (department, own students only)."""
+    dept = current_dept()
+    row = get_db().fetchone(
+        "SELECT v.id FROM viva_records v JOIN students s ON s.id=v.student_id"
+        " WHERE v.id=? AND s.department=?", (vid, dept["name"]))
+    if not row:
+        flash("Viva record not found.")
+        return redirect(url_for("dept_viva"))
+    card = build_viva_card(vid)
+    if not card:
+        flash("Result card is available once marks are entered.")
+        return redirect(url_for("dept_viva"))
+    return render_template("viva_card.html", uni=UNI_NAME, title=PORTAL_TITLE,
+                           base="dept_base.html", card=card, dept=dept,
+                           back_url=url_for("dept_viva"),
+                           pdf_url=url_for("dept_viva_card_pdf", vid=vid))
+
+
+@app.route("/dept/viva/card/<int:vid>/pdf")
+@dept_required
+def dept_viva_card_pdf(vid):
+    """Download viva result card PDF (department, own students only)."""
+    dept = current_dept()
+    row = get_db().fetchone(
+        "SELECT v.id FROM viva_records v JOIN students s ON s.id=v.student_id"
+        " WHERE v.id=? AND s.department=?", (vid, dept["name"]))
+    if not row:
+        flash("Viva record not found.")
+        return redirect(url_for("dept_viva"))
+    card = build_viva_card(vid)
+    if not card:
+        flash("Result card is available once marks are entered.")
+        return redirect(url_for("dept_viva"))
+    buf = build_viva_pdf(card)
+    return send_file(buf, mimetype="application/pdf", as_attachment=True,
+                     download_name=f"Viva_Result_Card_{card['reg_no']}.pdf")
 
 
 @app.route("/dept/template")
@@ -2590,7 +2844,7 @@ def student_viva():
         session.pop("student_id", None)
         return redirect(url_for("student_login"))
     vivas = [dict(r) for r in get_db().fetchall(
-        "SELECT examiner_name, examiner_affiliation, viva_date, result,"
+        "SELECT id, examiner_name, examiner_affiliation, viva_date, result,"
         " remarks, total_marks, obtained_marks, next_viva_date"
         " FROM viva_records WHERE student_id=? ORDER BY id DESC",
         (s["id"],))]
@@ -2612,6 +2866,49 @@ def student_notifications():
     db.commit()
     return render_template("student_notifications.html", uni=UNI_NAME,
                            title=PORTAL_TITLE, s=s, notes=notes)
+
+
+@app.route("/student/viva/card/<int:vid>")
+@student_required
+def student_viva_card(vid):
+    """View own viva result card."""
+    s = current_student()
+    row = get_db().fetchone(
+        "SELECT id FROM viva_records WHERE id=? AND student_id=?",
+        (vid, s["id"]))
+    if not row:
+        flash("Viva record not found.")
+        return redirect(url_for("student_viva"))
+    card = build_viva_card(vid)
+    if not card:
+        flash("Your result card will be available once the department"
+              " enters your marks.")
+        return redirect(url_for("student_viva"))
+    return render_template("viva_card.html", uni=UNI_NAME, title=PORTAL_TITLE,
+                           base="student_base.html", card=card, s=s,
+                           back_url=url_for("student_viva"),
+                           pdf_url=url_for("student_viva_card_pdf", vid=vid))
+
+
+@app.route("/student/viva/card/<int:vid>/pdf")
+@student_required
+def student_viva_card_pdf(vid):
+    """Download own viva result card PDF."""
+    s = current_student()
+    row = get_db().fetchone(
+        "SELECT id FROM viva_records WHERE id=? AND student_id=?",
+        (vid, s["id"]))
+    if not row:
+        flash("Viva record not found.")
+        return redirect(url_for("student_viva"))
+    card = build_viva_card(vid)
+    if not card:
+        flash("Your result card will be available once the department"
+              " enters your marks.")
+        return redirect(url_for("student_viva"))
+    buf = build_viva_pdf(card)
+    return send_file(buf, mimetype="application/pdf", as_attachment=True,
+                     download_name=f"Viva_Result_Card_{card['reg_no']}.pdf")
 
 
 @app.route("/student/change-password", methods=["POST"])
