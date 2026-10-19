@@ -253,7 +253,22 @@ def init_db():
             remarks TEXT,
             updated_by TEXT,
             created_at TEXT,
-            admin_seen INTEGER DEFAULT 0
+            admin_seen INTEGER DEFAULT 0,
+            total_marks INTEGER DEFAULT 120,
+            obtained_marks INTEGER,
+            next_viva_date TEXT
+        )
+    """)
+    db.execute(f"""
+        CREATE TABLE IF NOT EXISTS student_notifications (
+            {id_pg if USE_PG else id_lite},
+            student_id INTEGER NOT NULL,
+            kind TEXT,
+            title TEXT,
+            message TEXT,
+            link TEXT,
+            is_read INTEGER DEFAULT 0,
+            created_at TEXT
         )
     """)
     db.execute(f"""
@@ -291,6 +306,7 @@ def init_db():
     _migrate_drop_unique_constraints(db)
     _migrate_add_department_column(db)
     _migrate_add_viva_admin_seen(db)
+    _migrate_add_viva_marks(db)
     # Admin password comes from the env var (source of truth), stored hashed.
     pw_hash = generate_password_hash(
         os.environ.get("ADMIN_PASSWORD", "admin123") or "admin123")
@@ -361,6 +377,26 @@ def _migrate_drop_unique_constraints(db):
             db.conn.rollback()
         except Exception:
             pass
+
+
+def _migrate_add_viva_marks(db):
+    """Add viva_records.total_marks / obtained_marks / next_viva_date."""
+    try:
+        cols_needed = {"total_marks": "INTEGER DEFAULT 120",
+                       "obtained_marks": "INTEGER",
+                       "next_viva_date": "TEXT"}
+        if USE_PG:
+            for col, typ in cols_needed.items():
+                db.execute(f"ALTER TABLE viva_records ADD COLUMN IF NOT EXISTS"
+                           f" {col} {typ}")
+        else:
+            cols = [r[1] for r in db.fetchall("PRAGMA table_info(viva_records)")]
+            for col, typ in cols_needed.items():
+                if col not in cols:
+                    db.execute(f"ALTER TABLE viva_records ADD COLUMN {col} {typ}")
+        db.commit()
+    except Exception:
+        pass
 
 
 def _migrate_add_viva_admin_seen(db):
@@ -861,6 +897,26 @@ def notify_admin(kind, title, message="", link=""):
         pass
 
 
+def notify_student(student_id, kind, title, message="", link=""):
+    """Create an in-portal notification for a student."""
+    try:
+        get_db().execute(
+            "INSERT INTO student_notifications (student_id, kind, title,"
+            " message, link, created_at) VALUES (?,?,?,?,?,?)",
+            (student_id, kind, title, message, link,
+             datetime.now().strftime("%Y-%m-%d %H:%M")))
+        get_db().commit()
+    except Exception:
+        pass
+
+
+def student_unread_count(student_id):
+    row = get_db().fetchone(
+        "SELECT COUNT(*) AS n FROM student_notifications"
+        " WHERE student_id=? AND is_read=0", (student_id,))
+    return (row["n"] if isinstance(row, dict) else row[0]) if row else 0
+
+
 def admin_unread_count():
     row = get_db().fetchone(
         "SELECT COUNT(*) AS n FROM admin_notifications WHERE is_read=0")
@@ -1327,7 +1383,7 @@ def admin_viva_export():
     ws = wb.active
     ws.title = "Viva Records"
     headers = ["Student", "Reg.No", "Degree", "Department", "Examiner",
-               "Affiliation", "Viva Date", "Result", "Remarks"]
+               "Affiliation", "Viva Date", "Result", "Marks", "Remarks"]
     ws.append(headers)
     for cell in ws[1]:
         cell.font = Font(bold=True, color="FFFFFF")
@@ -1335,11 +1391,13 @@ def admin_viva_export():
         cell.alignment = Alignment(horizontal="center", vertical="center",
                                    wrap_text=True)
     for v in vivas:
+        marks = (f"{v.get('obtained_marks')}/{v.get('total_marks') or 120}"
+                 if v.get("obtained_marks") is not None else "")
         ws.append([v.get("student_name"), v.get("reg_no"), v.get("degree"),
                    v.get("department"), v.get("examiner_name"),
                    v.get("examiner_affiliation"), v.get("viva_date"),
-                   v.get("result"), v.get("remarks")])
-    widths = [24, 16, 22, 18, 22, 20, 14, 12, 30]
+                   v.get("result"), marks, v.get("remarks")])
+    widths = [24, 16, 22, 18, 22, 20, 14, 12, 12, 30]
     for i, w in enumerate(widths, start=1):
         ws.column_dimensions[ws.cell(row=1, column=i).column_letter].width = w
     buf = io.BytesIO()
@@ -1380,13 +1438,18 @@ def admin_viva_export_pdf():
              Paragraph(UNI_NAME, styles["Normal"]), Spacer(1, 6*mm)]
     data = [[Paragraph(h, head) for h in
              ["Student", "Reg.No", "Degree", "Department", "Examiner",
-              "Viva Date", "Result", "Remarks"]]]
+              "Viva Date", "Result", "Marks", "Remarks"]]]
     for v in vivas:
+        marks = (f"{v.get('obtained_marks')}/{v.get('total_marks') or 120}"
+                 if v.get("obtained_marks") is not None else "—")
         data.append([Paragraph(str(v.get(k) or "—"), normal) for k in
                      ("student_name", "reg_no", "degree", "department",
-                      "examiner_name", "viva_date", "result", "remarks")])
+                      "examiner_name", "viva_date", "result")]
+                    + [Paragraph(marks, normal),
+                       Paragraph(str(v.get("remarks") or "—"), normal)])
     t = Table(data, repeatRows=1,
-              colWidths=[42*mm, 24*mm, 34*mm, 30*mm, 36*mm, 22*mm, 18*mm, 50*mm])
+              colWidths=[40*mm, 22*mm, 30*mm, 28*mm, 32*mm, 20*mm, 16*mm,
+                         18*mm, 44*mm])
     t.setStyle(TableStyle([
         ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#2D3290")),
         ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
@@ -1441,6 +1504,8 @@ def _inject_dept_notif():
             return {"dept_unread": dept_unread_count(session["dept_id"])}
         if request.path.startswith("/admin") and session.get("admin_ok"):
             return {"admin_unread": admin_unread_count()}
+        if request.path.startswith("/student") and session.get("student_id"):
+            return {"student_unread": student_unread_count(session["student_id"])}
     except Exception:
         pass
     return {}
@@ -1825,6 +1890,11 @@ def dept_viva_bulk():
         viva_date = request.form.get("viva_date", "").strip()
         result = request.form.get("result", "Pending")
         remarks = request.form.get("remarks", "").strip()
+        total_marks = request.form.get("total_marks", "120").strip() or "120"
+        try:
+            total_marks = int(total_marks)
+        except ValueError:
+            total_marks = 120
         if not ids:
             flash("No students selected.")
             return redirect(url_for("dept_viva_bulk"))
@@ -1847,9 +1917,16 @@ def dept_viva_bulk():
             db.execute(
                 "INSERT INTO viva_records (student_id, examiner_name,"
                 " examiner_affiliation, viva_date, result, remarks,"
-                " updated_by, created_at) VALUES (?,?,?,?,?,?,?,?)",
+                " updated_by, created_at, total_marks)"
+                " VALUES (?,?,?,?,?,?,?,?,?)",
                 (sid, examiner, affiliation, viva_date or None, result,
-                 remarks, dept["name"], now))
+                 remarks, dept["name"], now, total_marks))
+            notify_student(st["id"], "viva", "Viva scheduled",
+                           f"Your viva has been scheduled — examiner"
+                           f" {examiner}"
+                           + (f" on {viva_date}" if viva_date else "")
+                           + f". Result: {result}",
+                           url_for("student_viva"))
             added += 1
         db.commit()
         if added:
@@ -1925,6 +2002,9 @@ def dept_viva():
         viva_date = request.form.get("viva_date", "").strip()
         result = request.form.get("result", "Pending")
         remarks = request.form.get("remarks", "").strip()
+        total_marks = request.form.get("total_marks", "120").strip() or "120"
+        obtained_raw = request.form.get("obtained_marks", "").strip()
+        next_viva_date = request.form.get("next_viva_date", "").strip()
         st = db.fetchone(
             "SELECT * FROM students WHERE id=? AND department=?",
             (sid, dept["name"]))
@@ -1941,12 +2021,24 @@ def dept_viva():
                   " another one.")
             return redirect(url_for("dept_viva"))
         now = datetime.now().strftime("%Y-%m-%d %H:%M")
+        try:
+            total_marks = int(total_marks)
+        except ValueError:
+            total_marks = 120
+        obtained_marks = None
+        if obtained_raw:
+            try:
+                obtained_marks = int(obtained_raw)
+            except ValueError:
+                pass
         db.execute(
             "INSERT INTO viva_records (student_id, examiner_name,"
             " examiner_affiliation, viva_date, result, remarks, updated_by,"
-            " created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+            " created_at, total_marks, obtained_marks, next_viva_date)"
+            " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             (sid, examiner, affiliation, viva_date or None, result,
-             remarks, dept["name"], now))
+             remarks, dept["name"], now, total_marks, obtained_marks,
+             next_viva_date or None))
         db.commit()
         st = dict(st)
         log_activity(f"dept:{dept['name']}", "viva_add",
@@ -1959,6 +2051,13 @@ def dept_viva():
                      f"{st['name']} ({st['reg_no']}) — examiner {examiner}"
                      + (f" on {viva_date}" if viva_date else ""),
                      url_for("admin_viva", department=dept["name"]))
+        notify_student(st["id"], "viva", "Viva scheduled",
+                       f"Your viva has been scheduled — examiner {examiner}"
+                       + (f" on {viva_date}" if viva_date else "")
+                       + f". Result: {result}"
+                       + (f" ({obtained_marks}/{total_marks} marks)"
+                          if obtained_marks is not None else ""),
+                       url_for("student_viva"))
         flash("Viva record saved.")
         return redirect(url_for("dept_viva"))
     students = [dict(r) for r in db.fetchall(
@@ -2011,15 +2110,37 @@ def dept_viva_edit(vid):
         viva_date = request.form.get("viva_date", "").strip()
         result = request.form.get("result", "Pending")
         remarks = request.form.get("remarks", "").strip()
+        total_marks = request.form.get("total_marks", "120").strip() or "120"
+        obtained_raw = request.form.get("obtained_marks", "").strip()
+        next_viva_date = request.form.get("next_viva_date", "").strip()
         if not examiner:
             flash("Examiner name is required.")
             return redirect(url_for("dept_viva_edit", vid=vid))
+        try:
+            total_marks = int(total_marks)
+        except ValueError:
+            total_marks = 120
+        obtained_marks = None
+        if obtained_raw:
+            try:
+                obtained_marks = int(obtained_raw)
+            except ValueError:
+                pass
         db.execute(
             "UPDATE viva_records SET examiner_name=?, examiner_affiliation=?,"
-            " viva_date=?, result=?, remarks=?, updated_by=? WHERE id=?",
+            " viva_date=?, result=?, remarks=?, updated_by=?, total_marks=?,"
+            " obtained_marks=?, next_viva_date=? WHERE id=?",
             (examiner, affiliation, viva_date or None, result, remarks,
-             dept["name"], vid))
+             dept["name"], total_marks, obtained_marks,
+             next_viva_date or None, vid))
         db.commit()
+        notify_student(v["student_id"], "viva", "Viva record updated",
+                       f"Your viva record was updated — result: {result}"
+                       + (f" ({obtained_marks}/{total_marks} marks)"
+                          if obtained_marks is not None else "")
+                       + (f", next viva on {next_viva_date}"
+                          if next_viva_date else ""),
+                       url_for("student_viva"))
         log_activity(f"dept:{dept['name']}", "viva_edit",
                      f"record #{vid} ({v['student_name']}) updated")
         flash("Viva record updated.")
@@ -2430,7 +2551,8 @@ def student_dashboard():
     docs = get_docs(s["id"])
     vivas = [dict(r) for r in get_db().fetchall(
         "SELECT examiner_name, examiner_affiliation, viva_date, result,"
-        " remarks FROM viva_records WHERE student_id=? ORDER BY id DESC",
+        " remarks, total_marks, obtained_marks, next_viva_date"
+        " FROM viva_records WHERE student_id=? ORDER BY id DESC",
         (s["id"],))]
     timeline = [
         {"label": "Synopsis", "done": s.get("synopsis") == "Received"},
@@ -2469,10 +2591,27 @@ def student_viva():
         return redirect(url_for("student_login"))
     vivas = [dict(r) for r in get_db().fetchall(
         "SELECT examiner_name, examiner_affiliation, viva_date, result,"
-        " remarks FROM viva_records WHERE student_id=? ORDER BY id DESC",
+        " remarks, total_marks, obtained_marks, next_viva_date"
+        " FROM viva_records WHERE student_id=? ORDER BY id DESC",
         (s["id"],))]
     return render_template("student_viva.html", uni=UNI_NAME,
                            title=PORTAL_TITLE, s=s, vivas=vivas)
+
+
+@app.route("/student/notifications")
+@student_required
+def student_notifications():
+    """In-portal notifications for the student."""
+    s = current_student()
+    db = get_db()
+    notes = [dict(r) for r in db.fetchall(
+        "SELECT * FROM student_notifications WHERE student_id=?"
+        " ORDER BY id DESC LIMIT 50", (s["id"],))]
+    db.execute("UPDATE student_notifications SET is_read=1 WHERE student_id=?",
+               (s["id"],))
+    db.commit()
+    return render_template("student_notifications.html", uni=UNI_NAME,
+                           title=PORTAL_TITLE, s=s, notes=notes)
 
 
 @app.route("/student/change-password", methods=["POST"])
