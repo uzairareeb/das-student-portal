@@ -533,34 +533,33 @@ code { background: var(--bg-soft); padding: 2px 8px; border-radius: 6px; font-si
 .vcard-top-accent { height: 6px; background: linear-gradient(90deg, #2d3290, #5b61c9, #2d3290); margin: -30px -30px 0; }
 .vhead { display: flex; align-items: center; gap: 16px; padding-top: 20px; }
 .vlogo-img { width: 92px; height: auto; flex-shrink: 0; }
-.vunititle { font-size: 16.5px; font-weight: 800; color: #1a1a1a; line-height: 1.4; white-space: nowrap; }
+.vunititle { font-size: 17px; font-weight: 800; color: #1a1a1a; line-height: 1.4; }
 .vunisub { font-size: 13px; font-weight: 600; color: #2d3290; letter-spacing: .5px; margin-top: 2px; }
 .vrule { height: 3px; background: #2d3290; margin: 16px 0 0; border-radius: 2px; }
 .vtitle { text-align: center; font-size: 19px; font-weight: 800; color: #1a1a1a; padding-top: 16px; letter-spacing: .5px; }
 .vtitle-sub { text-align: center; font-size: 13.5px; color: #2d3290; font-weight: 700; margin: 4px 0 18px; }
-.vsec-title { font-size: 13px; font-weight: 800; color: #2d3290; text-transform: uppercase; letter-spacing: 1px; margin: 20px 0 10px; padding-bottom: 6px; border-bottom: 2px solid #eef0fb; }
-.vfields { display: grid; grid-template-columns: 1fr 1fr; gap: 12px 24px; }
-.vfields .vf { font-size: 14.5px; }
-.vfields .lab { font-weight: 700; color: #1a1a1a; }
-.vtable { width: 100%; border-collapse: collapse; margin-top: 6px; border: 1px solid #333; }
+.vsec-title { font-size: 13.5px; font-weight: 800; color: #fff; text-transform: uppercase; letter-spacing: 1.2px; margin: 22px 0 12px; padding: 8px 14px; background: linear-gradient(90deg, #2d3290, #4a52b8); border-radius: 6px; display: flex; align-items: center; gap: 8px; }
+.vsec-title::before { content: ""; width: 4px; height: 16px; background: #fff; border-radius: 2px; opacity: .85; }
+.vfields { display: grid; grid-template-columns: 1fr 1fr; gap: 10px 16px; background: #f8f9fe; border: 1px solid #e4e7f5; border-radius: 8px; padding: 16px 18px; }
+.vfields .vf { font-size: 14.5px; padding: 6px 0; border-bottom: 1px dashed #dfe3f2; }
+.vfields .vf:nth-last-child(-n+2) { border-bottom: none; }
+.vfields .lab { font-weight: 700; color: #2d3290; }
+.vtable { width: 100%; border-collapse: collapse; margin-top: 6px; border: 1.5px solid #333; }
 .vtable td { border: 1px solid #333; padding: 11px 14px; font-size: 14.5px; }
+.vtable tr:last-child td { border-bottom: 1.5px solid #333; }
 .vtable .lab2 { background: #eef0fb; font-weight: 700; width: 22%; }
 .vtable .val { font-weight: 600; }
 .vstamp-row { text-align: center; margin: 20px 0 4px; }
 .vstamp { display: inline-block; padding: 12px 44px; border-radius: 10px; color: #fff; font-weight: 800; font-size: 22px; letter-spacing: 2px; }
-.vstamp.pass { background: linear-gradient(135deg, #1a7a2e, #2fa14f); box-shadow: 0 4px 14px rgba(26,122,46,.35); }
+.vstamp.pass { background: linear-gradient(135deg, #2d3290, #4a52b8); box-shadow: 0 4px 14px rgba(45,50,144,.35); }
 .vstamp.fail { background: linear-gradient(135deg, #b3261e, #d43a2f); box-shadow: 0 4px 14px rgba(179,38,30,.35); }
 .vnote { font-style: italic; font-size: 12.5px; color: #3c4257; text-align: center; margin: 18px 8px 2px; line-height: 1.65; }
 .vfoot { background: #2d3290; color: #fff; text-align: center; font-size: 13.5px; padding: 13px; margin: 22px -30px 0; border-radius: 0 0 3px 3px; }
 .vfoot small { display: block; font-size: 11.5px; opacity: .85; margin-top: 3px; }
 .vcard-actions { display: flex; gap: 12px; margin-top: 22px; justify-content: center; flex-wrap: wrap; }
-@media (max-width: 900px) {
-  .vhead { flex-direction: column; text-align: center; }
-  .vunititle { white-space: normal; }
-}
 @media (max-width: 640px) {
   .vfields { grid-template-columns: 1fr; }
-  .vunititle { font-size: 15px; }
+  .vhead { flex-direction: column; text-align: center; }
   .vcard { padding: 20px 18px 0; }
   .vcard-top-accent { margin: -20px -18px 0; }
   .vfoot { margin: 22px -18px 0; }
