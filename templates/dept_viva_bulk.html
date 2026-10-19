@@ -33,6 +33,10 @@
         {% for r in results %}<option value="{{ r }}">{{ r }}</option>{% endfor %}
       </select>
     </div>
+    <div>
+      <label class="f-label" for="total_marks">Total Marks</label>
+      <input class="no-icon" type="number" id="total_marks" name="total_marks" value="120" min="1">
+    </div>
     <div class="full">
       <label class="f-label" for="remarks">Remarks</label>
       <input class="no-icon" type="text" id="remarks" name="remarks">

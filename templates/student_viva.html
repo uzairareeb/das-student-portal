@@ -20,8 +20,11 @@
     <div><dt>Result</dt><dd>
       {% if v.result == 'Pass' %}<span class="pill q">Pass</span>
       {% elif v.result == 'Fail' %}<span class="pill nq">Fail</span>
+      {% elif v.result == 'Rescheduled' %}<span class="pill warn">Rescheduled</span>
       {% else %}<span class="pill warn">Pending</span>{% endif %}
     </dd></div>
+    {% if v.obtained_marks is not none %}<div><dt>Marks</dt><dd><strong>{{ v.obtained_marks }} / {{ v.total_marks or 120 }}</strong></dd></div>{% endif %}
+    {% if v.next_viva_date %}<div><dt>Next Viva Date</dt><dd>{{ v.next_viva_date }}</dd></div>{% endif %}
     {% if v.remarks %}<div><dt>Remarks</dt><dd>{{ v.remarks }}</dd></div>{% endif %}
   </dl>
   {% endfor %}

@@ -48,6 +48,18 @@
           {% for r in results %}<option value="{{ r }}">{{ r }}</option>{% endfor %}
         </select>
       </div>
+      <div id="marksFields" style="display:none">
+        <label class="f-label" for="total_marks">Total Marks</label>
+        <input class="no-icon" type="number" id="total_marks" name="total_marks" value="120" min="1">
+      </div>
+      <div id="obtainedFields" style="display:none">
+        <label class="f-label" for="obtained_marks">Obtained Marks</label>
+        <input class="no-icon" type="number" id="obtained_marks" name="obtained_marks" min="0" placeholder="e.g. 95">
+      </div>
+      <div id="nextDateFields" style="display:none">
+        <label class="f-label" for="next_viva_date">Next Viva Date</label>
+        <input class="no-icon" type="date" id="next_viva_date" name="next_viva_date">
+      </div>
       <div class="full">
         <label class="f-label" for="remarks">Remarks</label>
         <input class="no-icon" type="text" id="remarks" name="remarks"
@@ -58,6 +70,23 @@
       <button type="submit" class="btn primary">Save Viva Record</button>
     </div>
   </form>
+  <script>
+  (function () {
+    var result = document.getElementById('result');
+    var marks = document.getElementById('marksFields');
+    var obtained = document.getElementById('obtainedFields');
+    var nextDate = document.getElementById('nextDateFields');
+    function toggle() {
+      var v = result.value;
+      var showMarks = (v === 'Pass' || v === 'Fail');
+      var showNext = (v === 'Fail' || v === 'Rescheduled');
+      if (marks) marks.style.display = showMarks ? '' : 'none';
+      if (obtained) obtained.style.display = showMarks ? '' : 'none';
+      if (nextDate) nextDate.style.display = showNext ? '' : 'none';
+    }
+    if (result) { result.addEventListener('change', toggle); toggle(); }
+  })();
+  </script>
   {% else %}
   <div class="empty"><p>No students from your department in the system yet — viva records will appear here once DAS approves your uploads.</p></div>
   {% endif %}
@@ -72,7 +101,7 @@
   <div class="table-scroll">
     <table class="data-table">
       <thead>
-        <tr><th>Student</th><th>Reg.No</th><th>Examiner</th><th>Viva Date</th><th>Result</th><th>Remarks</th><th></th></tr>
+        <tr><th>Student</th><th>Reg.No</th><th>Examiner</th><th>Viva Date</th><th>Result</th><th>Marks</th><th>Remarks</th><th></th></tr>
       </thead>
       <tbody>
         {% for v in vivas %}
@@ -87,7 +116,8 @@
             {% elif v.result == 'Rescheduled' %}<span class="pill warn">Rescheduled</span>
             {% else %}<span class="pill">Pending</span>{% endif %}
           </td>
-          <td>{{ v.remarks or '—' }}</td>
+          <td class="nowrap">{% if v.obtained_marks is not none %}<strong>{{ v.obtained_marks }}/{{ v.total_marks or 120 }}</strong>{% else %}—{% endif %}</td>
+          <td>{{ v.remarks or '—' }}{% if v.next_viva_date %}<br><span class="hint">Next: {{ v.next_viva_date }}</span>{% endif %}</td>
           <td>
             <div class="row" style="gap:8px">
               <a class="btn ghost sm" href="{{ url_for('dept_viva_edit', vid=v.id) }}">Edit</a>

@@ -1,0 +1,31 @@
+{% extends "student_base.html" %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <h2>Notifications</h2>
+    <p>Viva updates and announcements from your department</p>
+  </div>
+</div>
+
+<div class="card section">
+  {% if notes %}
+  <div class="doc-list">
+    {% for n in notes %}
+    <div class="doc-row">
+      <span class="doc-icon notif-icon kind-{{ n.kind or 'info' }}">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+      </span>
+      <div class="doc-meta">
+        <div class="doc-name">{{ n.title }}</div>
+        <div class="doc-sub">{{ n.message }}</div>
+        <div class="doc-sub">{{ n.created_at }}</div>
+      </div>
+      {% if n.link %}<a class="btn ghost sm" href="{{ n.link }}">View</a>{% endif %}
+    </div>
+    {% endfor %}
+  </div>
+  {% else %}
+  <div class="empty"><p>No notifications yet.</p></div>
+  {% endif %}
+</div>
+{% endblock %}

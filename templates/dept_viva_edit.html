@@ -31,6 +31,21 @@
           {% for r in results %}<option value="{{ r }}" {% if v.result == r %}selected{% endif %}>{{ r }}</option>{% endfor %}
         </select>
       </div>
+      <div id="marksFields">
+        <label class="f-label" for="total_marks">Total Marks</label>
+        <input class="no-icon" type="number" id="total_marks" name="total_marks" min="1"
+               value="{{ v.total_marks or 120 }}">
+      </div>
+      <div id="obtainedFields">
+        <label class="f-label" for="obtained_marks">Obtained Marks</label>
+        <input class="no-icon" type="number" id="obtained_marks" name="obtained_marks" min="0"
+               value="{{ v.obtained_marks if v.obtained_marks is not none else '' }}" placeholder="e.g. 95">
+      </div>
+      <div id="nextDateFields">
+        <label class="f-label" for="next_viva_date">Next Viva Date</label>
+        <input class="no-icon" type="date" id="next_viva_date" name="next_viva_date"
+               value="{{ v.next_viva_date or '' }}">
+      </div>
       <div class="full">
         <label class="f-label" for="remarks">Remarks</label>
         <input class="no-icon" type="text" id="remarks" name="remarks" value="{{ v.remarks or '' }}">
@@ -41,5 +56,22 @@
       <a class="btn ghost" href="{{ url_for('dept_viva') }}">Cancel</a>
     </div>
   </form>
+  <script>
+  (function () {
+    var result = document.getElementById('result');
+    var marks = document.getElementById('marksFields');
+    var obtained = document.getElementById('obtainedFields');
+    var nextDate = document.getElementById('nextDateFields');
+    function toggle() {
+      var v = result.value;
+      var showMarks = (v === 'Pass' || v === 'Fail');
+      var showNext = (v === 'Fail' || v === 'Rescheduled');
+      if (marks) marks.style.display = showMarks ? '' : 'none';
+      if (obtained) obtained.style.display = showMarks ? '' : 'none';
+      if (nextDate) nextDate.style.display = showNext ? '' : 'none';
+    }
+    if (result) { result.addEventListener('change', toggle); toggle(); }
+  })();
+  </script>
 </div>
 {% endblock %}
