@@ -53,7 +53,7 @@
       <thead>
         <tr>
           <th>Student</th><th>Reg.No</th><th>Degree</th><th>Department</th>
-          <th>Examiner</th><th>Viva Date</th><th>Result</th><th>Marks</th><th>Remarks</th>
+          <th>Examiner</th><th>Viva Date</th><th>Result</th><th>Marks</th><th>Remarks</th><th>Card</th>
         </tr>
       </thead>
       <tbody>
@@ -68,6 +68,7 @@
           <td>{% if v.result == 'Pass' %}<span class="pill q">Pass</span>{% elif v.result == 'Fail' %}<span class="pill nq">Fail</span>{% elif v.result == 'Rescheduled' %}<span class="pill warn">Rescheduled</span>{% else %}<span class="pill warn">Pending</span>{% endif %}</td>
           <td class="nowrap">{% if v.obtained_marks is not none %}<strong>{{ v.obtained_marks }}/{{ v.total_marks or 120 }}</strong>{% else %}—{% endif %}{% if v.next_viva_date %}<br><span class="hint">Next: {{ v.next_viva_date }}</span>{% endif %}</td>
           <td class="comments-cell">{{ v.remarks or '—' }}</td>
+          <td class="nowrap">{% if v.obtained_marks is not none %}<a class="btn primary sm" href="{{ url_for('admin_viva_card', vid=v.id) }}">Result Card</a>{% else %}—{% endif %}</td>
         </tr>
         {% endfor %}
       </tbody>

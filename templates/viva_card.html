@@ -1,0 +1,80 @@
+{% extends base %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <h2>Viva Result Card</h2>
+    <p>{{ card.name }} &middot; {{ card.reg_no }}</p>
+  </div>
+  <a class="btn ghost sm" href="{{ back_url }}">&larr; Back</a>
+</div>
+
+<div class="vcard-wrap">
+  <div class="vcard">
+    <div class="vcard-top-accent"></div>
+    <div class="vhead">
+      <img class="vlogo-img" src="{{ url_for('static', filename='img/cuvas-logo.png') }}" alt="CUVAS logo">
+      <div>
+        <div class="vunititle">Cholistan University of Veterinary &amp; Animal Sciences, Bahawalpur</div>
+        <div class="vunisub">DIRECTORATE OF ADVANCED STUDIES</div>
+      </div>
+    </div>
+    <div class="vrule"></div>
+    <div class="vtitle">Viva Voce Result Card</div>
+    <div class="vtitle-sub">{{ card.degree }}{% if card.session %} &middot; Session {{ card.session }}{% endif %}</div>
+
+    <div class="vsec-title">Student Information</div>
+    <div class="vfields">
+      <div class="vf"><span class="lab">Name:</span> {{ card.name }}</div>
+      <div class="vf"><span class="lab">Father's Name:</span> {{ card.father_name or '—' }}</div>
+      <div class="vf"><span class="lab">Registration No:</span> {{ card.reg_no }}</div>
+      <div class="vf"><span class="lab">Department:</span> {{ card.department or '—' }}</div>
+      <div class="vf"><span class="lab">Degree Program:</span> {{ card.degree or '—' }}</div>
+      <div class="vf"><span class="lab">Session:</span> {{ card.session or '—' }}</div>
+    </div>
+
+    <div class="vsec-title">Viva Details</div>
+    <div class="vfields">
+      <div class="vf"><span class="lab">Examiner:</span> {{ card.examiner_name }}</div>
+      <div class="vf"><span class="lab">Affiliation:</span> {{ card.examiner_affiliation or '—' }}</div>
+      <div class="vf"><span class="lab">Viva Date:</span> {{ card.viva_date or '—' }}</div>
+      <div class="vf"><span class="lab">Conducted By:</span> {{ card.department or '—' }} Department</div>
+    </div>
+
+    <div class="vsec-title">Result</div>
+    <table class="vtable">
+      <tr>
+        <td class="lab2">Total Marks</td><td class="val">{{ card.total_marks }}</td>
+        <td class="lab2">Obtained Marks</td><td class="val">{{ card.obtained_marks }}</td>
+      </tr>
+      <tr>
+        <td class="lab2">Percentage</td><td class="val">{{ card.percentage }}%</td>
+        <td class="lab2">Result</td>
+        <td class="val" style="color:{% if card.result == 'Pass' %}#2d3290{% else %}#b3261e{% endif %}; font-weight:800;">{{ card.result }}</td>
+      </tr>
+    </table>
+
+    <div class="vstamp-row">
+      <span class="vstamp {{ 'pass' if card.result == 'Pass' else 'fail' }}">{{ card.result|upper }}</span>
+    </div>
+
+    {% if card.remarks %}
+    <div class="vsec-title">Remarks</div>
+    <p style="font-size:14.5px; margin:0;">{{ card.remarks }}</p>
+    {% endif %}
+
+    <p class="vnote">NOTE: This is a system generated result card. Errors and omissions are excepted. For any query, please contact the Directorate of Advanced Studies.</p>
+    <div class="vfoot">
+      &copy; {{ card.year }} Cholistan University of Veterinary &amp; Animal Sciences, Bahawalpur
+      <small>Directorate of Advanced Studies &middot; Generated on {{ card.generated_on }}</small>
+    </div>
+  </div>
+
+  <div class="vcard-actions">
+    <a class="btn primary" href="{{ pdf_url }}">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+      Download PDF
+    </a>
+    <a class="btn ghost" href="{{ back_url }}">Back</a>
+  </div>
+</div>
+{% endblock %}

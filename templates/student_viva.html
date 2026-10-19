@@ -27,6 +27,12 @@
     {% if v.next_viva_date %}<div><dt>Next Viva Date</dt><dd>{{ v.next_viva_date }}</dd></div>{% endif %}
     {% if v.remarks %}<div><dt>Remarks</dt><dd>{{ v.remarks }}</dd></div>{% endif %}
   </dl>
+  {% if v.obtained_marks is not none %}
+  <div class="row" style="margin:4px 0 18px">
+    <a class="btn primary sm" href="{{ url_for('student_viva_card', vid=v.id) }}">View Result Card</a>
+    <a class="btn ghost sm" href="{{ url_for('student_viva_card_pdf', vid=v.id) }}">Download PDF</a>
+  </div>
+  {% endif %}
   {% endfor %}
 </div>
 {% else %}
