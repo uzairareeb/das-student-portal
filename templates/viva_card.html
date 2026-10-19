@@ -49,7 +49,7 @@
       <tr>
         <td class="lab2">Percentage</td><td class="val">{{ card.percentage }}%</td>
         <td class="lab2">Result</td>
-        <td class="val" style="color:{% if card.result == 'Pass' %}#1a7a2e{% else %}#b3261e{% endif %}; font-weight:800;">{{ card.result }}</td>
+        <td class="val" style="color:{% if card.result == 'Pass' %}#2d3290{% else %}#b3261e{% endif %}; font-weight:800;">{{ card.result }}</td>
       </tr>
     </table>
 
@@ -65,7 +65,7 @@
     <p class="vnote">NOTE: This is a system generated result card. Errors and omissions are excepted. For any query, please contact the Directorate of Advanced Studies.</p>
     <div class="vfoot">
       &copy; {{ card.year }} Cholistan University of Veterinary &amp; Animal Sciences, Bahawalpur
-      <small>Directorate of Advanced Studies &middot; Generated on {{ card.generated_on }}</small>
+      <small>Directorate of Advanced Studies &middot; Generated: {{ card.generated_on }}</small>
     </div>
   </div>
 
