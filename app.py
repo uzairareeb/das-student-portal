@@ -1383,99 +1383,130 @@ def build_viva_card(vid):
 
 
 def build_viva_pdf(card):
-    """Viva result card PDF matching the web card design."""
+    """Viva result card PDF — matches the web card design exactly.
+
+    Same layout, colors and sections as templates/viva_card.html:
+    header (logo + university on one line), rule, title, Student
+    Information / Viva Details / Result sections with underlines, result
+    table, PASS/FAIL stamp (green/red), remarks, note and footer.
+    """
     from reportlab.lib import colors
+    from reportlab.lib.enums import TA_CENTER
+    from reportlab.lib.styles import ParagraphStyle
     from reportlab.pdfgen import canvas
+    from reportlab.platypus import Paragraph
 
-    SOLID = colors.HexColor("#2d3290")
-    DARK = colors.HexColor("#111111")
-    LBL_BG = colors.HexColor("#eef0fb")
-    LINE = colors.HexColor("#333333")
-    RED = colors.HexColor("#b3261e")
-    GREEN = colors.HexColor("#1a7a2e")
+    SOLID = colors.HexColor("#2d3290")    # primary (web: --primary)
+    DARK = colors.HexColor("#1a1a1a")     # ink
+    LBL_BG = colors.HexColor("#eef0fb")   # label cells / section underlines
+    LINE = colors.HexColor("#333333")     # table grid
+    RED = colors.HexColor("#b3261e")      # fail
+    GREEN = colors.HexColor("#1a7a2e")    # pass
+    MUTED = colors.HexColor("#3c4257")    # note text
 
-    W, H = 780, 640
+    W, H = 780, 780
     buf = io.BytesIO()
     c = canvas.Canvas(buf, pagesize=(W, H))
 
     bx, bw = 16, W - 32
     btop, bbot = H - 16, 16
+    cx = bx + bw / 2
+    ix0, ix1 = bx + 18, bx + bw - 18  # inner content edges
+
+    # outer border + top accent band (web: .vcard / .vcard-top-accent)
     c.setStrokeColor(DARK)
     c.setLineWidth(1.2)
     c.rect(bx, bbot, bw, btop - bbot, stroke=1, fill=0)
-    # top accent band
     c.setFillColor(SOLID)
     c.rect(bx, btop - 6, bw, 6, stroke=0, fill=1)
 
-    # header: logo + university
+    # header: logo + university name on ONE line (web: .vhead/.vunititle)
     lh = 52
-    lx, ly = bx + 18, btop - 22 - lh
+    lx = ix0
+    ly = btop - 22 - lh
     logo_path = os.path.join(os.path.dirname(os.path.abspath(__file__)),
                              "static", "img", "cuvas-logo.png")
     if os.path.exists(logo_path):
         c.drawImage(logo_path, lx, ly, lh * 1.8, lh, preserveAspectRatio=True)
-    c.setFont("Helvetica-Bold", 14)
+    tx = lx + lh * 1.8 + 14
+    uni_name = ("Cholistan University of Veterinary & Animal Sciences,"
+                " Bahawalpur")
+    fs = 14.0
+    while (c.stringWidth(uni_name, "Helvetica-Bold", fs) > (bx + bw - tx - 4)
+           and fs > 9):
+        fs -= 0.5
+    c.setFont("Helvetica-Bold", fs)
     c.setFillColor(DARK)
-    c.drawString(lx + lh * 1.8 + 14, ly + 26,
-                 "Cholistan University of Veterinary & Animal Sciences,")
-    c.drawString(lx + lh * 1.8 + 14, ly + 8, "Bahawalpur")
+    c.drawString(tx, ly + 30, uni_name)
     c.setFont("Helvetica-Bold", 10)
     c.setFillColor(SOLID)
-    c.drawString(lx + lh * 1.8 + 14, ly - 8, "DIRECTORATE OF ADVANCED STUDIES")
+    c.drawString(tx, ly + 12, "DIRECTORATE OF ADVANCED STUDIES")
 
-    # rule + title
+    # rule + card title (web: .vrule / .vtitle / .vtitle-sub)
     c.setFillColor(SOLID)
-    c.rect(bx + 18, ly - 20, bw - 36, 3, stroke=0, fill=1)
-    cx = bx + bw / 2
+    c.rect(ix0, ly - 14, ix1 - ix0, 3, stroke=0, fill=1)
     c.setFillColor(DARK)
-    c.setFont("Helvetica-Bold", 16)
-    c.drawCentredString(cx, ly - 48, "Viva Voce Result Card")
+    c.setFont("Helvetica-Bold", 17)
+    c.drawCentredString(cx, ly - 42, "Viva Voce Result Card")
     c.setFillColor(SOLID)
     c.setFont("Helvetica-Bold", 11)
     deg_line = card["degree"] or ""
     if card["session"]:
-        deg_line += f"  |  Session {card['session']}"
-    c.drawCentredString(cx, ly - 68, deg_line)
+        deg_line += f" \u00b7 Session {card['session']}"
+    c.drawCentredString(cx, ly - 62, deg_line)
 
-    # helper for label/value rows
-    y = ly - 100
-    c.setFont("Helvetica", 11)
+    y = ly - 62
+
+    def section(title):
+        """Section header with underline (web: .vsec-title)."""
+        nonlocal y
+        y -= 30
+        c.setFont("Helvetica-Bold", 11)
+        c.setFillColor(SOLID)
+        c.drawString(ix0, y, title.upper())
+        c.setStrokeColor(LBL_BG)
+        c.setLineWidth(2)
+        c.line(ix0, y - 8, ix1, y - 8)
+        y -= 22
+
     def field(x, yy, label, value):
         c.setFont("Helvetica-Bold", 11)
         c.setFillColor(DARK)
         c.drawString(x, yy, label)
         lw = c.stringWidth(label, "Helvetica-Bold", 11)
+        val = str(value) if value else "\u2014"
+        max_w = ix1 - x - lw - 10
+        while c.stringWidth(val, "Helvetica", 11) > max_w and len(val) > 8:
+            val = val[:-4] + "..."
         c.setFont("Helvetica", 11)
-        c.drawString(x + lw + 6, yy, str(value or "—"))
+        c.drawString(x + lw + 6, yy, val)
 
-    c.setFont("Helvetica-Bold", 11)
-    c.setFillColor(SOLID)
-    c.drawString(bx + 18, y, "STUDENT INFORMATION")
-    y -= 20
-    col2 = bx + 18 + (bw - 36) / 2
-    field(bx + 18, y, "Name:", card["name"])
+    col2 = ix0 + (ix1 - ix0) / 2
+
+    section("Student Information")
+    field(ix0, y, "Name:", card["name"])
     field(col2, y, "Father's Name:", card["father_name"])
     y -= 20
-    field(bx + 18, y, "Registration No:", card["reg_no"])
+    field(ix0, y, "Registration No:", card["reg_no"])
     field(col2, y, "Department:", card["department"])
     y -= 20
-    field(bx + 18, y, "Degree Program:", card["degree"])
+    field(ix0, y, "Degree Program:", card["degree"])
     field(col2, y, "Session:", card["session"])
-
-    y -= 32
-    c.setFont("Helvetica-Bold", 11)
-    c.setFillColor(SOLID)
-    c.drawString(bx + 18, y, "VIVA DETAILS")
     y -= 20
-    field(bx + 18, y, "Examiner:", card["examiner_name"])
+
+    section("Viva Details")
+    field(ix0, y, "Examiner:", card["examiner_name"])
     field(col2, y, "Affiliation:", card["examiner_affiliation"])
     y -= 20
-    field(bx + 18, y, "Viva Date:", card["viva_date"])
-    field(col2, y, "Conducted By:", (card["department"] or "") + " Department")
+    field(ix0, y, "Viva Date:", card["viva_date"])
+    field(col2, y, "Conducted By:",
+          ((card["department"] or "") + " Department").strip())
+    y -= 20
 
-    # result table
-    y -= 36
-    tx, tw = bx + 18, bw - 36
+    section("Result")
+    # result table (web: .vtable) — all grid lines drawn, incl. bottom row
+    y -= 8
+    tx0, tw = ix0, ix1 - ix0
     rows = [
         ("Total Marks", str(card["total_marks"]),
          "Obtained Marks", str(card["obtained_marks"])),
@@ -1487,51 +1518,84 @@ def build_viva_pdf(card):
     for ri, (l1, v1, l2, v2) in enumerate(rows):
         yy = y - ri * rh
         for ci, (lab, val) in enumerate([(l1, v1), (l2, v2)]):
-            x0 = tx + ci * 2 * cw
+            x0 = tx0 + ci * 2 * cw
             c.setFillColor(LBL_BG)
             c.rect(x0, yy - rh, cw, rh, stroke=0, fill=1)
             c.setFillColor(DARK)
             c.setFont("Helvetica-Bold", 11)
             c.drawString(x0 + 10, yy - 20, lab)
-            c.setFont("Helvetica", 11)
             if lab == "Result":
                 c.setFillColor(GREEN if val == "Pass" else RED)
                 c.setFont("Helvetica-Bold", 11)
+            else:
+                c.setFont("Helvetica", 11)
             c.drawString(x0 + cw + 10, yy - 20, val)
-            c.setFillColor(DARK)
     c.setStrokeColor(LINE)
-    c.setLineWidth(0.8)
+    c.setLineWidth(0.9)
     for ri in range(3):
         yy = y - ri * rh
-        c.line(tx, yy, tx + tw, yy)
+        c.line(tx0, yy, tx0 + tw, yy)
     for ci in range(5):
-        x0 = tx + ci * cw
+        x0 = tx0 + ci * cw
         c.line(x0, y, x0, y - 2 * rh)
-    c.line(tx + tw, y, tx + tw, y - 2 * rh)
+    y = y - 2 * rh
 
-    # result stamp
-    y = y - 2 * rh - 44
-    stamp_w, stamp_h = 190, 44
+    # result stamp (web: .vstamp) — green PASS / red FAIL
+    y -= 46
+    stamp_w, stamp_h = 200, 46
     c.setFillColor(GREEN if card["result"] == "Pass" else RED)
-    c.roundRect(cx - stamp_w / 2, y - stamp_h, stamp_w, stamp_h, 8,
+    c.roundRect(cx - stamp_w / 2, y - stamp_h, stamp_w, stamp_h, 10,
                 stroke=0, fill=1)
     c.setFillColor(colors.white)
-    c.setFont("Helvetica-Bold", 20)
-    c.drawCentredString(cx, y - stamp_h + 15, card["result"].upper())
+    c.setFont("Helvetica-Bold", 21)
+    c.drawCentredString(cx, y - stamp_h + 16, (card["result"] or "").upper())
+    y = y - stamp_h
 
-    # note + footer
-    c.setFillColor(colors.HexColor("#3c4257"))
-    c.setFont("Helvetica-Oblique", 9)
-    c.drawCentredString(cx, bbot + 52,
-        "NOTE: This is a system generated result card. Errors and omissions"
-        " are excepted.")
+    # remarks (web: Remarks section) — only when present
+    if card.get("remarks"):
+        y -= 30
+        c.setFont("Helvetica-Bold", 11)
+        c.setFillColor(SOLID)
+        c.drawString(ix0, y, "REMARKS")
+        c.setStrokeColor(LBL_BG)
+        c.setLineWidth(2)
+        c.line(ix0, y - 8, ix1, y - 8)
+        y -= 16
+        rstyle = ParagraphStyle("remarks", fontName="Helvetica", fontSize=11,
+                                leading=15, textColor=DARK)
+        safe = (card["remarks"].replace("&", "&amp;")
+                               .replace("<", "&lt;")
+                               .replace(">", "&gt;"))
+        rp = Paragraph(safe, rstyle)
+        _, rph = rp.wrap(ix1 - ix0, 200)
+        y -= rph
+        rp.drawOn(c, ix0, y)
+
+    # note (web: .vnote) — full text, wrapped
+    note = ("NOTE: This is a system generated result card. Errors and "
+            "omissions are excepted. For any query, please contact the "
+            "Directorate of Advanced Studies.")
+    nstyle = ParagraphStyle("note", fontName="Helvetica-Oblique", fontSize=9,
+                            leading=13, textColor=MUTED, alignment=TA_CENTER)
+    np = Paragraph(note, nstyle)
+    _, nh = np.wrap(ix1 - ix0 - 16, 100)
+    ny = max(bbot + 62, y - 30 - nh)
+    np.drawOn(c, ix0 + 8, ny)
+
+    # footer bar (web: .vfoot)
     c.setFillColor(SOLID)
-    c.rect(bx, bbot, bw, 34, stroke=0, fill=1)
+    c.rect(bx, bbot, bw, 44, stroke=0, fill=1)
     c.setFillColor(colors.white)
-    c.setFont("Helvetica", 10)
-    c.drawCentredString(cx, bbot + 13,
-        f"© {card['year']} Cholistan University of Veterinary & Animal"
-        f" Sciences, Bahawalpur  |  Generated on {card['generated_on']}")
+    c.setFont("Helvetica-Bold", 10)
+    c.drawCentredString(
+        cx, bbot + 24,
+        f"\u00a9 {card['year']} Cholistan University of Veterinary & Animal"
+        " Sciences, Bahawalpur")
+    c.setFont("Helvetica", 8.5)
+    c.drawCentredString(
+        cx, bbot + 11,
+        f"Directorate of Advanced Studies  \u00b7  Generated on"
+        f" {card['generated_on']}")
 
     c.showPage()
     c.save()
