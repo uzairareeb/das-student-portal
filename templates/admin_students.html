@@ -85,13 +85,20 @@
   <form id="bulkForm" method="post" action="{{ url_for('admin_students_delete_selected') }}">
     <div class="bulk-bar">
       <button type="submit" class="btn danger sm" data-confirm="Delete the SELECTED students and all their documents? This cannot be undone.">Delete Selected</button>
-      <select class="no-icon" name="assign_dept" aria-label="Department to assign" style="max-width:220px">
-        <option value="">Assign dept…</option>
-        <option value="__none">— Unassign —</option>
+      <span class="bulk-sep"></span>
+      <select class="no-icon" id="deptQuick" aria-label="Quick-select a department" style="max-width:210px">
+        <option value="">Quick select dept…</option>
+        <option value="__unassigned">— Unassigned —</option>
         {% for v in departments %}<option value="{{ v }}">{{ v }}</option>{% endfor %}
       </select>
-      <button type="submit" class="btn primary sm" formaction="{{ url_for('admin_students_assign_dept') }}" onclick="return document.querySelector('select[name=assign_dept]').value ? true : (alert('Please choose a department first.'), false)">Assign to Selected</button>
-      <span class="hint">Tick the boxes, then assign or delete.</span>
+      <select class="no-icon" name="bulk_status" aria-label="Status to apply" style="max-width:190px">
+        <option value="">Set status…</option>
+        {% for v in status_list %}<option value="{{ v }}">{{ v }}</option>{% endfor %}
+      </select>
+      <input class="no-icon" type="date" name="bulk_coe" aria-label="Thesis Forward (COE) date" style="max-width:175px">
+      <label class="hint" style="display:flex;gap:6px;align-items:center;margin:0"><input type="checkbox" name="bulk_coe_clear" value="1"> Clear COE</label>
+      <button type="submit" class="btn primary sm" formaction="{{ url_for('admin_students_bulk_update') }}">Apply to Selected</button>
+      <span class="hint">Tick the boxes (or quick-select a department), set a status and/or COE date, then Apply.</span>
     </div>
     <div class="table-wrap">
       <table class="wide-table">
@@ -107,7 +114,7 @@
         </thead>
         <tbody>
           {% for s in students %}
-          <tr>
+          <tr data-dept="{{ s.department or '' }}">
             <td class="cb"><input type="checkbox" class="selBox" name="sel" value="{{ s.id }}"></td>
             <td>{{ s.name }}</td>
             <td>{{ s.reg_no }}</td>
@@ -133,12 +140,13 @@
               {% else %}<span class="pill nq">Not Received</span>{% endif %}
             </td>
             <td>{{ s.coe_display }}</td>
-            <td>
-              {% if s.status in ['Continue', 'Viva Done', 'Pass Out'] %}<span class="pill q">{{ s.status }}</span>
-              {% elif s.status in ['Viva Pending', 'Defense Pending'] %}<span class="pill warn">{{ s.status }}</span>
-              {% else %}<span class="pill nq">{{ s.status }}</span>{% endif %}
+            <td class="status-cell">
+              <button type="button" class="pill status-pill {% if s.status in ['Continue', 'Viva Done', 'Pass Out'] %}q{% elif s.status in ['Viva Pending', 'Defense Pending'] %}warn{% else %}nq{% endif %}" data-sid="{{ s.id }}" title="Click to change status">{{ s.status }}<span class="caret">&#9662;</span></button>
+              <div class="status-menu" hidden>
+                {% for st in status_list %}<button type="button" class="status-opt{% if st == s.status %} active{% endif %}" data-status="{{ st }}">{{ st }}</button>{% endfor %}
+              </div>
             </td>
-            <td><a class="btn ghost sm" href="{{ url_for('admin_student_profile', sid=s.id) }}">Profile</a></td>
+            <td><button type="button" class="btn ghost sm profile-btn" data-sid="{{ s.id }}">Profile</button></td>
           </tr>
           {% endfor %}
         </tbody>
@@ -176,13 +184,233 @@
   </div>
   {% endif %}
 </div>
+<!-- edit student popup (same form as the profile page, without leaving the list) -->
+<div class="modal-backdrop" id="editModal" hidden>
+  <div class="modal modal-lg" role="dialog" aria-modal="true" aria-labelledby="editTitle">
+    <div class="edit-head">
+      <div>
+        <h3 id="editTitle">Edit Student</h3>
+        <p class="hint" id="editSub" style="margin:2px 0 0"></p>
+      </div>
+      <button type="button" class="modal-x" id="editClose" aria-label="Close">&times;</button>
+    </div>
+    <form method="post" id="editForm" action="">
+      <input type="hidden" name="next" id="editNext" value="">
+      <div class="form-grid">
+        <div>
+          <label class="f-label" for="e_name">Name *</label>
+          <input class="no-icon" type="text" id="e_name" name="name" required>
+        </div>
+        <div>
+          <label class="f-label" for="e_father_name">Father Name</label>
+          <input class="no-icon" type="text" id="e_father_name" name="father_name">
+        </div>
+        <div>
+          <label class="f-label" for="e_reg_no">Registration No. *</label>
+          <input class="no-icon" type="text" id="e_reg_no" name="reg_no" required>
+        </div>
+        <div>
+          <label class="f-label" for="e_cnic">CNIC</label>
+          <input class="no-icon" type="text" id="e_cnic" name="cnic">
+        </div>
+        <div>
+          <label class="f-label" for="e_gender">Gender</label>
+          <select class="no-icon" id="e_gender" name="gender">
+            <option value="">—</option>
+            {% for v in genders %}<option value="{{ v }}">{{ v }}</option>{% endfor %}
+          </select>
+        </div>
+        <div>
+          <label class="f-label" for="e_degree">Degree</label>
+          <input class="no-icon" type="text" id="e_degree" name="degree">
+        </div>
+        <div>
+          <label class="f-label" for="e_session">Session</label>
+          <input class="no-icon" type="text" id="e_session" name="session">
+        </div>
+        <div>
+          <label class="f-label" for="e_department">Department</label>
+          <select class="no-icon" id="e_department" name="department">
+            <option value="">— Unassigned —</option>
+            {% for v in departments %}<option value="{{ v }}">{{ v }}</option>{% endfor %}
+          </select>
+        </div>
+        <div>
+          <label class="f-label" for="e_status">Status</label>
+          <select class="no-icon" id="e_status" name="status">
+            {% for v in status_list %}<option value="{{ v }}">{{ v }}</option>{% endfor %}
+          </select>
+        </div>
+        <div>
+          <label class="f-label" for="e_folder_file">Folder/File (With GS-Forms)</label>
+          <select class="no-icon" id="e_folder_file" name="folder_file">
+            {% for v in folders %}<option value="{{ v }}">{{ v }}</option>{% endfor %}
+          </select>
+        </div>
+        <div class="full">
+          <label class="f-label" for="e_comments_missing">Comments (Missing)</label>
+          <input class="no-icon" type="text" id="e_comments_missing" name="comments_missing">
+        </div>
+        <div>
+          <label class="f-label" for="e_synopsis">Synopsis</label>
+          <select class="no-icon" id="e_synopsis" name="synopsis">
+            {% for v in received %}<option value="{{ v }}">{{ v }}</option>{% endfor %}
+          </select>
+        </div>
+        <div>
+          <label class="f-label" for="e_semi_final_thesis">Semi-Final Thesis</label>
+          <select class="no-icon" id="e_semi_final_thesis" name="semi_final_thesis">
+            {% for v in received %}<option value="{{ v }}">{{ v }}</option>{% endfor %}
+          </select>
+        </div>
+        <div>
+          <label class="f-label" for="e_final_thesis">Final Thesis</label>
+          <select class="no-icon" id="e_final_thesis" name="final_thesis">
+            {% for v in received %}<option value="{{ v }}">{{ v }}</option>{% endfor %}
+          </select>
+        </div>
+        <div>
+          <label class="f-label" for="e_thesis_forward_coe">Thesis Forward (COE) Date</label>
+          <input class="no-icon" type="date" id="e_thesis_forward_coe" name="thesis_forward_coe">
+        </div>
+      </div>
+      <div class="modal-actions" style="margin-top:20px">
+        <a class="btn ghost" id="editFullProfile" href="#">Full Profile &rarr;</a>
+        <span style="flex:1"></span>
+        <button type="button" class="btn ghost" id="editCancel">Cancel</button>
+        <button type="submit" class="btn primary">Save Changes</button>
+      </div>
+    </form>
+  </div>
+</div>
+
 <script>
   (function () {
+    /* ---- select all on page ---- */
     var all = document.getElementById('selAll');
-    if (!all) return;
-    all.addEventListener('change', function () {
-      var boxes = document.querySelectorAll('.selBox');
-      for (var i = 0; i < boxes.length; i++) boxes[i].checked = all.checked;
+    if (all) {
+      all.addEventListener('change', function () {
+        var boxes = document.querySelectorAll('.selBox');
+        for (var i = 0; i < boxes.length; i++) boxes[i].checked = all.checked;
+      });
+    }
+
+    /* ---- quick-select a whole department ---- */
+    var dq = document.getElementById('deptQuick');
+    if (dq) {
+      dq.addEventListener('change', function () {
+        var want = dq.value;
+        document.querySelectorAll('tr[data-dept]').forEach(function (tr) {
+          var cb = tr.querySelector('.selBox');
+          if (!cb) return;
+          var d = tr.getAttribute('data-dept');
+          cb.checked = want !== '' && (want === '__unassigned' ? d === '' : d === want);
+        });
+      });
+    }
+
+    /* ---- inline status change ---- */
+    function closeMenus(except) {
+      document.querySelectorAll('.status-menu').forEach(function (m) {
+        if (m !== except) m.hidden = true;
+      });
+    }
+    document.querySelectorAll('.status-pill').forEach(function (pill) {
+      pill.addEventListener('click', function (e) {
+        e.stopPropagation();
+        var menu = pill.parentElement.querySelector('.status-menu');
+        var willOpen = menu.hidden;
+        closeMenus(menu);
+        if (willOpen) {
+          var r = pill.getBoundingClientRect();
+          menu.hidden = false;
+          var mw = 200, mh = 300;
+          menu.style.left = Math.min(r.left, window.innerWidth - mw - 10) + 'px';
+          menu.style.top = (r.bottom + mh + 12 > window.innerHeight && r.top - mh > 0)
+            ? (r.top - menu.offsetHeight - 6) + 'px'
+            : (r.bottom + 6) + 'px';
+        }
+      });
+    });
+    document.addEventListener('click', function () { closeMenus(null); });
+    document.querySelectorAll('.status-opt').forEach(function (opt) {
+      opt.addEventListener('click', function () {
+        var cell = opt.closest('.status-cell');
+        var pill = cell.querySelector('.status-pill');
+        var sid = pill.getAttribute('data-sid');
+        var st = opt.getAttribute('data-status');
+        cell.querySelector('.status-menu').hidden = true;
+        if (opt.classList.contains('active')) return;
+        var fd = new FormData();
+        fd.append('status', st);
+        fetch('/admin/student/' + sid + '/status', { method: 'POST', body: fd })
+          .then(function (r) { return r.json(); })
+          .then(function (d) {
+            if (!d.ok) throw new Error(d.error || 'failed');
+            pill.className = 'pill status-pill ' + d.pill;
+            pill.innerHTML = d.status + '<span class="caret">&#9662;</span>';
+            cell.querySelectorAll('.status-opt').forEach(function (o) {
+              o.classList.toggle('active', o.getAttribute('data-status') === d.status);
+            });
+          })
+          .catch(function () { alert('Could not update the status. Please try again.'); });
+      });
+    });
+
+    /* ---- edit student popup ---- */
+    var modal = document.getElementById('editModal');
+    var form = document.getElementById('editForm');
+    function setVal(id, v) { var el = document.getElementById(id); if (el) el.value = v || ''; }
+    function openModal() {
+      modal.hidden = false;
+      document.body.style.overflow = 'hidden';
+    }
+    function closeModal() {
+      if (modal.hidden) return;
+      modal.classList.add('closing');
+      setTimeout(function () {
+        modal.hidden = true;
+        modal.classList.remove('closing');
+        document.body.style.overflow = '';
+      }, 190);
+    }
+    document.querySelectorAll('.profile-btn').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        var sid = btn.getAttribute('data-sid');
+        fetch('/admin/student/' + sid + '/json')
+          .then(function (r) { return r.json(); })
+          .then(function (d) {
+            if (!d.ok) throw new Error(d.error || 'failed');
+            setVal('e_name', d.name);
+            setVal('e_father_name', d.father_name);
+            setVal('e_reg_no', d.reg_no);
+            setVal('e_cnic', d.cnic);
+            setVal('e_gender', d.gender);
+            setVal('e_degree', d.degree);
+            setVal('e_session', d.session);
+            setVal('e_department', d.department);
+            setVal('e_status', d.status);
+            setVal('e_folder_file', d.folder_file);
+            setVal('e_comments_missing', d.comments_missing);
+            setVal('e_synopsis', d.synopsis);
+            setVal('e_semi_final_thesis', d.semi_final_thesis);
+            setVal('e_final_thesis', d.final_thesis);
+            setVal('e_thesis_forward_coe', d.coe_iso);
+            document.getElementById('editSub').textContent = d.name + ' · ' + d.reg_no;
+            document.getElementById('editFullProfile').href = '/admin/student/' + sid;
+            document.getElementById('editNext').value =
+              window.location.pathname + window.location.search;
+            form.action = '/admin/student/' + sid + '/save';
+            openModal();
+          })
+          .catch(function () { alert('Could not load the student record.'); });
+      });
+    });
+    document.getElementById('editClose').addEventListener('click', closeModal);
+    document.getElementById('editCancel').addEventListener('click', closeModal);
+    modal.addEventListener('click', function (e) { if (e.target === modal) closeModal(); });
+    document.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape') { closeMenus(null); closeModal(); }
     });
   })();
 </script>
