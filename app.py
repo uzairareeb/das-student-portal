@@ -738,7 +738,7 @@ def admin_students():
         page_url=page_url, per_page=PER_PAGE,
         sessions=distinct_values("session"), degrees=distinct_values("degree"),
         genders=GENDER_OPTS, folders=FOLDER_OPTS, status_list=STATUS_LIST,
-        departments=dept_names(),
+        received=RECEIVED_OPTS, departments=dept_names(),
         f=request.args, export_url=export_url,
         export_pdf_url=export_pdf_url)
 
@@ -2433,12 +2433,15 @@ def admin_student_save(sid):
     if not s:
         return "Student not found.", 404
     f = request.form
+    nxt = (f.get("next") or "").strip()
+    if not nxt.startswith("/admin/"):
+        nxt = ""
     name = f.get("name", "").strip()
     reg_no = f.get("reg_no", "").strip()
     cnic = norm_cnic(f.get("cnic", ""))
     if not name or not reg_no or not cnic:
         flash("Name, Registration No. and CNIC are required.")
-        return redirect(url_for("admin_student_profile", sid=sid))
+        return redirect(nxt or url_for("admin_student_profile", sid=sid))
     db = get_db()
     now = datetime.now().strftime("%Y-%m-%d %H:%M")
     dept = (f.get("department") or "").strip()
@@ -2483,7 +2486,7 @@ def admin_student_save(sid):
     except Exception:
         pass
     flash("Student record updated.")
-    return redirect(url_for("admin_student_profile", sid=sid))
+    return redirect(nxt or url_for("admin_student_profile", sid=sid))
 
 
 @app.route("/admin/students/delete-selected", methods=["POST"])
@@ -2504,32 +2507,80 @@ def admin_students_delete_selected():
     return redirect(url_for("admin_students"))
 
 
-@app.route("/admin/students/assign-dept", methods=["POST"])
+@app.route("/admin/student/<int:sid>/status", methods=["POST"])
 @admin_required
-def admin_students_assign_dept():
-    """Bulk-assign the selected students to a department (or unassign).
-    The dept portal filters students by exact department name, so only
-    names from the departments table are accepted."""
+def admin_student_status(sid):
+    """Inline status change from the student list (AJAX, no page reload)."""
+    s = get_student(sid)
+    if not s:
+        return {"ok": False, "error": "Student not found."}, 404
+    status = pick(request.form.get("status"), STATUS_LIST, s["status"])
+    db = get_db()
+    db.execute("UPDATE students SET status=?, updated_at=? WHERE id=?",
+               (status, datetime.now().strftime("%Y-%m-%d %H:%M"), sid))
+    db.commit()
+    log_activity("admin", "student_status", f"id={sid} status -> {status}")
+    pill = ("q" if status in ("Continue", "Viva Done", "Pass Out")
+            else "warn" if status in ("Viva Pending", "Defense Pending")
+            else "nq")
+    return {"ok": True, "status": status, "pill": pill}
+
+
+@app.route("/admin/student/<int:sid>/json")
+@admin_required
+def admin_student_json(sid):
+    """Student record as JSON — fills the list-page edit popup."""
+    s = get_student(sid)
+    if not s:
+        return {"ok": False, "error": "Student not found."}, 404
+    keys = ("id", "cnic", "name", "father_name", "reg_no", "gender",
+            "degree", "session", "department", "status", "folder_file",
+            "comments_missing", "synopsis", "semi_final_thesis",
+            "final_thesis")
+    out = {k: (s.get(k) or "") for k in keys}
+    out["coe_iso"] = parse_coe(s.get("thesis_forward_coe"))
+    out["ok"] = True
+    return out
+
+
+@app.route("/admin/students/bulk-update", methods=["POST"])
+@admin_required
+def admin_students_bulk_update():
+    """Bulk-set status and/or Thesis Forward (COE) date for the selected
+    students (tick the boxes, or quick-select a whole department)."""
     ids = [int(x) for x in request.form.getlist("sel") if x.isdigit()]
-    dept = (request.form.get("assign_dept") or "").strip()
-    if dept == "__none":
-        dept = ""
-    if dept and dept not in set(dept_names()):
-        flash("Please choose a department from the list.")
-        return redirect(url_for("admin_students"))
     if not ids:
         flash("No students selected — tick the boxes first.")
         return redirect(url_for("admin_students"))
+    status = (request.form.get("bulk_status") or "").strip()
+    coe_raw = (request.form.get("bulk_coe") or "").strip()
+    sets, vals, done = [], [], []
+    if status:
+        vals.append(pick(status, STATUS_LIST, "Continue"))
+        sets.append("status=?")
+        done.append(f"status '{vals[-1]}'")
+    if request.form.get("bulk_coe_clear") == "1":
+        sets.append("thesis_forward_coe=NULL")
+        done.append("COE date cleared")
+    elif coe_raw:
+        coe = parse_coe(coe_raw)
+        if coe:
+            sets.append("thesis_forward_coe=?")
+            vals.append(coe)
+            done.append(f"COE date {coe}")
+    if not sets:
+        flash("Choose a status or a COE date to apply first.")
+        return redirect(url_for("admin_students"))
     db = get_db()
-    now = datetime.now().strftime("%Y-%m-%d %H:%M")
     ph = ", ".join(["?"] * len(ids))
-    db.execute(f"UPDATE students SET department=?, updated_at=? WHERE id IN ({ph})",
-               (dept, now, *ids))
+    db.execute(
+        f"UPDATE students SET {', '.join(sets)}, updated_at=?"
+        f" WHERE id IN ({ph})",
+        (*vals, datetime.now().strftime("%Y-%m-%d %H:%M"), *ids))
     db.commit()
-    log_activity("admin", "student_bulk_dept_assign",
-                 f"{len(ids)} student(s) -> '{dept or 'Unassigned'}'")
-    flash(f"{len(ids)} student(s) assigned to '{dept or 'Unassigned'}'. "
-          "They now appear in that department's portal.")
+    log_activity("admin", "student_bulk_update",
+                 f"{len(ids)} student(s): " + "; ".join(done))
+    flash(f"Updated {len(ids)} student(s): " + "; ".join(done) + ".")
     return redirect(url_for("admin_students"))
 
 
