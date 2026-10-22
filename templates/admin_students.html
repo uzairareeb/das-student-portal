@@ -4,7 +4,7 @@
 <div class="page-head">
   <div>
     <h2>Student List</h2>
-    <p>{{ filtered_total }} matching &middot; {{ total }} total &middot; Page {{ page }} of {{ pages }}</p>
+    <p id="countLine">{{ filtered_total }} matching &middot; {{ total }} total &middot; Page {{ page }} of {{ pages }}</p>
   </div>
 </div>
 
@@ -71,6 +71,7 @@
     <span class="section-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg></span>
     <h3>Student List</h3>
     <span class="hint">{{ per_page }} per page</span>
+    <span class="hint" id="liveHint" hidden style="color:var(--primary);font-weight:600"></span>
     <span style="flex:1"></span>
     <a class="btn ghost sm" href="{{ export_url }}">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
@@ -86,19 +87,13 @@
     <div class="bulk-bar">
       <button type="submit" class="btn danger sm" data-confirm="Delete the SELECTED students and all their documents? This cannot be undone.">Delete Selected</button>
       <span class="bulk-sep"></span>
-      <select class="no-icon" id="deptQuick" aria-label="Quick-select a department" style="max-width:210px">
-        <option value="">Quick select dept…</option>
-        <option value="__unassigned">— Unassigned —</option>
-        {% for v in departments %}<option value="{{ v }}">{{ v }}</option>{% endfor %}
-      </select>
       <select class="no-icon" name="bulk_status" aria-label="Status to apply" style="max-width:190px">
         <option value="">Set status…</option>
         {% for v in status_list %}<option value="{{ v }}">{{ v }}</option>{% endfor %}
       </select>
       <input class="no-icon" type="date" name="bulk_coe" aria-label="Thesis Forward (COE) date" style="max-width:175px">
-      <label class="hint" style="display:flex;gap:6px;align-items:center;margin:0"><input type="checkbox" name="bulk_coe_clear" value="1"> Clear COE</label>
       <button type="submit" class="btn primary sm" formaction="{{ url_for('admin_students_bulk_update') }}">Apply to Selected</button>
-      <span class="hint">Tick the boxes (or quick-select a department), set a status and/or COE date, then Apply.</span>
+      <span class="hint">Tick the boxes, set a status and/or COE date, then Apply.</span>
     </div>
     <div class="table-wrap">
       <table class="wide-table">
@@ -112,7 +107,7 @@
             <th>Status</th><th></th>
           </tr>
         </thead>
-        <tbody>
+        <tbody id="studentsBody">
           {% for s in students %}
           <tr data-dept="{{ s.department or '' }}">
             <td class="cb"><input type="checkbox" class="selBox" name="sel" value="{{ s.id }}"></td>
@@ -141,7 +136,7 @@
             </td>
             <td>{{ s.coe_display }}</td>
             <td class="status-cell">
-              <button type="button" class="pill status-pill {% if s.status in ['Continue', 'Viva Done', 'Pass Out'] %}q{% elif s.status in ['Viva Pending', 'Defense Pending'] %}warn{% else %}nq{% endif %}" data-sid="{{ s.id }}" title="Click to change status">{{ s.status }}<span class="caret">&#9662;</span></button>
+              <button type="button" class="pill status-pill {% if s.status in ['Continue', 'Viva Done', 'Pass Out', 'Sent to COE'] %}q{% elif s.status in ['Viva Pending', 'Defense Pending'] %}warn{% else %}nq{% endif %}" data-sid="{{ s.id }}" title="Click to change status">{{ s.status }}<span class="caret">&#9662;</span></button>
               <div class="status-menu" hidden>
                 {% for st in status_list %}<button type="button" class="status-opt{% if st == s.status %} active{% endif %}" data-status="{{ st }}">{{ st }}</button>{% endfor %}
               </div>
@@ -160,7 +155,7 @@
     <span class="hint">Removes every student record and all uploaded documents.</span>
   </div>
   {% if pages > 1 %}
-  <div class="pagination">
+  <div class="pagination" id="pagination">
     {% if page > 1 %}
     <a class="btn ghost sm" href="{{ page_url(page-1) }}">&larr; Prev</a>
     {% endif %}
@@ -286,6 +281,8 @@
 
 <script>
   (function () {
+    var STATUSES = {{ status_list|tojson }};
+
     /* ---- select all on page ---- */
     var all = document.getElementById('selAll');
     if (all) {
@@ -295,28 +292,15 @@
       });
     }
 
-    /* ---- quick-select a whole department ---- */
-    var dq = document.getElementById('deptQuick');
-    if (dq) {
-      dq.addEventListener('change', function () {
-        var want = dq.value;
-        document.querySelectorAll('tr[data-dept]').forEach(function (tr) {
-          var cb = tr.querySelector('.selBox');
-          if (!cb) return;
-          var d = tr.getAttribute('data-dept');
-          cb.checked = want !== '' && (want === '__unassigned' ? d === '' : d === want);
-        });
-      });
-    }
-
-    /* ---- inline status change ---- */
+    /* ---- inline status change (event delegation: works for live-search rows too) ---- */
     function closeMenus(except) {
       document.querySelectorAll('.status-menu').forEach(function (m) {
         if (m !== except) m.hidden = true;
       });
     }
-    document.querySelectorAll('.status-pill').forEach(function (pill) {
-      pill.addEventListener('click', function (e) {
+    document.addEventListener('click', function (e) {
+      var pill = e.target.closest('.status-pill');
+      if (pill) {
         e.stopPropagation();
         var menu = pill.parentElement.querySelector('.status-menu');
         var willOpen = menu.hidden;
@@ -324,20 +308,18 @@
         if (willOpen) {
           var r = pill.getBoundingClientRect();
           menu.hidden = false;
-          var mw = 200, mh = 300;
-          menu.style.left = Math.min(r.left, window.innerWidth - mw - 10) + 'px';
-          menu.style.top = (r.bottom + mh + 12 > window.innerHeight && r.top - mh > 0)
+          menu.style.left = Math.min(r.left, window.innerWidth - 210) + 'px';
+          menu.style.top = (r.bottom + 300 + 12 > window.innerHeight && r.top - 300 > 0)
             ? (r.top - menu.offsetHeight - 6) + 'px'
             : (r.bottom + 6) + 'px';
         }
-      });
-    });
-    document.addEventListener('click', function () { closeMenus(null); });
-    document.querySelectorAll('.status-opt').forEach(function (opt) {
-      opt.addEventListener('click', function () {
+        return;
+      }
+      var opt = e.target.closest('.status-opt');
+      if (opt) {
         var cell = opt.closest('.status-cell');
-        var pill = cell.querySelector('.status-pill');
-        var sid = pill.getAttribute('data-sid');
+        var p = cell.querySelector('.status-pill');
+        var sid = p.getAttribute('data-sid');
         var st = opt.getAttribute('data-status');
         cell.querySelector('.status-menu').hidden = true;
         if (opt.classList.contains('active')) return;
@@ -347,14 +329,18 @@
           .then(function (r) { return r.json(); })
           .then(function (d) {
             if (!d.ok) throw new Error(d.error || 'failed');
-            pill.className = 'pill status-pill ' + d.pill;
-            pill.innerHTML = d.status + '<span class="caret">&#9662;</span>';
+            p.className = 'pill status-pill ' + d.pill;
+            p.innerHTML = d.status + '<span class="caret">&#9662;</span>';
             cell.querySelectorAll('.status-opt').forEach(function (o) {
               o.classList.toggle('active', o.getAttribute('data-status') === d.status);
             });
           })
           .catch(function () { alert('Could not update the status. Please try again.'); });
-      });
+        return;
+      }
+      if (!e.target.closest('.status-menu')) closeMenus(null);
+      var pb = e.target.closest('.profile-btn');
+      if (pb) openEditor(pb.getAttribute('data-sid'));
     });
 
     /* ---- edit student popup ---- */
@@ -374,44 +360,135 @@
         document.body.style.overflow = '';
       }, 190);
     }
-    document.querySelectorAll('.profile-btn').forEach(function (btn) {
-      btn.addEventListener('click', function () {
-        var sid = btn.getAttribute('data-sid');
-        fetch('/admin/student/' + sid + '/json')
-          .then(function (r) { return r.json(); })
-          .then(function (d) {
-            if (!d.ok) throw new Error(d.error || 'failed');
-            setVal('e_name', d.name);
-            setVal('e_father_name', d.father_name);
-            setVal('e_reg_no', d.reg_no);
-            setVal('e_cnic', d.cnic);
-            setVal('e_gender', d.gender);
-            setVal('e_degree', d.degree);
-            setVal('e_session', d.session);
-            setVal('e_department', d.department);
-            setVal('e_status', d.status);
-            setVal('e_folder_file', d.folder_file);
-            setVal('e_comments_missing', d.comments_missing);
-            setVal('e_synopsis', d.synopsis);
-            setVal('e_semi_final_thesis', d.semi_final_thesis);
-            setVal('e_final_thesis', d.final_thesis);
-            setVal('e_thesis_forward_coe', d.coe_iso);
-            document.getElementById('editSub').textContent = d.name + ' · ' + d.reg_no;
-            document.getElementById('editFullProfile').href = '/admin/student/' + sid;
-            document.getElementById('editNext').value =
-              window.location.pathname + window.location.search;
-            form.action = '/admin/student/' + sid + '/save';
-            openModal();
-          })
-          .catch(function () { alert('Could not load the student record.'); });
-      });
-    });
+    function openEditor(sid) {
+      fetch('/admin/student/' + sid + '/json')
+        .then(function (r) { return r.json(); })
+        .then(function (d) {
+          if (!d.ok) throw new Error(d.error || 'failed');
+          setVal('e_name', d.name);
+          setVal('e_father_name', d.father_name);
+          setVal('e_reg_no', d.reg_no);
+          setVal('e_cnic', d.cnic);
+          setVal('e_gender', d.gender);
+          setVal('e_degree', d.degree);
+          setVal('e_session', d.session);
+          setVal('e_department', d.department);
+          setVal('e_status', d.status);
+          setVal('e_folder_file', d.folder_file);
+          setVal('e_comments_missing', d.comments_missing);
+          setVal('e_synopsis', d.synopsis);
+          setVal('e_semi_final_thesis', d.semi_final_thesis);
+          setVal('e_final_thesis', d.final_thesis);
+          setVal('e_thesis_forward_coe', d.coe_iso);
+          document.getElementById('editSub').textContent = d.name + ' \u00b7 ' + d.reg_no;
+          document.getElementById('editFullProfile').href = '/admin/student/' + sid;
+          document.getElementById('editNext').value =
+            window.location.pathname + window.location.search;
+          form.action = '/admin/student/' + sid + '/save';
+          openModal();
+        })
+        .catch(function () { alert('Could not load the student record.'); });
+    }
     document.getElementById('editClose').addEventListener('click', closeModal);
     document.getElementById('editCancel').addEventListener('click', closeModal);
     modal.addEventListener('click', function (e) { if (e.target === modal) closeModal(); });
     document.addEventListener('keydown', function (e) {
       if (e.key === 'Escape') { closeMenus(null); closeModal(); }
     });
+
+    /* ---- autosearch: type 3+ letters, the list filters itself ---- */
+    var qInput = document.getElementById('q');
+    var tbody = document.getElementById('studentsBody');
+    var pagination = document.getElementById('pagination');
+    var countLine = document.getElementById('countLine');
+    var liveHint = document.getElementById('liveHint');
+    var origRows = tbody ? tbody.innerHTML : '';
+    var origCount = countLine ? countLine.innerHTML : '';
+    var searchMode = false;
+    var debounce = null;
+
+    function esc(t) {
+      return String(t == null ? '' : t).replace(/[&<>"']/g, function (m) {
+        return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[m];
+      });
+    }
+    function ynPill(v, yesText, noText) {
+      return v === yesText
+        ? '<span class="pill q">' + yesText + '</span>'
+        : '<span class="pill nq">' + noText + '</span>';
+    }
+    function menuHTML(cur) {
+      var h = '';
+      STATUSES.forEach(function (st) {
+        h += '<button type="button" class="status-opt' + (st === cur ? ' active' : '') +
+             '" data-status="' + esc(st) + '">' + esc(st) + '</button>';
+      });
+      return h;
+    }
+    function rowHTML(s) {
+      return '<tr data-dept="' + esc(s.department) + '">'
+        + '<td class="cb"><input type="checkbox" class="selBox" name="sel" value="' + s.id + '"></td>'
+        + '<td>' + esc(s.name) + '</td>'
+        + '<td>' + esc(s.reg_no) + '</td>'
+        + '<td>' + esc(s.gender || '\u2014') + '</td>'
+        + '<td class="degree-cell">' + esc(s.degree || '\u2014') + '</td>'
+        + '<td>' + esc(s.session || '\u2014') + '</td>'
+        + '<td>' + esc(s.department || '\u2014') + '</td>'
+        + '<td>' + ynPill(s.folder_file, 'Completed', 'Not Completed') + '</td>'
+        + '<td class="comments-cell">' + esc(s.comments_missing || '\u2014') + '</td>'
+        + '<td>' + ynPill(s.synopsis, 'Received', 'Not Received') + '</td>'
+        + '<td>' + ynPill(s.semi_final_thesis, 'Received', 'Not Received') + '</td>'
+        + '<td>' + ynPill(s.final_thesis, 'Received', 'Not Received') + '</td>'
+        + '<td>' + esc(s.coe_display) + '</td>'
+        + '<td class="status-cell"><button type="button" class="pill status-pill ' + s.pill +
+          '" data-sid="' + s.id + '" title="Click to change status">' + esc(s.status) +
+          '<span class="caret">&#9662;</span></button>' +
+          '<div class="status-menu" hidden>' + menuHTML(s.status) + '</div></td>'
+        + '<td><button type="button" class="btn ghost sm profile-btn" data-sid="' + s.id + '">Profile</button></td>'
+        + '</tr>';
+    }
+    function restoreList() {
+      if (!searchMode) return;
+      searchMode = false;
+      tbody.innerHTML = origRows;
+      if (pagination) pagination.style.display = '';
+      if (countLine) countLine.innerHTML = origCount;
+      if (liveHint) liveHint.hidden = true;
+    }
+    function liveSearch(v) {
+      var params = new URLSearchParams();
+      var filterForm = qInput.closest('form');
+      if (filterForm) {
+        new FormData(filterForm).forEach(function (val, key) { if (val) params.set(key, val); });
+      }
+      params.set('q', v);
+      fetch('/admin/students/search.json?' + params.toString())
+        .then(function (r) { return r.json(); })
+        .then(function (d) {
+          if (!d.ok || qInput.value.trim() !== v) return;
+          searchMode = true;
+          tbody.innerHTML = d.students.length
+            ? d.students.map(rowHTML).join('')
+            : '<tr><td colspan="15" style="text-align:center;padding:26px;color:var(--muted)">No students match &quot;' + esc(v) + '&quot;.</td></tr>';
+          if (pagination) pagination.style.display = 'none';
+          if (countLine) countLine.textContent = d.total + ' live result(s) for "' + v + '"';
+          if (liveHint) {
+            liveHint.hidden = false;
+            liveHint.textContent = 'Live search on \u2014 clear the search box for the full list.';
+          }
+          if (all) all.checked = false;
+        })
+        .catch(function () {});
+    }
+    if (qInput && tbody) {
+      qInput.addEventListener('input', function () {
+        clearTimeout(debounce);
+        var v = qInput.value.trim();
+        if (v.length === 0) { restoreList(); return; }
+        if (v.length < 3) return;
+        debounce = setTimeout(function () { liveSearch(v); }, 300);
+      });
+    }
   })();
 </script>
 {% endblock %}

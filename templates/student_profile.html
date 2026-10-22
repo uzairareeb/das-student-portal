@@ -7,7 +7,7 @@
     <div>
       <h2>{{ s.name }}</h2>
       <p class="sp-sub">{{ s.reg_no }} &middot; {{ s.degree or '—' }} &middot; Session {{ s.session or '—' }}</p>
-      {% if s.status in ['Continue', 'Viva Done', 'Pass Out'] %}<span class="pill q">{{ s.status }}</span>
+      {% if s.status in ['Continue', 'Viva Done', 'Pass Out', 'Sent to COE'] %}<span class="pill q">{{ s.status }}</span>
       {% elif s.status in ['Viva Pending', 'Defense Pending'] %}<span class="pill warn">{{ s.status }}</span>
       {% else %}<span class="pill nq">{{ s.status }}</span>{% endif %}
     </div>
