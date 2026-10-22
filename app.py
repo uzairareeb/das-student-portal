@@ -41,7 +41,17 @@ UNI_NAME = "Advanced Studies Office"
 PORTAL_TITLE = "Student Data Management System"
 
 STATUS_LIST = ["Continue", "Freeze", "Left", "Admission Cancelled",
-               "Viva Done", "Viva Pending", "Defense Pending", "Pass Out"]
+               "Viva Done", "Viva Pending", "Defense Pending", "Sent to COE",
+               "Pass Out"]
+def status_pill_class(status):
+    """Pill colour for a status: q (green) / warn (amber) / nq (red)."""
+    if status in ("Continue", "Viva Done", "Pass Out", "Sent to COE"):
+        return "q"
+    if status in ("Viva Pending", "Defense Pending"):
+        return "warn"
+    return "nq"
+
+
 FOLDER_OPTS = ["Completed", "Not Completed"]
 RECEIVED_OPTS = ["Received", "Not Received"]
 GENDER_OPTS = ["Male", "Female"]
@@ -2520,10 +2530,7 @@ def admin_student_status(sid):
                (status, datetime.now().strftime("%Y-%m-%d %H:%M"), sid))
     db.commit()
     log_activity("admin", "student_status", f"id={sid} status -> {status}")
-    pill = ("q" if status in ("Continue", "Viva Done", "Pass Out")
-            else "warn" if status in ("Viva Pending", "Defense Pending")
-            else "nq")
-    return {"ok": True, "status": status, "pill": pill}
+    return {"ok": True, "status": status, "pill": status_pill_class(status)}
 
 
 @app.route("/admin/student/<int:sid>/json")
@@ -2543,6 +2550,30 @@ def admin_student_json(sid):
     return out
 
 
+@app.route("/admin/students/search.json")
+@admin_required
+def admin_students_search():
+    """Live search for the student list (autosearch as you type)."""
+    rows = query_students(request.args)
+    out = []
+    for s in rows[:200]:
+        st = s.get("status") or ""
+        out.append({
+            "id": s["id"], "name": s.get("name") or "",
+            "reg_no": s.get("reg_no") or "", "gender": s.get("gender") or "",
+            "degree": s.get("degree") or "", "session": s.get("session") or "",
+            "department": s.get("department") or "",
+            "folder_file": s.get("folder_file") or "",
+            "comments_missing": s.get("comments_missing") or "",
+            "synopsis": s.get("synopsis") or "",
+            "semi_final_thesis": s.get("semi_final_thesis") or "",
+            "final_thesis": s.get("final_thesis") or "",
+            "coe_display": fmt_coe(s.get("thesis_forward_coe")),
+            "status": st, "pill": status_pill_class(st),
+        })
+    return {"ok": True, "total": len(rows), "students": out}
+
+
 @app.route("/admin/students/bulk-update", methods=["POST"])
 @admin_required
 def admin_students_bulk_update():
@@ -2559,10 +2590,7 @@ def admin_students_bulk_update():
         vals.append(pick(status, STATUS_LIST, "Continue"))
         sets.append("status=?")
         done.append(f"status '{vals[-1]}'")
-    if request.form.get("bulk_coe_clear") == "1":
-        sets.append("thesis_forward_coe=NULL")
-        done.append("COE date cleared")
-    elif coe_raw:
+    if coe_raw:
         coe = parse_coe(coe_raw)
         if coe:
             sets.append("thesis_forward_coe=?")
