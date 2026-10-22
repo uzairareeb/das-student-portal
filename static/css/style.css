@@ -84,7 +84,7 @@ body {
 .input-group { position: relative; margin-bottom: 16px; }
 .input-icon { position: absolute; left: 15px; top: 50%; transform: translateY(-50%); color: #98a2b3; display: flex; }
 .input-icon svg { width: 19px; height: 19px; }
-input[type="text"], input[type="password"], input[type="email"], input[type="number"], input[type="date"], select, textarea {
+input[type="text"], input[type="password"], input[type="email"], input[type="number"], input[type="date"], input[type="datetime-local"], select, textarea {
   width: 100%; padding: 14px 16px 14px 46px; border: 1.5px solid var(--line); border-radius: 10px;
   font-size: 15.5px; font-family: inherit; color: var(--ink); background: #fbfbfe; transition: border-color .15s, box-shadow .15s;
 }

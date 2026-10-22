@@ -50,12 +50,12 @@
     <div><dt>Registration No.</dt><dd>{{ s.reg_no }}</dd></div>
     <div><dt>Gender</dt><dd>{{ s.gender or '—' }}</dd></div>
     <div><dt>Department</dt><dd>{{ s.department or '—' }}</dd></div>
-    <div><dt>Comments (Missing)</dt><dd>{{ s.comments_missing or '—' }}</dd></div>
     <div><dt>Semi-Final Thesis</dt><dd>{% if s.semi_final_thesis == 'Received' %}<span class="pill q">Received</span>{% else %}<span class="pill nq">Not Received</span>{% endif %}</dd></div>
     <div><dt>Semi-Final Received On</dt><dd>{{ s.semi_at_disp }}</dd></div>
     <div><dt>Final Thesis</dt><dd>{% if s.final_thesis == 'Received' %}<span class="pill q">Received</span>{% else %}<span class="pill nq">Not Received</span>{% endif %}</dd></div>
     <div><dt>Final Received On</dt><dd>{{ s.final_at_disp }}</dd></div>
     <div><dt>Thesis Forward (COE)</dt><dd>{{ s.coe_display }}</dd></div>
+    <div><dt>Comments (Missing)</dt><dd>{{ s.comments_missing or '—' }}</dd></div>
   </dl>
 </div>
 
@@ -116,16 +116,6 @@
           {% for v in folders %}<option value="{{ v }}" {% if s.folder_file==v %}selected{% endif %}>{{ v }}</option>{% endfor %}
         </select>
       </div>
-      <div class="full">
-        <label class="f-label" for="comments_missing">Comments (Missing)</label>
-        <input class="no-icon" type="text" id="comments_missing" name="comments_missing" value="{{ s.comments_missing or '' }}">
-      </div>
-      <div>
-        <label class="f-label" for="synopsis">Synopsis</label>
-        <select class="no-icon" id="synopsis" name="synopsis">
-          {% for v in received %}<option value="{{ v }}" {% if s.synopsis==v %}selected{% endif %}>{{ v }}</option>{% endfor %}
-        </select>
-      </div>
       <div>
         <label class="f-label" for="semi_final_thesis">Semi-Final Thesis</label>
         <select class="no-icon" id="semi_final_thesis" name="semi_final_thesis">
@@ -147,8 +137,18 @@
         <input class="no-icon" type="datetime-local" id="final_thesis_at" name="final_thesis_at" value="{{ s.final_at_local }}">
       </div>
       <div>
+        <label class="f-label" for="synopsis">Synopsis</label>
+        <select class="no-icon" id="synopsis" name="synopsis">
+          {% for v in received %}<option value="{{ v }}" {% if s.synopsis==v %}selected{% endif %}>{{ v }}</option>{% endfor %}
+        </select>
+      </div>
+      <div>
         <label class="f-label" for="thesis_forward_coe">Thesis Forward (COE) Date</label>
         <input class="no-icon" type="date" id="thesis_forward_coe" name="thesis_forward_coe" value="{{ s.coe_iso }}">
+      </div>
+      <div class="full">
+        <label class="f-label" for="comments_missing">Comments (Missing)</label>
+        <input class="no-icon" type="text" id="comments_missing" name="comments_missing" value="{{ s.comments_missing or '' }}">
       </div>
     </div>
     <div class="row" style="margin-top:18px">

@@ -104,7 +104,7 @@
             <th>Folder/File</th><th>Synopsis</th>
             <th>Semi-Final</th><th>Final Thesis</th><th>Thesis Received Dates</th>
             <th>Thesis Forward (COE)</th>
-            <th>Status</th><th></th>
+            <th>Status</th><th>Comments (Missing)</th><th></th>
           </tr>
         </thead>
         <tbody id="studentsBody">
@@ -141,6 +141,7 @@
                 {% for st in status_list %}<button type="button" class="status-opt{% if st == s.status %} active{% endif %}" data-status="{{ st }}">{{ st }}</button>{% endfor %}
               </div>
             </td>
+            <td class="comments-cell">{{ s.comments_missing or '—' }}</td>
             <td><button type="button" class="btn ghost sm profile-btn" data-sid="{{ s.id }}">Profile</button></td>
           </tr>
           {% endfor %}
@@ -242,16 +243,6 @@
             {% for v in folders %}<option value="{{ v }}">{{ v }}</option>{% endfor %}
           </select>
         </div>
-        <div class="full">
-          <label class="f-label" for="e_comments_missing">Comments (Missing)</label>
-          <input class="no-icon" type="text" id="e_comments_missing" name="comments_missing">
-        </div>
-        <div>
-          <label class="f-label" for="e_synopsis">Synopsis</label>
-          <select class="no-icon" id="e_synopsis" name="synopsis">
-            {% for v in received %}<option value="{{ v }}">{{ v }}</option>{% endfor %}
-          </select>
-        </div>
         <div>
           <label class="f-label" for="e_semi_final_thesis">Semi-Final Thesis</label>
           <select class="no-icon" id="e_semi_final_thesis" name="semi_final_thesis">
@@ -273,8 +264,18 @@
           <input class="no-icon" type="datetime-local" id="e_final_thesis_at" name="final_thesis_at">
         </div>
         <div>
+          <label class="f-label" for="e_synopsis">Synopsis</label>
+          <select class="no-icon" id="e_synopsis" name="synopsis">
+            {% for v in received %}<option value="{{ v }}">{{ v }}</option>{% endfor %}
+          </select>
+        </div>
+        <div>
           <label class="f-label" for="e_thesis_forward_coe">Thesis Forward (COE) Date</label>
           <input class="no-icon" type="date" id="e_thesis_forward_coe" name="thesis_forward_coe">
+        </div>
+        <div class="full">
+          <label class="f-label" for="e_comments_missing">Comments (Missing)</label>
+          <input class="no-icon" type="text" id="e_comments_missing" name="comments_missing">
         </div>
       </div>
       <div class="modal-actions" style="margin-top:20px">
@@ -469,6 +470,7 @@
           '" data-sid="' + s.id + '" title="Click to change status">' + esc(s.status) +
           '<span class="caret">&#9662;</span></button>' +
           '<div class="status-menu" hidden>' + menuHTML(s.status) + '</div></td>'
+        + '<td class="comments-cell">' + esc(s.comments_missing || '\u2014') + '</td>'
         + '<td><button type="button" class="btn ghost sm profile-btn" data-sid="' + s.id + '">Profile</button></td>'
         + '</tr>';
     }
@@ -494,7 +496,7 @@
           searchMode = true;
           tbody.innerHTML = d.students.length
             ? d.students.map(rowHTML).join('')
-            : '<tr><td colspan="12" style="text-align:center;padding:26px;color:var(--muted)">No students match &quot;' + esc(v) + '&quot;.</td></tr>';
+            : '<tr><td colspan="13" style="text-align:center;padding:26px;color:var(--muted)">No students match &quot;' + esc(v) + '&quot;.</td></tr>';
           if (pagination) pagination.style.display = 'none';
           if (countLine) countLine.textContent = d.total + ' live result(s) for "' + v + '"';
           if (liveHint) {
