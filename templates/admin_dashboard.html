@@ -31,6 +31,32 @@
   {% endfor %}
 </div>
 
+<div class="card section pending-card">
+  <div class="section-head">
+    <span class="section-icon warn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg></span>
+    <h3>Dhyaan Dein — Pending Actions</h3>
+    {% if pending.total %}<span class="pill warn">{{ pending.total }} pending</span>{% endif %}
+  </div>
+  {% if pending.groups %}
+  {% for g in pending.groups %}
+  <div class="pending-group">
+    <div class="pending-group-head">{{ g.title }} <span class="pending-count">{{ g.count }}</span></div>
+    {% for it in g.rows %}
+    <a class="pending-item" href="{{ url_for('admin_student_profile', sid=it.id) }}">
+      <span class="pending-name">{{ it.name }}</span>
+      <span class="pending-reg">{{ it.reg_no }}</span>
+      <span class="pending-detail">{{ it.detail }}</span>
+      <span class="pending-go">&rarr;</span>
+    </a>
+    {% endfor %}
+    {% if g.more %}<p class="hint" style="margin:8px 2px 2px">…aur {{ g.more }} students isi list mein hain — Student List mein filter karke dekhein.</p>{% endif %}
+  </div>
+  {% endfor %}
+  {% else %}
+  <p class="pending-clear"><span class="tick">&#10003;</span> Sab update hai — koi pending action nahi hai.</p>
+  {% endif %}
+</div>
+
 <div class="dash-grid">
   <div class="card section">
     <div class="section-head">

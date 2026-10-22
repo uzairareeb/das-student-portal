@@ -536,6 +536,21 @@ code { background: var(--bg-soft); padding: 2px 8px; border-radius: 6px; font-si
 .modal-x:hover { background: #dde1f7; transform: rotate(90deg); }
 .dates-cell { font-size: 12px; color: var(--muted); line-height: 1.55; white-space: nowrap; }
 .dates-cell span { font-weight: 700; color: var(--ink); }
+
+/* ---------- dashboard: pending actions ---------- */
+.pending-card { border-left: 4px solid var(--warn); }
+.pending-group { margin-top: 14px; }
+.pending-group-head { font-size: 13px; font-weight: 800; letter-spacing: .4px; text-transform: uppercase; color: #344054; margin-bottom: 6px; display: flex; align-items: center; gap: 8px; }
+.pending-count { background: var(--warn-bg); color: var(--warn); border-radius: 999px; padding: 1px 9px; font-size: 12px; font-weight: 800; }
+.pending-item { display: flex; align-items: center; gap: 12px; padding: 9px 12px; border-radius: 10px; text-decoration: none; transition: background .15s; }
+.pending-item:hover { background: #fdf6ec; }
+.pending-item + .pending-item { border-top: 1px dashed var(--line); }
+.pending-name { font-weight: 700; color: var(--ink); font-size: 14px; }
+.pending-reg { color: var(--muted); font-size: 12.5px; white-space: nowrap; }
+.pending-detail { color: var(--muted); font-size: 13px; margin-left: auto; text-align: right; }
+.pending-go { color: var(--warn); font-weight: 800; }
+.pending-clear { display: flex; align-items: center; gap: 10px; color: var(--ok); font-weight: 600; margin: 6px 0 2px; }
+.pending-clear .tick { display: inline-flex; align-items: center; justify-content: center; width: 24px; height: 24px; border-radius: 50%; background: var(--ok-bg); font-size: 14px; }
 .modal-icon svg { width: 32px; height: 32px; }
 /* animated green tick */
 .tick { width: 84px; height: 84px; margin: 0 auto; display: block; }
