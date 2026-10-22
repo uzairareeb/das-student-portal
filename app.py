@@ -205,6 +205,8 @@ def init_db():
             synopsis TEXT DEFAULT 'Not Received',
             semi_final_thesis TEXT DEFAULT 'Not Received',
             final_thesis TEXT DEFAULT 'Not Received',
+            semi_final_thesis_at TEXT,
+            final_thesis_at TEXT,
             thesis_forward_coe {"DATE" if USE_PG else "TEXT"},
             status TEXT DEFAULT 'Continue',
             department TEXT,
@@ -318,6 +320,7 @@ def init_db():
     _migrate_add_department_column(db)
     _migrate_add_viva_admin_seen(db)
     _migrate_add_viva_marks(db)
+    _migrate_add_thesis_dates(db)
     # Admin password comes from the env var (source of truth), stored hashed.
     pw_hash = generate_password_hash(
         os.environ.get("ADMIN_PASSWORD", "admin123") or "admin123")
@@ -353,6 +356,7 @@ def _migrate_drop_unique_constraints(db):
         new_cols = ["id", "cnic", "name", "father_name", "reg_no", "gender",
                     "degree", "session", "folder_file", "comments_missing",
                     "synopsis", "semi_final_thesis", "final_thesis",
+                    "semi_final_thesis_at", "final_thesis_at",
                     "thesis_forward_coe", "status", "department",
                     "password_hash", "created_at", "updated_at"]
         cols = [c for c in new_cols if c in old_cols]
@@ -371,6 +375,8 @@ def _migrate_drop_unique_constraints(db):
                 synopsis TEXT DEFAULT 'Not Received',
                 semi_final_thesis TEXT DEFAULT 'Not Received',
                 final_thesis TEXT DEFAULT 'Not Received',
+                semi_final_thesis_at TEXT,
+                final_thesis_at TEXT,
                 thesis_forward_coe TEXT,
                 status TEXT DEFAULT 'Continue',
                 department TEXT,
@@ -424,6 +430,30 @@ def _migrate_add_viva_admin_seen(db):
         db.commit()
     except Exception:
         pass
+
+
+def _migrate_add_thesis_dates(db):
+    """Add students.semi_final_thesis_at / final_thesis_at. Safe to rerun."""
+    try:
+        if USE_PG:
+            db.execute("ALTER TABLE students ADD COLUMN IF NOT EXISTS"
+                       " semi_final_thesis_at TEXT")
+            db.execute("ALTER TABLE students ADD COLUMN IF NOT EXISTS"
+                       " final_thesis_at TEXT")
+        else:
+            cols = [r[1] for r in db.fetchall("PRAGMA table_info(students)")]
+            if "semi_final_thesis_at" not in cols:
+                db.execute("ALTER TABLE students ADD COLUMN"
+                           " semi_final_thesis_at TEXT")
+            if "final_thesis_at" not in cols:
+                db.execute("ALTER TABLE students ADD COLUMN"
+                           " final_thesis_at TEXT")
+        db.commit()
+    except Exception:
+        try:
+            db.conn.rollback()
+        except Exception:
+            pass
 
 
 def _migrate_add_department_column(db):
@@ -527,6 +557,46 @@ def fmt_coe(val):
     if iso:
         return datetime.strptime(iso, "%Y-%m-%d").strftime("%b %d, %Y")
     return s
+
+
+def parse_dt(raw):
+    """Form datetime -> 'YYYY-MM-DD HH:MM' or ''."""
+    s = (str(raw) if raw is not None else "").strip().replace("T", " ")
+    if not s:
+        return ""
+    for cand in (s, s[:16]):
+        try:
+            return datetime.strptime(cand, "%Y-%m-%d %H:%M").strftime("%Y-%m-%d %H:%M")
+        except ValueError:
+            continue
+    return ""
+
+
+def fmt_stamp(val):
+    """DB datetime -> '22 Oct 2026, 09:41 AM' or em dash."""
+    iso = parse_dt(val)
+    if not iso:
+        return "\u2014"
+    return datetime.strptime(iso, "%Y-%m-%d %H:%M").strftime("%d %b %Y, %I:%M %p")
+
+
+def dt_local(val):
+    """DB datetime -> value for an <input type=datetime-local>."""
+    iso = parse_dt(val)
+    return iso.replace(" ", "T") if iso else ""
+
+
+def _thesis_stamp(new_status, posted_raw, old_status, old_val):
+    """Received-on stamp: Not Received clears it; a posted datetime wins;
+    an already-Received record keeps its stamp; a fresh Received = now."""
+    if new_status != "Received":
+        return None
+    posted = parse_dt(posted_raw)
+    if posted:
+        return posted
+    if old_status == "Received" and old_val:
+        return parse_dt(old_val) or None
+    return datetime.now().strftime("%Y-%m-%d %H:%M")
 
 
 def pick(val, options, default):
@@ -727,6 +797,8 @@ def admin_students():
                               offset=(page - 1) * PER_PAGE)
     for s in students:
         s["coe_display"] = fmt_coe(s.get("thesis_forward_coe"))
+        s["semi_at_disp"] = fmt_stamp(s.get("semi_final_thesis_at"))
+        s["final_at_disp"] = fmt_stamp(s.get("final_thesis_at"))
     total = count_students({})
     base_args = {k: v for k, v in request.args.items() if k != "page"}
     export_url = url_for("admin_export")
@@ -765,7 +837,8 @@ def admin_export():
     ws.title = "Students"
     headers = ["Name", "Reg.No", "Gender", "Degree", "Session", "Folder/File",
                "Comments (Missing)", "Synopsis", "Semi-Final Thesis",
-               "Final Thesis", "Thesis Forward (COE)", "Status"]
+               "Semi-Final Received On", "Final Thesis",
+               "Final Received On", "Thesis Forward (COE)", "Status"]
     ws.append(headers)
     for cell in ws[1]:
         cell.font = Font(bold=True, color="FFFFFF")
@@ -773,13 +846,18 @@ def admin_export():
         cell.alignment = Alignment(horizontal="center", vertical="center",
                                    wrap_text=True)
     for s in students:
+        _semi = fmt_stamp(s.get("semi_final_thesis_at"))
+        _fin = fmt_stamp(s.get("final_thesis_at"))
         ws.append([s.get("name"), s.get("reg_no"), s.get("gender"),
                    s.get("degree"), s.get("session"), s.get("folder_file"),
                    s.get("comments_missing"), s.get("synopsis"),
-                   s.get("semi_final_thesis"), s.get("final_thesis"),
+                   s.get("semi_final_thesis"),
+                   "" if _semi == "\u2014" else _semi,
+                   s.get("final_thesis"),
+                   "" if _fin == "\u2014" else _fin,
                    parse_coe(s.get("thesis_forward_coe")) or "",
                    s.get("status")])
-    widths = [24, 16, 10, 22, 12, 14, 30, 12, 14, 14, 18, 16]
+    widths = [24, 16, 10, 22, 12, 14, 26, 12, 14, 21, 14, 21, 18, 16]
     for i, w in enumerate(widths, start=1):
         ws.column_dimensions[ws.cell(row=1, column=i).column_letter].width = w
     buf = io.BytesIO()
@@ -841,8 +919,12 @@ def admin_export_pdf():
             Paragraph(s.get("folder_file") or "—", cell),
             Paragraph(s.get("comments_missing") or "—", cell),
             Paragraph(s.get("synopsis") or "—", cell),
-            Paragraph(s.get("semi_final_thesis") or "—", cell),
-            Paragraph(s.get("final_thesis") or "—", cell),
+            Paragraph((s.get("semi_final_thesis") or "—") + (
+                "<br/>" + fmt_stamp(s.get("semi_final_thesis_at"))
+                if s.get("semi_final_thesis_at") else ""), cell),
+            Paragraph((s.get("final_thesis") or "—") + (
+                "<br/>" + fmt_stamp(s.get("final_thesis_at"))
+                if s.get("final_thesis_at") else ""), cell),
             Paragraph(fmt_coe(s.get("thesis_forward_coe")), cell),
             Paragraph(s.get("status") or "—", cell),
         ])
@@ -1778,6 +1860,8 @@ def dept_student_profile(sid):
         flash("Student not found.")
         return redirect(url_for("dept_students"))
     s["coe_display"] = fmt_coe(s.get("thesis_forward_coe"))
+    s["semi_at_disp"] = fmt_stamp(s.get("semi_final_thesis_at"))
+    s["final_at_disp"] = fmt_stamp(s.get("final_thesis_at"))
     docs = get_docs(sid)
     vivas = [dict(r) for r in get_db().fetchall(
         "SELECT examiner_name, examiner_affiliation, viva_date, result,"
@@ -1922,7 +2006,8 @@ def dept_students_export():
     ws = wb.active
     ws.title = "Students"
     headers = ["Name", "Reg.No", "CNIC", "Gender", "Degree", "Session",
-               "Folder/File", "Synopsis", "Semi-Final Thesis", "Final Thesis",
+               "Folder/File", "Synopsis", "Semi-Final Thesis",
+               "Semi-Final Received On", "Final Thesis", "Final Received On",
                "Thesis Forward (COE)", "Status"]
     ws.append(headers)
     for cell in ws[1]:
@@ -1931,13 +2016,18 @@ def dept_students_export():
         cell.alignment = Alignment(horizontal="center", vertical="center",
                                    wrap_text=True)
     for s in students:
+        _semi = fmt_stamp(s.get("semi_final_thesis_at"))
+        _fin = fmt_stamp(s.get("final_thesis_at"))
         ws.append([s.get("name"), s.get("reg_no"), s.get("cnic"),
                    s.get("gender"), s.get("degree"), s.get("session"),
                    s.get("folder_file"), s.get("synopsis"),
-                   s.get("semi_final_thesis"), s.get("final_thesis"),
+                   s.get("semi_final_thesis"),
+                   "" if _semi == "\u2014" else _semi,
+                   s.get("final_thesis"),
+                   "" if _fin == "\u2014" else _fin,
                    parse_coe(s.get("thesis_forward_coe")) or "",
                    s.get("status")])
-    widths = [24, 16, 18, 10, 22, 12, 14, 12, 16, 14, 18, 16]
+    widths = [24, 16, 18, 10, 22, 12, 14, 12, 16, 21, 14, 21, 18, 16]
     for i, w in enumerate(widths, start=1):
         ws.column_dimensions[ws.cell(row=1, column=i).column_letter].width = w
     buf = io.BytesIO()
@@ -2425,6 +2515,10 @@ def admin_student_profile(sid):
                                message="Student not found."), 404
     s["coe_display"] = fmt_coe(s.get("thesis_forward_coe"))
     s["coe_iso"] = parse_coe(s.get("thesis_forward_coe"))
+    s["semi_at_disp"] = fmt_stamp(s.get("semi_final_thesis_at"))
+    s["final_at_disp"] = fmt_stamp(s.get("final_thesis_at"))
+    s["semi_at_local"] = dt_local(s.get("semi_final_thesis_at"))
+    s["final_at_local"] = dt_local(s.get("final_thesis_at"))
     docs = get_docs(sid)
     vivas = [dict(r) for r in get_db().fetchall(
         "SELECT * FROM viva_records WHERE student_id=? ORDER BY id DESC",
@@ -2454,6 +2548,14 @@ def admin_student_save(sid):
         return redirect(nxt or url_for("admin_student_profile", sid=sid))
     db = get_db()
     now = datetime.now().strftime("%Y-%m-%d %H:%M")
+    semi_status = pick(f.get("semi_final_thesis"), RECEIVED_OPTS, "Not Received")
+    final_status = pick(f.get("final_thesis"), RECEIVED_OPTS, "Not Received")
+    semi_at = _thesis_stamp(semi_status, f.get("semi_final_thesis_at"),
+                            s.get("semi_final_thesis"),
+                            s.get("semi_final_thesis_at"))
+    final_at = _thesis_stamp(final_status, f.get("final_thesis_at"),
+                             s.get("final_thesis"),
+                             s.get("final_thesis_at"))
     dept = (f.get("department") or "").strip()
     if dept and dept not in set(dept_names()):
         dept = (s.get("department") or "").strip()  # ignore tampered values
@@ -2462,6 +2564,7 @@ def admin_student_save(sid):
             """UPDATE students SET cnic=?, name=?, father_name=?, reg_no=?,
                gender=?, degree=?, session=?, folder_file=?, comments_missing=?,
                synopsis=?, semi_final_thesis=?, final_thesis=?,
+               semi_final_thesis_at=?, final_thesis_at=?,
                thesis_forward_coe=?, status=?, department=?, updated_at=?
                WHERE id=?""",
             (cnic, name, f.get("father_name", "").strip(), reg_no,
@@ -2470,8 +2573,7 @@ def admin_student_save(sid):
              pick(f.get("folder_file"), FOLDER_OPTS, "Not Completed"),
              f.get("comments_missing", "").strip() or "N/A",
              pick(f.get("synopsis"), RECEIVED_OPTS, "Not Received"),
-             pick(f.get("semi_final_thesis"), RECEIVED_OPTS, "Not Received"),
-             pick(f.get("final_thesis"), RECEIVED_OPTS, "Not Received"),
+             semi_status, final_status, semi_at, final_at,
              parse_coe(f.get("thesis_forward_coe")) or None,
              pick(f.get("status"), STATUS_LIST, "Continue"),
              dept, now, sid))
@@ -2546,6 +2648,8 @@ def admin_student_json(sid):
             "final_thesis")
     out = {k: (s.get(k) or "") for k in keys}
     out["coe_iso"] = parse_coe(s.get("thesis_forward_coe"))
+    out["semi_final_thesis_at"] = dt_local(s.get("semi_final_thesis_at"))
+    out["final_thesis_at"] = dt_local(s.get("final_thesis_at"))
     out["ok"] = True
     return out
 
@@ -2569,6 +2673,8 @@ def admin_students_search():
             "semi_final_thesis": s.get("semi_final_thesis") or "",
             "final_thesis": s.get("final_thesis") or "",
             "coe_display": fmt_coe(s.get("thesis_forward_coe")),
+            "semi_at": fmt_stamp(s.get("semi_final_thesis_at")),
+            "final_at": fmt_stamp(s.get("final_thesis_at")),
             "status": st, "pill": status_pill_class(st),
         })
     return {"ok": True, "total": len(rows), "students": out}
