@@ -21,6 +21,7 @@
   <div class="sp-stat">
     <div class="k">Synopsis</div>
     <div class="v">{% if s.synopsis == 'Received' %}<span class="pill q">Received</span>{% else %}<span class="pill nq">Not Received</span>{% endif %}</div>
+    {% if s.synopsis_at %}<div class="hint" style="margin-top:4px">{{ s.syn_at_disp }}</div>{% endif %}
   </div>
   <div class="sp-stat">
     <div class="k">Semi-Final Thesis</div>

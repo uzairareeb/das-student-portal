@@ -101,10 +101,10 @@
           <tr>
             <th class="cb"><input type="checkbox" id="selAll" title="Select all on this page"></th>
             <th>Name</th><th>Reg.No</th><th>Degree</th>
-            <th>Folder/File</th><th>Synopsis</th>
+            <th>Folder/File</th><th>Synopsis</th><th>Synopsis Received</th>
             <th>Semi-Final</th><th>Final Thesis</th><th>Thesis Received Dates</th>
             <th>Thesis Forward (COE)</th>
-            <th>Status</th><th>Comments (Missing)</th><th></th>
+            <th>Status</th><th></th>
           </tr>
         </thead>
         <tbody id="studentsBody">
@@ -122,6 +122,7 @@
               {% if s.synopsis == 'Received' %}<span class="pill q">Received</span>
               {% else %}<span class="pill nq">Not Received</span>{% endif %}
             </td>
+            <td class="dates-cell">{{ s.syn_at_disp }}</td>
             <td>
               {% if s.semi_final_thesis == 'Received' %}<span class="pill q">Received</span>
               {% else %}<span class="pill nq">Not Received</span>{% endif %}
@@ -135,13 +136,11 @@
               <div><span>Final:</span> {{ s.final_at_disp }}</div>
             </td>
             <td>{{ s.coe_display }}</td>
-            <td class="status-cell">
-              <button type="button" class="pill status-pill {% if s.status in ['Continue', 'Viva Done', 'Pass Out', 'Sent to COE'] %}q{% elif s.status in ['Viva Pending', 'Defense Pending'] %}warn{% else %}nq{% endif %}" data-sid="{{ s.id }}" title="Click to change status">{{ s.status }}<span class="caret">&#9662;</span></button>
-              <div class="status-menu" hidden>
-                {% for st in status_list %}<button type="button" class="status-opt{% if st == s.status %} active{% endif %}" data-status="{{ st }}">{{ st }}</button>{% endfor %}
-              </div>
+            <td>
+              {% if s.status in ['Continue', 'Viva Done', 'Pass Out', 'Sent to COE'] %}<span class="pill q">{{ s.status }}</span>
+              {% elif s.status in ['Viva Pending', 'Defense Pending'] %}<span class="pill warn">{{ s.status }}</span>
+              {% else %}<span class="pill nq">{{ s.status }}</span>{% endif %}
             </td>
-            <td class="comments-cell">{{ s.comments_missing or '—' }}</td>
             <td><button type="button" class="btn ghost sm profile-btn" data-sid="{{ s.id }}">Profile</button></td>
           </tr>
           {% endfor %}
@@ -244,6 +243,16 @@
           </select>
         </div>
         <div>
+          <label class="f-label" for="e_synopsis">Synopsis</label>
+          <select class="no-icon" id="e_synopsis" name="synopsis">
+            {% for v in received %}<option value="{{ v }}">{{ v }}</option>{% endfor %}
+          </select>
+        </div>
+        <div>
+          <label class="f-label" for="e_synopsis_at">Synopsis Received On</label>
+          <input class="no-icon" type="datetime-local" id="e_synopsis_at" name="synopsis_at">
+        </div>
+        <div>
           <label class="f-label" for="e_semi_final_thesis">Semi-Final Thesis</label>
           <select class="no-icon" id="e_semi_final_thesis" name="semi_final_thesis">
             {% for v in received %}<option value="{{ v }}">{{ v }}</option>{% endfor %}
@@ -262,12 +271,6 @@
         <div>
           <label class="f-label" for="e_final_thesis_at">Final Received On</label>
           <input class="no-icon" type="datetime-local" id="e_final_thesis_at" name="final_thesis_at">
-        </div>
-        <div>
-          <label class="f-label" for="e_synopsis">Synopsis</label>
-          <select class="no-icon" id="e_synopsis" name="synopsis">
-            {% for v in received %}<option value="{{ v }}">{{ v }}</option>{% endfor %}
-          </select>
         </div>
         <div>
           <label class="f-label" for="e_thesis_forward_coe">Thesis Forward (COE) Date</label>
@@ -290,8 +293,6 @@
 
 <script>
   (function () {
-    var STATUSES = {{ status_list|tojson }};
-
     /* ---- select all on page ---- */
     var all = document.getElementById('selAll');
     if (all) {
@@ -301,53 +302,8 @@
       });
     }
 
-    /* ---- inline status change (event delegation: works for live-search rows too) ---- */
-    function closeMenus(except) {
-      document.querySelectorAll('.status-menu').forEach(function (m) {
-        if (m !== except) m.hidden = true;
-      });
-    }
+    /* ---- profile popup (event delegation: works for live-search rows too) ---- */
     document.addEventListener('click', function (e) {
-      var pill = e.target.closest('.status-pill');
-      if (pill) {
-        e.stopPropagation();
-        var menu = pill.parentElement.querySelector('.status-menu');
-        var willOpen = menu.hidden;
-        closeMenus(menu);
-        if (willOpen) {
-          var r = pill.getBoundingClientRect();
-          menu.hidden = false;
-          menu.style.left = Math.min(r.left, window.innerWidth - 210) + 'px';
-          menu.style.top = (r.bottom + 300 + 12 > window.innerHeight && r.top - 300 > 0)
-            ? (r.top - menu.offsetHeight - 6) + 'px'
-            : (r.bottom + 6) + 'px';
-        }
-        return;
-      }
-      var opt = e.target.closest('.status-opt');
-      if (opt) {
-        var cell = opt.closest('.status-cell');
-        var p = cell.querySelector('.status-pill');
-        var sid = p.getAttribute('data-sid');
-        var st = opt.getAttribute('data-status');
-        cell.querySelector('.status-menu').hidden = true;
-        if (opt.classList.contains('active')) return;
-        var fd = new FormData();
-        fd.append('status', st);
-        fetch('/admin/student/' + sid + '/status', { method: 'POST', body: fd })
-          .then(function (r) { return r.json(); })
-          .then(function (d) {
-            if (!d.ok) throw new Error(d.error || 'failed');
-            p.className = 'pill status-pill ' + d.pill;
-            p.innerHTML = d.status + '<span class="caret">&#9662;</span>';
-            cell.querySelectorAll('.status-opt').forEach(function (o) {
-              o.classList.toggle('active', o.getAttribute('data-status') === d.status);
-            });
-          })
-          .catch(function () { alert('Could not update the status. Please try again.'); });
-        return;
-      }
-      if (!e.target.closest('.status-menu')) closeMenus(null);
       var pb = e.target.closest('.profile-btn');
       if (pb) openEditor(pb.getAttribute('data-sid'));
     });
@@ -386,6 +342,7 @@
           setVal('e_folder_file', d.folder_file);
           setVal('e_comments_missing', d.comments_missing);
           setVal('e_synopsis', d.synopsis);
+          setVal('e_synopsis_at', d.synopsis_at);
           setVal('e_semi_final_thesis', d.semi_final_thesis);
           setVal('e_final_thesis', d.final_thesis);
           setVal('e_semi_final_thesis_at', d.semi_final_thesis_at);
@@ -415,13 +372,14 @@
         else { dt.value = ''; }
       });
     }
+    wireThesis('e_synopsis', 'e_synopsis_at');
     wireThesis('e_semi_final_thesis', 'e_semi_final_thesis_at');
     wireThesis('e_final_thesis', 'e_final_thesis_at');
     document.getElementById('editClose').addEventListener('click', closeModal);
     document.getElementById('editCancel').addEventListener('click', closeModal);
     modal.addEventListener('click', function (e) { if (e.target === modal) closeModal(); });
     document.addEventListener('keydown', function (e) {
-      if (e.key === 'Escape') { closeMenus(null); closeModal(); }
+      if (e.key === 'Escape') closeModal();
     });
 
     /* ---- autosearch: type 3+ letters, the list filters itself ---- */
@@ -445,14 +403,6 @@
         ? '<span class="pill q">' + yesText + '</span>'
         : '<span class="pill nq">' + noText + '</span>';
     }
-    function menuHTML(cur) {
-      var h = '';
-      STATUSES.forEach(function (st) {
-        h += '<button type="button" class="status-opt' + (st === cur ? ' active' : '') +
-             '" data-status="' + esc(st) + '">' + esc(st) + '</button>';
-      });
-      return h;
-    }
     function rowHTML(s) {
       return '<tr data-dept="' + esc(s.department) + '">'
         + '<td class="cb"><input type="checkbox" class="selBox" name="sel" value="' + s.id + '"></td>'
@@ -461,16 +411,13 @@
         + '<td class="degree-cell">' + esc(s.degree || '\u2014') + '</td>'
         + '<td>' + ynPill(s.folder_file, 'Completed', 'Not Completed') + '</td>'
         + '<td>' + ynPill(s.synopsis, 'Received', 'Not Received') + '</td>'
+        + '<td class="dates-cell">' + esc(s.syn_at) + '</td>'
         + '<td>' + ynPill(s.semi_final_thesis, 'Received', 'Not Received') + '</td>'
         + '<td>' + ynPill(s.final_thesis, 'Received', 'Not Received') + '</td>'
         + '<td class="dates-cell"><div><span>Semi:</span> ' + esc(s.semi_at) +
           '</div><div><span>Final:</span> ' + esc(s.final_at) + '</div></td>'
         + '<td>' + esc(s.coe_display) + '</td>'
-        + '<td class="status-cell"><button type="button" class="pill status-pill ' + s.pill +
-          '" data-sid="' + s.id + '" title="Click to change status">' + esc(s.status) +
-          '<span class="caret">&#9662;</span></button>' +
-          '<div class="status-menu" hidden>' + menuHTML(s.status) + '</div></td>'
-        + '<td class="comments-cell">' + esc(s.comments_missing || '\u2014') + '</td>'
+        + '<td><span class="pill ' + s.pill + '">' + esc(s.status) + '</span></td>'
         + '<td><button type="button" class="btn ghost sm profile-btn" data-sid="' + s.id + '">Profile</button></td>'
         + '</tr>';
     }
