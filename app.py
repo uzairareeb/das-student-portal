@@ -44,7 +44,7 @@ STATUS_LIST = ["Continue", "Freeze", "Left", "Admission Cancelled",
                "Viva Done", "Viva Pending", "Defense Pending", "Sent to COE",
                "Pass Out"]
 def status_pill_class(status):
-    """Pill colour for a status: q (green) / warn (amber) / nq (red)."""
+    """Pill colour for a status."""
     if status in ("Continue", "Viva Done", "Pass Out", "Sent to COE"):
         return "q"
     if status in ("Viva Pending", "Defense Pending"):
@@ -203,6 +203,7 @@ def init_db():
             folder_file TEXT DEFAULT 'Not Completed',
             comments_missing TEXT DEFAULT 'N/A',
             synopsis TEXT DEFAULT 'Not Received',
+            synopsis_at TEXT,
             semi_final_thesis TEXT DEFAULT 'Not Received',
             final_thesis TEXT DEFAULT 'Not Received',
             semi_final_thesis_at TEXT,
@@ -355,8 +356,8 @@ def _migrate_drop_unique_constraints(db):
         old_cols = [r[1] for r in db.fetchall("PRAGMA table_info(students)")]
         new_cols = ["id", "cnic", "name", "father_name", "reg_no", "gender",
                     "degree", "session", "folder_file", "comments_missing",
-                    "synopsis", "semi_final_thesis", "final_thesis",
-                    "semi_final_thesis_at", "final_thesis_at",
+                    "synopsis", "synopsis_at", "semi_final_thesis",
+                    "final_thesis", "semi_final_thesis_at", "final_thesis_at",
                     "thesis_forward_coe", "status", "department",
                     "password_hash", "created_at", "updated_at"]
         cols = [c for c in new_cols if c in old_cols]
@@ -373,6 +374,7 @@ def _migrate_drop_unique_constraints(db):
                 folder_file TEXT DEFAULT 'Not Completed',
                 comments_missing TEXT DEFAULT 'N/A',
                 synopsis TEXT DEFAULT 'Not Received',
+                synopsis_at TEXT,
                 semi_final_thesis TEXT DEFAULT 'Not Received',
                 final_thesis TEXT DEFAULT 'Not Received',
                 semi_final_thesis_at TEXT,
@@ -433,21 +435,19 @@ def _migrate_add_viva_admin_seen(db):
 
 
 def _migrate_add_thesis_dates(db):
-    """Add students.semi_final_thesis_at / final_thesis_at. Safe to rerun."""
+    """Add the received-on datetime columns. Safe to rerun."""
     try:
         if USE_PG:
-            db.execute("ALTER TABLE students ADD COLUMN IF NOT EXISTS"
-                       " semi_final_thesis_at TEXT")
-            db.execute("ALTER TABLE students ADD COLUMN IF NOT EXISTS"
-                       " final_thesis_at TEXT")
+            for col in ("synopsis_at", "semi_final_thesis_at",
+                        "final_thesis_at"):
+                db.execute("ALTER TABLE students ADD COLUMN IF NOT EXISTS"
+                           f" {col} TEXT")
         else:
             cols = [r[1] for r in db.fetchall("PRAGMA table_info(students)")]
-            if "semi_final_thesis_at" not in cols:
-                db.execute("ALTER TABLE students ADD COLUMN"
-                           " semi_final_thesis_at TEXT")
-            if "final_thesis_at" not in cols:
-                db.execute("ALTER TABLE students ADD COLUMN"
-                           " final_thesis_at TEXT")
+            for col in ("synopsis_at", "semi_final_thesis_at",
+                        "final_thesis_at"):
+                if col not in cols:
+                    db.execute(f"ALTER TABLE students ADD COLUMN {col} TEXT")
         db.commit()
     except Exception:
         try:
@@ -587,8 +587,8 @@ def dt_local(val):
 
 
 def _thesis_stamp(new_status, posted_raw, old_status, old_val):
-    """Received-on stamp: Not Received clears it; a posted datetime wins;
-    an already-Received record keeps its stamp; a fresh Received = now."""
+    """Received-on stamp: Not Received clears; posted wins; an existing
+    Received stamp is kept; a fresh Received = now."""
     if new_status != "Received":
         return None
     posted = parse_dt(posted_raw)
@@ -797,6 +797,7 @@ def admin_students():
                               offset=(page - 1) * PER_PAGE)
     for s in students:
         s["coe_display"] = fmt_coe(s.get("thesis_forward_coe"))
+        s["syn_at_disp"] = fmt_stamp(s.get("synopsis_at"))
         s["semi_at_disp"] = fmt_stamp(s.get("semi_final_thesis_at"))
         s["final_at_disp"] = fmt_stamp(s.get("final_thesis_at"))
     total = count_students({})
@@ -836,8 +837,9 @@ def admin_export():
     ws = wb.active
     ws.title = "Students"
     headers = ["Name", "Reg.No", "Gender", "Degree", "Session", "Folder/File",
-               "Synopsis", "Semi-Final Thesis", "Semi-Final Received On",
-               "Final Thesis", "Final Received On", "Thesis Forward (COE)",
+               "Synopsis", "Synopsis Received On", "Semi-Final Thesis",
+               "Semi-Final Received On", "Final Thesis",
+               "Final Received On", "Thesis Forward (COE)",
                "Status", "Comments (Missing)"]
     ws.append(headers)
     for cell in ws[1]:
@@ -846,17 +848,20 @@ def admin_export():
         cell.alignment = Alignment(horizontal="center", vertical="center",
                                    wrap_text=True)
     for s in students:
+        _syn = fmt_stamp(s.get("synopsis_at"))
         _semi = fmt_stamp(s.get("semi_final_thesis_at"))
         _fin = fmt_stamp(s.get("final_thesis_at"))
         ws.append([s.get("name"), s.get("reg_no"), s.get("gender"),
                    s.get("degree"), s.get("session"), s.get("folder_file"),
-                   s.get("synopsis"), s.get("semi_final_thesis"),
+                   s.get("synopsis"),
+                   "" if _syn == "\u2014" else _syn,
+                   s.get("semi_final_thesis"),
                    "" if _semi == "\u2014" else _semi,
                    s.get("final_thesis"),
                    "" if _fin == "\u2014" else _fin,
                    parse_coe(s.get("thesis_forward_coe")) or "",
                    s.get("status"), s.get("comments_missing")])
-    widths = [24, 16, 10, 22, 12, 14, 12, 14, 21, 14, 21, 18, 16, 26]
+    widths = [24, 16, 10, 22, 12, 14, 12, 21, 14, 21, 14, 21, 18, 16, 26]
     for i, w in enumerate(widths, start=1):
         ws.column_dimensions[ws.cell(row=1, column=i).column_letter].width = w
     buf = io.BytesIO()
@@ -916,7 +921,9 @@ def admin_export_pdf():
             Paragraph(s.get("degree") or "—", cell),
             Paragraph(s.get("session") or "—", cell),
             Paragraph(s.get("folder_file") or "—", cell),
-            Paragraph(s.get("synopsis") or "—", cell),
+            Paragraph((s.get("synopsis") or "—") + (
+                "<br/>" + fmt_stamp(s.get("synopsis_at"))
+                if s.get("synopsis_at") else ""), cell),
             Paragraph((s.get("semi_final_thesis") or "—") + (
                 "<br/>" + fmt_stamp(s.get("semi_final_thesis_at"))
                 if s.get("semi_final_thesis_at") else ""), cell),
@@ -1859,6 +1866,7 @@ def dept_student_profile(sid):
         flash("Student not found.")
         return redirect(url_for("dept_students"))
     s["coe_display"] = fmt_coe(s.get("thesis_forward_coe"))
+    s["syn_at_disp"] = fmt_stamp(s.get("synopsis_at"))
     s["semi_at_disp"] = fmt_stamp(s.get("semi_final_thesis_at"))
     s["final_at_disp"] = fmt_stamp(s.get("final_thesis_at"))
     docs = get_docs(sid)
@@ -2005,9 +2013,9 @@ def dept_students_export():
     ws = wb.active
     ws.title = "Students"
     headers = ["Name", "Reg.No", "CNIC", "Gender", "Degree", "Session",
-               "Folder/File", "Synopsis", "Semi-Final Thesis",
-               "Semi-Final Received On", "Final Thesis", "Final Received On",
-               "Thesis Forward (COE)", "Status"]
+               "Folder/File", "Synopsis", "Synopsis Received On",
+               "Semi-Final Thesis", "Semi-Final Received On", "Final Thesis",
+               "Final Received On", "Thesis Forward (COE)", "Status"]
     ws.append(headers)
     for cell in ws[1]:
         cell.font = Font(bold=True, color="FFFFFF")
@@ -2015,18 +2023,20 @@ def dept_students_export():
         cell.alignment = Alignment(horizontal="center", vertical="center",
                                    wrap_text=True)
     for s in students:
+        _syn = fmt_stamp(s.get("synopsis_at"))
         _semi = fmt_stamp(s.get("semi_final_thesis_at"))
         _fin = fmt_stamp(s.get("final_thesis_at"))
         ws.append([s.get("name"), s.get("reg_no"), s.get("cnic"),
                    s.get("gender"), s.get("degree"), s.get("session"),
                    s.get("folder_file"), s.get("synopsis"),
+                   "" if _syn == "\u2014" else _syn,
                    s.get("semi_final_thesis"),
                    "" if _semi == "\u2014" else _semi,
                    s.get("final_thesis"),
                    "" if _fin == "\u2014" else _fin,
                    parse_coe(s.get("thesis_forward_coe")) or "",
                    s.get("status")])
-    widths = [24, 16, 18, 10, 22, 12, 14, 12, 16, 21, 14, 21, 18, 16]
+    widths = [24, 16, 18, 10, 22, 12, 14, 12, 21, 16, 21, 14, 21, 18, 16]
     for i, w in enumerate(widths, start=1):
         ws.column_dimensions[ws.cell(row=1, column=i).column_letter].width = w
     buf = io.BytesIO()
@@ -2515,6 +2525,8 @@ def admin_student_profile(sid):
                                message="Student not found."), 404
     s["coe_display"] = fmt_coe(s.get("thesis_forward_coe"))
     s["coe_iso"] = parse_coe(s.get("thesis_forward_coe"))
+    s["syn_at_disp"] = fmt_stamp(s.get("synopsis_at"))
+    s["syn_at_local"] = dt_local(s.get("synopsis_at"))
     s["semi_at_disp"] = fmt_stamp(s.get("semi_final_thesis_at"))
     s["final_at_disp"] = fmt_stamp(s.get("final_thesis_at"))
     s["semi_at_local"] = dt_local(s.get("semi_final_thesis_at"))
@@ -2548,6 +2560,9 @@ def admin_student_save(sid):
         return redirect(nxt or url_for("admin_student_profile", sid=sid))
     db = get_db()
     now = datetime.now().strftime("%Y-%m-%d %H:%M")
+    syn_status = pick(f.get("synopsis"), RECEIVED_OPTS, "Not Received")
+    syn_at = _thesis_stamp(syn_status, f.get("synopsis_at"),
+                           s.get("synopsis"), s.get("synopsis_at"))
     semi_status = pick(f.get("semi_final_thesis"), RECEIVED_OPTS, "Not Received")
     final_status = pick(f.get("final_thesis"), RECEIVED_OPTS, "Not Received")
     semi_at = _thesis_stamp(semi_status, f.get("semi_final_thesis_at"),
@@ -2563,7 +2578,7 @@ def admin_student_save(sid):
         db.execute(
             """UPDATE students SET cnic=?, name=?, father_name=?, reg_no=?,
                gender=?, degree=?, session=?, folder_file=?, comments_missing=?,
-               synopsis=?, semi_final_thesis=?, final_thesis=?,
+               synopsis=?, synopsis_at=?, semi_final_thesis=?, final_thesis=?,
                semi_final_thesis_at=?, final_thesis_at=?,
                thesis_forward_coe=?, status=?, department=?, updated_at=?
                WHERE id=?""",
@@ -2572,7 +2587,7 @@ def admin_student_save(sid):
              f.get("session", "").strip(),
              pick(f.get("folder_file"), FOLDER_OPTS, "Not Completed"),
              f.get("comments_missing", "").strip() or "N/A",
-             pick(f.get("synopsis"), RECEIVED_OPTS, "Not Received"),
+             syn_status, syn_at,
              semi_status, final_status, semi_at, final_at,
              parse_coe(f.get("thesis_forward_coe")) or None,
              pick(f.get("status"), STATUS_LIST, "Continue"),
@@ -2619,26 +2634,10 @@ def admin_students_delete_selected():
     return redirect(url_for("admin_students"))
 
 
-@app.route("/admin/student/<int:sid>/status", methods=["POST"])
-@admin_required
-def admin_student_status(sid):
-    """Inline status change from the student list (AJAX, no page reload)."""
-    s = get_student(sid)
-    if not s:
-        return {"ok": False, "error": "Student not found."}, 404
-    status = pick(request.form.get("status"), STATUS_LIST, s["status"])
-    db = get_db()
-    db.execute("UPDATE students SET status=?, updated_at=? WHERE id=?",
-               (status, datetime.now().strftime("%Y-%m-%d %H:%M"), sid))
-    db.commit()
-    log_activity("admin", "student_status", f"id={sid} status -> {status}")
-    return {"ok": True, "status": status, "pill": status_pill_class(status)}
-
-
 @app.route("/admin/student/<int:sid>/json")
 @admin_required
 def admin_student_json(sid):
-    """Student record as JSON — fills the list-page edit popup."""
+    """Student record as JSON for the edit popup."""
     s = get_student(sid)
     if not s:
         return {"ok": False, "error": "Student not found."}, 404
@@ -2648,6 +2647,7 @@ def admin_student_json(sid):
             "final_thesis")
     out = {k: (s.get(k) or "") for k in keys}
     out["coe_iso"] = parse_coe(s.get("thesis_forward_coe"))
+    out["synopsis_at"] = dt_local(s.get("synopsis_at"))
     out["semi_final_thesis_at"] = dt_local(s.get("semi_final_thesis_at"))
     out["final_thesis_at"] = dt_local(s.get("final_thesis_at"))
     out["ok"] = True
@@ -2657,7 +2657,7 @@ def admin_student_json(sid):
 @app.route("/admin/students/search.json")
 @admin_required
 def admin_students_search():
-    """Live search for the student list (autosearch as you type)."""
+    """Live search for the student list."""
     rows = query_students(request.args)
     out = []
     for s in rows[:200]:
@@ -2673,6 +2673,7 @@ def admin_students_search():
             "semi_final_thesis": s.get("semi_final_thesis") or "",
             "final_thesis": s.get("final_thesis") or "",
             "coe_display": fmt_coe(s.get("thesis_forward_coe")),
+            "syn_at": fmt_stamp(s.get("synopsis_at")),
             "semi_at": fmt_stamp(s.get("semi_final_thesis_at")),
             "final_at": fmt_stamp(s.get("final_thesis_at")),
             "status": st, "pill": status_pill_class(st),
@@ -2683,8 +2684,7 @@ def admin_students_search():
 @app.route("/admin/students/bulk-update", methods=["POST"])
 @admin_required
 def admin_students_bulk_update():
-    """Bulk-set status and/or Thesis Forward (COE) date for the selected
-    students (tick the boxes, or quick-select a whole department)."""
+    """Bulk-set status and/or COE date for the selected students."""
     ids = [int(x) for x in request.form.getlist("sel") if x.isdigit()]
     if not ids:
         flash("No students selected — tick the boxes first.")
