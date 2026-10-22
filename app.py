@@ -109,8 +109,8 @@ COLUMN_MAP = {
 
 TEMPLATE_HEADERS = ["CNIC", "Name", "Father Name", "Registration No.", "Gender",
                     "Degree", "Session", "Folder/File (With GS-Forms)",
-                    "Comments (Missing)", "Synopsis", "Semi-Final Thesis",
-                    "Final Thesis", "Thesis Forward (COE)", "Status"]
+                    "Synopsis", "Semi-Final Thesis", "Final Thesis",
+                    "Thesis Forward (COE)", "Status", "Comments (Missing)"]
 
 
 def docs_for_degree(degree):
@@ -836,9 +836,9 @@ def admin_export():
     ws = wb.active
     ws.title = "Students"
     headers = ["Name", "Reg.No", "Gender", "Degree", "Session", "Folder/File",
-               "Comments (Missing)", "Synopsis", "Semi-Final Thesis",
-               "Semi-Final Received On", "Final Thesis",
-               "Final Received On", "Thesis Forward (COE)", "Status"]
+               "Synopsis", "Semi-Final Thesis", "Semi-Final Received On",
+               "Final Thesis", "Final Received On", "Thesis Forward (COE)",
+               "Status", "Comments (Missing)"]
     ws.append(headers)
     for cell in ws[1]:
         cell.font = Font(bold=True, color="FFFFFF")
@@ -850,14 +850,13 @@ def admin_export():
         _fin = fmt_stamp(s.get("final_thesis_at"))
         ws.append([s.get("name"), s.get("reg_no"), s.get("gender"),
                    s.get("degree"), s.get("session"), s.get("folder_file"),
-                   s.get("comments_missing"), s.get("synopsis"),
-                   s.get("semi_final_thesis"),
+                   s.get("synopsis"), s.get("semi_final_thesis"),
                    "" if _semi == "\u2014" else _semi,
                    s.get("final_thesis"),
                    "" if _fin == "\u2014" else _fin,
                    parse_coe(s.get("thesis_forward_coe")) or "",
-                   s.get("status")])
-    widths = [24, 16, 10, 22, 12, 14, 26, 12, 14, 21, 14, 21, 18, 16]
+                   s.get("status"), s.get("comments_missing")])
+    widths = [24, 16, 10, 22, 12, 14, 12, 14, 21, 14, 21, 18, 16, 26]
     for i, w in enumerate(widths, start=1):
         ws.column_dimensions[ws.cell(row=1, column=i).column_letter].width = w
     buf = io.BytesIO()
@@ -904,10 +903,10 @@ def admin_export_pdf():
              Paragraph(f"{len(students)} student(s) &middot; generated "
                        f"{datetime.now().strftime('%d %b %Y, %H:%M')}", sub_style)]
     headers = ["Name", "Reg.No", "Gender", "Degree", "Session", "Folder/File",
-               "Comments", "Synopsis", "Semi-Final", "Final Thesis",
-               "COE Date", "Status"]
+               "Synopsis", "Semi-Final", "Final Thesis", "COE Date", "Status",
+               "Comments"]
     widths = [32 * mm, 26 * mm, 14 * mm, 34 * mm, 20 * mm, 22 * mm,
-              34 * mm, 18 * mm, 18 * mm, 18 * mm, 20 * mm, 21 * mm]
+              18 * mm, 18 * mm, 18 * mm, 20 * mm, 21 * mm, 34 * mm]
     data = [[Paragraph(h, head_cell) for h in headers]]
     for s in students:
         data.append([
@@ -917,7 +916,6 @@ def admin_export_pdf():
             Paragraph(s.get("degree") or "—", cell),
             Paragraph(s.get("session") or "—", cell),
             Paragraph(s.get("folder_file") or "—", cell),
-            Paragraph(s.get("comments_missing") or "—", cell),
             Paragraph(s.get("synopsis") or "—", cell),
             Paragraph((s.get("semi_final_thesis") or "—") + (
                 "<br/>" + fmt_stamp(s.get("semi_final_thesis_at"))
@@ -927,6 +925,7 @@ def admin_export_pdf():
                 if s.get("final_thesis_at") else ""), cell),
             Paragraph(fmt_coe(s.get("thesis_forward_coe")), cell),
             Paragraph(s.get("status") or "—", cell),
+            Paragraph(s.get("comments_missing") or "—", cell),
         ])
     tbl = Table(data, colWidths=widths, repeatRows=1)
     tbl.setStyle(TableStyle([
@@ -1705,8 +1704,8 @@ def random_example_row():
             f"{random.randint(20, 25)}-CUVAS-{random.randint(1000, 9999):04d}",
             random.choice(["Male", "Female"]), random.choice(_EX_DEGREES),
             random.choice(["F. 23-25", "24-26 Fall", "S. 21-24"]),
-            "Not Completed", "N/A", "Not Received", "Not Received",
-            "Not Received", "", "Continue"]
+            "Not Completed", "Not Received", "Not Received",
+            "Not Received", "", "Continue", "N/A"]
 
 
 VIVA_RESULTS = ["Pending", "Pass", "Fail", "Rescheduled"]
@@ -2179,7 +2178,7 @@ def dept_template():
         cell.alignment = Alignment(horizontal="center", vertical="center",
                                    wrap_text=True)
     ws.append(random_example_row())
-    widths = [18, 22, 22, 16, 10, 22, 12, 18, 30, 12, 14, 14, 18, 16]
+    widths = [18, 22, 22, 16, 10, 22, 12, 18, 12, 14, 14, 18, 16, 30]
     for i, w in enumerate(widths, start=1):
         ws.column_dimensions[ws.cell(row=1, column=i).column_letter].width = w
     buf = io.BytesIO()
@@ -2378,9 +2377,10 @@ def admin_import_template():
         cell.alignment = Alignment(horizontal="center", vertical="center",
                                    wrap_text=True)
     ws.append(["3520212345671", "Ayesha Raza", "Muhammad Raza", "24-DAS-0101",
-               "Female", "MPhil Biochemistry", "F. 23-25", "Completed", "N/A",
-               "Received", "Received", "Not Received", "2026-05-10", "Continue"])
-    widths = [18, 22, 22, 16, 10, 22, 12, 18, 30, 12, 14, 14, 18, 16]
+               "Female", "MPhil Biochemistry", "F. 23-25", "Completed",
+               "Received", "Received", "Not Received", "2026-05-10",
+               "Continue", "N/A"])
+    widths = [18, 22, 22, 16, 10, 22, 12, 18, 12, 14, 14, 18, 16, 30]
     for i, w in enumerate(widths, start=1):
         ws.column_dimensions[ws.cell(row=1, column=i).column_letter].width = w
     buf = io.BytesIO()
