@@ -16,7 +16,7 @@ import io
 import os
 import re
 import sqlite3
-from datetime import datetime, date
+from datetime import datetime, date, timedelta
 from functools import wraps
 from urllib.parse import urlencode
 
@@ -484,8 +484,7 @@ def _ensure_db():
         try:
             init_db()
         except Exception:
-            # Concurrent cold starts can race on CREATE TABLE; the loser
-            # gets a duplicate-object error which is safe to ignore.
+            # Cold-start CREATE TABLE races are safe to ignore.
             pass
         _db_ready = True
 
@@ -742,8 +741,7 @@ def admin_logout():
 @app.route("/admin/dashboard")
 @admin_required
 def admin_dashboard():
-    """Overview only: stats, charts, recent activity. The full student
-    list lives on its own dedicated page (/admin/students)."""
+    """Overview: stats, charts, pending actions, recent uploads."""
     db = get_db()
     total = count_students({})
     stat_rows = db.fetchall(
@@ -773,19 +771,22 @@ def admin_dashboard():
         " FROM documents d JOIN students s ON s.id=d.student_id"
         " ORDER BY d.id DESC LIMIT 5")
     recent = [dict(r) for r in recent]
+    from pending_actions import compute_pending
+    pending = compute_pending(db, datetime.now(), parse_coe, parse_dt,
+                              fmt_coe, fmt_stamp)
     return render_template(
         "admin_dashboard.html", uni=UNI_NAME, title=PORTAL_TITLE,
         total=total, stats=stats, status_list=STATUS_LIST,
         status_counts=[stats.get(st, 0) for st in STATUS_LIST],
         degrees=degrees, sessions=sessions,
-        doc_total=doc_total, with_docs=with_docs, recent=recent)
+        doc_total=doc_total, with_docs=with_docs, recent=recent,
+        pending=pending)
 
 
 @app.route("/admin/students")
 @admin_required
 def admin_students():
-    """Dedicated full student list page: filters, table, pagination,
-    bulk actions, Excel/PDF export."""
+    """Student list page: filters, table, pagination, bulk, export."""
     try:
         page = max(int(request.args.get("page", 1) or 1), 1)
     except (TypeError, ValueError):
@@ -878,7 +879,7 @@ def admin_export():
 @app.route("/admin/export-pdf")
 @admin_required
 def admin_export_pdf():
-    """Well-organized landscape PDF of the (filtered) student list."""
+    """Landscape PDF of the (filtered) student list."""
     from reportlab.lib import colors
     from reportlab.lib.pagesizes import A4, landscape
     from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
@@ -2002,7 +2003,7 @@ def dept_viva_calendar():
 @app.route("/dept/students/export")
 @dept_required
 def dept_students_export():
-    """Excel export of the department's own students."""
+    """Excel export of own students."""
     from openpyxl import Workbook
     from openpyxl.styles import Font, PatternFill, Alignment
     dept = current_dept()
