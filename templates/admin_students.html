@@ -100,10 +100,10 @@
         <thead>
           <tr>
             <th class="cb"><input type="checkbox" id="selAll" title="Select all on this page"></th>
-            <th>Name</th><th>Reg.No</th><th>Gender</th><th>Degree</th><th>Session</th>
-            <th>Department</th>
-            <th>Folder/File</th><th>Comments (Missing)</th><th>Synopsis</th>
-            <th>Semi-Final</th><th>Final Thesis</th><th>Thesis Forward (COE)</th>
+            <th>Name</th><th>Reg.No</th><th>Degree</th>
+            <th>Folder/File</th><th>Synopsis</th>
+            <th>Semi-Final</th><th>Final Thesis</th><th>Thesis Received Dates</th>
+            <th>Thesis Forward (COE)</th>
             <th>Status</th><th></th>
           </tr>
         </thead>
@@ -113,15 +113,11 @@
             <td class="cb"><input type="checkbox" class="selBox" name="sel" value="{{ s.id }}"></td>
             <td>{{ s.name }}</td>
             <td>{{ s.reg_no }}</td>
-            <td>{{ s.gender or '—' }}</td>
             <td class="degree-cell">{{ s.degree or '—' }}</td>
-            <td>{{ s.session or '—' }}</td>
-            <td>{{ s.department or '—' }}</td>
             <td>
               {% if s.folder_file == 'Completed' %}<span class="pill q">Completed</span>
               {% else %}<span class="pill nq">Not Completed</span>{% endif %}
             </td>
-            <td class="comments-cell">{{ s.comments_missing or '—' }}</td>
             <td>
               {% if s.synopsis == 'Received' %}<span class="pill q">Received</span>
               {% else %}<span class="pill nq">Not Received</span>{% endif %}
@@ -133,6 +129,10 @@
             <td>
               {% if s.final_thesis == 'Received' %}<span class="pill q">Received</span>
               {% else %}<span class="pill nq">Not Received</span>{% endif %}
+            </td>
+            <td class="dates-cell">
+              <div><span>Semi:</span> {{ s.semi_at_disp }}</div>
+              <div><span>Final:</span> {{ s.final_at_disp }}</div>
             </td>
             <td>{{ s.coe_display }}</td>
             <td class="status-cell">
@@ -259,10 +259,18 @@
           </select>
         </div>
         <div>
+          <label class="f-label" for="e_semi_final_thesis_at">Semi-Final Received On</label>
+          <input class="no-icon" type="datetime-local" id="e_semi_final_thesis_at" name="semi_final_thesis_at">
+        </div>
+        <div>
           <label class="f-label" for="e_final_thesis">Final Thesis</label>
           <select class="no-icon" id="e_final_thesis" name="final_thesis">
             {% for v in received %}<option value="{{ v }}">{{ v }}</option>{% endfor %}
           </select>
+        </div>
+        <div>
+          <label class="f-label" for="e_final_thesis_at">Final Received On</label>
+          <input class="no-icon" type="datetime-local" id="e_final_thesis_at" name="final_thesis_at">
         </div>
         <div>
           <label class="f-label" for="e_thesis_forward_coe">Thesis Forward (COE) Date</label>
@@ -379,6 +387,8 @@
           setVal('e_synopsis', d.synopsis);
           setVal('e_semi_final_thesis', d.semi_final_thesis);
           setVal('e_final_thesis', d.final_thesis);
+          setVal('e_semi_final_thesis_at', d.semi_final_thesis_at);
+          setVal('e_final_thesis_at', d.final_thesis_at);
           setVal('e_thesis_forward_coe', d.coe_iso);
           document.getElementById('editSub').textContent = d.name + ' \u00b7 ' + d.reg_no;
           document.getElementById('editFullProfile').href = '/admin/student/' + sid;
@@ -389,6 +399,23 @@
         })
         .catch(function () { alert('Could not load the student record.'); });
     }
+    /* Received -> auto-fill that moment's date + time (editable) */
+    function nowLocal() {
+      var d = new Date();
+      function p(n) { return (n < 10 ? '0' : '') + n; }
+      return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate()) +
+             'T' + p(d.getHours()) + ':' + p(d.getMinutes());
+    }
+    function wireThesis(selId, dtId) {
+      var sel = document.getElementById(selId), dt = document.getElementById(dtId);
+      if (!sel || !dt) return;
+      sel.addEventListener('change', function () {
+        if (sel.value === 'Received') { if (!dt.value) dt.value = nowLocal(); }
+        else { dt.value = ''; }
+      });
+    }
+    wireThesis('e_semi_final_thesis', 'e_semi_final_thesis_at');
+    wireThesis('e_final_thesis', 'e_final_thesis_at');
     document.getElementById('editClose').addEventListener('click', closeModal);
     document.getElementById('editCancel').addEventListener('click', closeModal);
     modal.addEventListener('click', function (e) { if (e.target === modal) closeModal(); });
@@ -430,15 +457,13 @@
         + '<td class="cb"><input type="checkbox" class="selBox" name="sel" value="' + s.id + '"></td>'
         + '<td>' + esc(s.name) + '</td>'
         + '<td>' + esc(s.reg_no) + '</td>'
-        + '<td>' + esc(s.gender || '\u2014') + '</td>'
         + '<td class="degree-cell">' + esc(s.degree || '\u2014') + '</td>'
-        + '<td>' + esc(s.session || '\u2014') + '</td>'
-        + '<td>' + esc(s.department || '\u2014') + '</td>'
         + '<td>' + ynPill(s.folder_file, 'Completed', 'Not Completed') + '</td>'
-        + '<td class="comments-cell">' + esc(s.comments_missing || '\u2014') + '</td>'
         + '<td>' + ynPill(s.synopsis, 'Received', 'Not Received') + '</td>'
         + '<td>' + ynPill(s.semi_final_thesis, 'Received', 'Not Received') + '</td>'
         + '<td>' + ynPill(s.final_thesis, 'Received', 'Not Received') + '</td>'
+        + '<td class="dates-cell"><div><span>Semi:</span> ' + esc(s.semi_at) +
+          '</div><div><span>Final:</span> ' + esc(s.final_at) + '</div></td>'
         + '<td>' + esc(s.coe_display) + '</td>'
         + '<td class="status-cell"><button type="button" class="pill status-pill ' + s.pill +
           '" data-sid="' + s.id + '" title="Click to change status">' + esc(s.status) +
@@ -469,7 +494,7 @@
           searchMode = true;
           tbody.innerHTML = d.students.length
             ? d.students.map(rowHTML).join('')
-            : '<tr><td colspan="15" style="text-align:center;padding:26px;color:var(--muted)">No students match &quot;' + esc(v) + '&quot;.</td></tr>';
+            : '<tr><td colspan="12" style="text-align:center;padding:26px;color:var(--muted)">No students match &quot;' + esc(v) + '&quot;.</td></tr>';
           if (pagination) pagination.style.display = 'none';
           if (countLine) countLine.textContent = d.total + ' live result(s) for "' + v + '"';
           if (liveHint) {

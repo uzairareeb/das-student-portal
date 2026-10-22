@@ -545,6 +545,8 @@ button.pill { font-family: inherit; }
 .edit-head h3 { margin: 0; font-size: 20px; font-weight: 800; color: var(--ink); }
 .modal-x { margin-left: auto; background: #eef0fb; border: none; width: 34px; height: 34px; border-radius: 10px; font-size: 19px; cursor: pointer; color: var(--primary); line-height: 1; flex-shrink: 0; transition: background .15s, transform .15s; }
 .modal-x:hover { background: #dde1f7; transform: rotate(90deg); }
+.dates-cell { font-size: 12px; color: var(--muted); line-height: 1.55; white-space: nowrap; }
+.dates-cell span { font-weight: 700; color: var(--ink); }
 .modal-icon svg { width: 32px; height: 32px; }
 /* animated green tick */
 .tick { width: 84px; height: 84px; margin: 0 auto; display: block; }

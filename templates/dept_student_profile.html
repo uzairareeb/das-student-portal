@@ -25,10 +25,12 @@
   <div class="sp-stat">
     <div class="k">Semi-Final Thesis</div>
     <div class="v">{% if s.semi_final_thesis == 'Received' %}<span class="pill q">Received</span>{% else %}<span class="pill nq">Not Received</span>{% endif %}</div>
+    {% if s.semi_final_thesis_at %}<div class="hint" style="margin-top:4px">{{ s.semi_at_disp }}</div>{% endif %}
   </div>
   <div class="sp-stat">
     <div class="k">Final Thesis</div>
     <div class="v">{% if s.final_thesis == 'Received' %}<span class="pill q">Received</span>{% else %}<span class="pill nq">Not Received</span>{% endif %}</div>
+    {% if s.final_thesis_at %}<div class="hint" style="margin-top:4px">{{ s.final_at_disp }}</div>{% endif %}
   </div>
   <div class="sp-stat">
     <div class="k">Folder / File</div>

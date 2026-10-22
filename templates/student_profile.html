@@ -52,6 +52,9 @@
     <div><dt>Department</dt><dd>{{ s.department or '—' }}</dd></div>
     <div><dt>Comments (Missing)</dt><dd>{{ s.comments_missing or '—' }}</dd></div>
     <div><dt>Semi-Final Thesis</dt><dd>{% if s.semi_final_thesis == 'Received' %}<span class="pill q">Received</span>{% else %}<span class="pill nq">Not Received</span>{% endif %}</dd></div>
+    <div><dt>Semi-Final Received On</dt><dd>{{ s.semi_at_disp }}</dd></div>
+    <div><dt>Final Thesis</dt><dd>{% if s.final_thesis == 'Received' %}<span class="pill q">Received</span>{% else %}<span class="pill nq">Not Received</span>{% endif %}</dd></div>
+    <div><dt>Final Received On</dt><dd>{{ s.final_at_disp }}</dd></div>
     <div><dt>Thesis Forward (COE)</dt><dd>{{ s.coe_display }}</dd></div>
   </dl>
 </div>
@@ -130,10 +133,18 @@
         </select>
       </div>
       <div>
+        <label class="f-label" for="semi_final_thesis_at">Semi-Final Received On</label>
+        <input class="no-icon" type="datetime-local" id="semi_final_thesis_at" name="semi_final_thesis_at" value="{{ s.semi_at_local }}">
+      </div>
+      <div>
         <label class="f-label" for="final_thesis">Final Thesis</label>
         <select class="no-icon" id="final_thesis" name="final_thesis">
           {% for v in received %}<option value="{{ v }}" {% if s.final_thesis==v %}selected{% endif %}>{{ v }}</option>{% endfor %}
         </select>
+      </div>
+      <div>
+        <label class="f-label" for="final_thesis_at">Final Received On</label>
+        <input class="no-icon" type="datetime-local" id="final_thesis_at" name="final_thesis_at" value="{{ s.final_at_local }}">
       </div>
       <div>
         <label class="f-label" for="thesis_forward_coe">Thesis Forward (COE) Date</label>
@@ -206,4 +217,26 @@
   <div class="empty"><p>No documents yet.</p></div>
   {% endif %}
 </div>
+
+<script>
+  /* Received -> auto-fill that moment's date + time (editable) */
+  (function () {
+    function nowLocal() {
+      var d = new Date();
+      function p(n) { return (n < 10 ? '0' : '') + n; }
+      return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate()) +
+             'T' + p(d.getHours()) + ':' + p(d.getMinutes());
+    }
+    function wireThesis(selId, dtId) {
+      var sel = document.getElementById(selId), dt = document.getElementById(dtId);
+      if (!sel || !dt) return;
+      sel.addEventListener('change', function () {
+        if (sel.value === 'Received') { if (!dt.value) dt.value = nowLocal(); }
+        else { dt.value = ''; }
+      });
+    }
+    wireThesis('semi_final_thesis', 'semi_final_thesis_at');
+    wireThesis('final_thesis', 'final_thesis_at');
+  })();
+</script>
 {% endblock %}
