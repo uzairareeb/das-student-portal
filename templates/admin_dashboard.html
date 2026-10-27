@@ -1,65 +1,71 @@
 {% extends "admin_base.html" %}
 {% block content %}
-<div class="page-head admin-head">
+<!-- Banner -->
+<div class="dash-banner">
   <div>
+    <p class="banner-greet">{{ greeting }}, Administrator</p>
     <h2>Admin Dashboard</h2>
-    <p>Overview of student records &middot; {{ total }} students in the system &middot; {{ today_str }}</p>
+    <p class="banner-sub">Overview of student records &middot; {{ total }} students in the system &middot; {{ today_str }}</p>
+    <form method="get" action="{{ url_for('admin_students') }}" class="banner-search" role="search">
+      <input type="text" name="q" placeholder="Search by name, Reg.No or CNIC" aria-label="Search students">
+      <button type="submit" class="btn primary sm">Search</button>
+    </form>
   </div>
-  <form method="get" action="{{ url_for('admin_students') }}" class="admin-search" role="search">
-    <input type="text" name="q" placeholder="Search by name, Reg.No or CNIC" aria-label="Search students">
-    <button type="submit" class="btn primary sm">Search</button>
-  </form>
-</div>
-
-<div class="stats admin-stats">
-  <a class="stat c-blue" href="{{ url_for('admin_students') }}">
-    <span class="section-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg></span>
-    <div><div class="n">{{ total }}</div><div class="t">Total students</div></div>
-  </a>
-  {% for st in status_list %}
-  {% if st == 'Continue' %}{% set cc = 'c-blue' %}
-  {% elif st == 'Viva Done' %}{% set cc = 'c-green' %}
-  {% elif st == 'Pass Out' %}{% set cc = 'c-teal' %}
-  {% elif st == 'Sent to COE' %}{% set cc = 'c-purple' %}
-  {% elif st in ['Viva Pending', 'Defense Pending'] %}{% set cc = 'c-amber' %}
-  {% elif st in ['Left', 'Admission Cancelled'] %}{% set cc = 'c-red' %}
-  {% else %}{% set cc = 'c-slate' %}{% endif %}
-  <a class="stat {{ cc }}" href="{{ url_for('admin_students', status=st) }}">
-    {% if st in ['Continue', 'Viva Done', 'Pass Out', 'Sent to COE'] %}
-    <span class="section-icon ok"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg></span>
-    {% elif st in ['Viva Pending', 'Defense Pending'] %}
-    <span class="section-icon warn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="6" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg></span>
-    {% else %}
-    <span class="section-icon bad"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg></span>
-    {% endif %}
-    <div><div class="n">{{ stats.get(st, 0) }}</div><div class="t">{{ st }}</div></div>
-  </a>
-  {% endfor %}
-</div>
-
-<div class="card section">
-  <div class="section-head">
-    <span class="section-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/></svg></span>
-    <h3>Quick Actions</h3>
-  </div>
-  <div class="quick-grid">
-    <a class="quick-tile q-blue" href="{{ url_for('admin_student_new') }}"><strong>Add Student</strong><span>Create a new record</span></a>
-    <a class="quick-tile q-purple" href="{{ url_for('admin_import') }}"><strong>Import</strong><span>Upload an Excel file</span></a>
-    <a class="quick-tile q-teal" href="{{ url_for('admin_students') }}"><strong>Student List</strong><span>Search and manage</span></a>
-    <a class="quick-tile q-green" href="{{ url_for('admin_export') }}"><strong>Export Excel</strong><span>All student records</span></a>
-    <a class="quick-tile q-red" href="{{ url_for('admin_export_pdf') }}"><strong>Export PDF</strong><span>Printable student list</span></a>
-    <a class="quick-tile q-amber" href="{{ url_for('admin_reports') }}"><strong>Reports</strong><span>Summary and analysis</span></a>
-    <a class="quick-tile q-slate" href="{{ url_for('admin_viva') }}"><strong>Viva Records</strong><span>Results and cards</span></a>
-    <a class="quick-tile q-blue" href="{{ url_for('admin_departments') }}"><strong>Departments</strong><span>Portal logins</span></a>
-    <a class="quick-tile q-purple" href="{{ url_for('admin_uploads') }}"><strong>Dept Uploads</strong><span>Review submissions</span></a>
-    <a class="quick-tile q-teal" href="{{ url_for('admin_activity') }}"><strong>Activity Log</strong><span>Who changed what</span></a>
+  <div class="banner-right">
+    <img src="{{ url_for('static', filename='img/cuvas-logo.png') }}" alt="CUVAS logo">
+    <p>Excellence in Veterinary<br>Education and Research</p>
   </div>
 </div>
 
-<div class="card section pending-card">
-  <div class="section-head">
-    <span class="section-icon warn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg></span>
-    <h3>Attention Needed &mdash; Pending Actions</h3>
+<!-- Row 1: Statistics + Quick Actions -->
+<div class="dash-top">
+  <!-- 1. Student Statistics -->
+  <section class="card dash-card">
+    <div class="dash-card-head">
+      <h3><span class="dash-ico blue">S</span> Student Statistics</h3>
+      <a href="{{ url_for('admin_students') }}">View All</a>
+    </div>
+    <div class="tile-grid">
+      <a class="tile t-blue" href="{{ url_for('admin_students') }}">
+        <span class="tile-ico">S</span><div><div class="n">{{ total }}</div><div class="t">Total Students</div></div>
+      </a>
+      {% for st in status_list %}
+      {% if st == 'Continue' %}{% set tc = 't-green' %}
+      {% elif st == 'Freeze' %}{% set tc = 't-amber' %}
+      {% elif st == 'Left' %}{% set tc = 't-purple' %}
+      {% elif st == 'Admission Cancelled' %}{% set tc = 't-red' %}
+      {% elif st == 'Viva Done' %}{% set tc = 't-green2' %}
+      {% elif st == 'Viva Pending' %}{% set tc = 't-blue2' %}
+      {% elif st == 'Defense Pending' %}{% set tc = 't-purple2' %}
+      {% elif st == 'Sent to COE' %}{% set tc = 't-blue3' %}
+      {% elif st == 'Pass Out' %}{% set tc = 't-red2' %}
+      {% else %}{% set tc = 't-slate' %}{% endif %}
+      <a class="tile {{ tc }}" href="{{ url_for('admin_students', status=st) }}">
+        <span class="tile-ico">{{ st[0] }}</span><div><div class="n">{{ stats.get(st, 0) }}</div><div class="t">{{ st }}</div></div>
+      </a>
+      {% endfor %}
+    </div>
+  </section>
+
+  <!-- 2. Quick Actions -->
+  <section class="card dash-card">
+    <div class="dash-card-head">
+      <h3><span class="dash-ico purple">Q</span> Quick Actions</h3>
+    </div>
+    <div class="quick-list">
+      <a class="quick-row" href="{{ url_for('admin_student_new') }}"><span class="q-ico blue">+</span><span><strong>Add Student</strong><small>Create a new student record</small></span></a>
+      <a class="quick-row" href="{{ url_for('admin_import') }}"><span class="q-ico green">I</span><span><strong>Import Students</strong><small>Upload an Excel file</small></span></a>
+      <a class="quick-row" href="{{ url_for('admin_students') }}"><span class="q-ico purple">L</span><span><strong>Student List</strong><small>Search and manage student records</small></span></a>
+      <a class="quick-row" href="{{ url_for('admin_export') }}"><span class="q-ico teal">E</span><span><strong>Export to Excel</strong><small>All student records</small></span></a>
+      <a class="quick-row" href="{{ url_for('admin_export_pdf') }}"><span class="q-ico red">P</span><span><strong>Export to PDF</strong><small>Printable student list</small></span></a>
+    </div>
+  </section>
+</div>
+
+<!-- 3. Attention Needed -->
+<section class="card dash-card pending-card">
+  <div class="dash-card-head">
+    <h3><span class="dash-ico amber">!</span> Attention Needed</h3>
     {% if pending.total %}<span class="pill warn">{{ pending.total }} pending</span>{% endif %}
   </div>
   {% if pending.groups %}
@@ -80,118 +86,104 @@
   {% else %}
   <p class="pending-clear"><span class="tick">&#10003;</span> All clear &mdash; no pending actions.</p>
   {% endif %}
-</div>
+</section>
 
-<div class="card section">
-  <div class="section-head">
-    <span class="section-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="20" x2="12" y2="10"/><line x1="18" y1="20" x2="18" y2="4"/><line x1="6" y1="20" x2="6" y2="16"/></svg></span>
-    <h3>Thesis Pipeline</h3>
-  </div>
-  <div class="pipeline">
-    {% for p in pipeline %}
-    <div class="pipe-row">
-      <span class="pipe-label">{{ p.stage }}</span>
-      <span class="pipe-bar"><span style="width:{{ p.pct }}%"></span></span>
-      <span class="pipe-num">{{ p.count }} <small>({{ p.pct }}%)</small></span>
+<!-- Row: Status + Viva -->
+<div class="dash-row">
+  <!-- 4. Students by Status -->
+  <section class="card dash-card">
+    <div class="dash-card-head">
+      <h3><span class="dash-ico blue">S</span> Students by Status</h3>
+      <a href="{{ url_for('admin_students') }}">View All</a>
     </div>
-    {% endfor %}
-  </div>
-  <p class="hint">Counts are cumulative: each stage shows how many students have reached it out of {{ total }} in total.</p>
-</div>
+    <div class="donut-wrap">
+      <div class="donut-box"><canvas id="chStatus"></canvas><div class="donut-centre"><div class="n">{{ total }}</div><div class="t">Total</div></div></div>
+      <ul class="legend-list">
+        {% for st in status_list %}
+        <li><span class="dot" style="background:{{ ['#2457a7', '#15803d', '#d97706', '#7c3aed', '#b91c1c', '#0e7490', '#db2777', '#475569', '#f59e0b'][loop.index0 % 9] }}"></span>{{ st }}<strong>{{ stats.get(st, 0) }} ({{ (stats.get(st, 0) * 100 // total) if total else 0 }}%)</strong></li>
+        {% endfor %}
+      </ul>
+    </div>
+  </section>
 
-<div class="dash-grid">
-  <div class="card section">
-    <div class="section-head">
-      <span class="section-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.21 15.89A10 10 0 1 1 8 2.83"/><path d="M22 12A10 10 0 0 0 12 2v10z"/></svg></span>
-      <h3>Students by Status</h3>
-    </div>
-    <div class="chart-box"><canvas id="chStatus"></canvas></div>
-  </div>
-  <div class="card section">
-    <div class="section-head">
-      <span class="section-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="20" x2="12" y2="10"/><line x1="18" y1="20" x2="18" y2="4"/><line x1="6" y1="20" x2="6" y2="16"/></svg></span>
-      <h3>Top Degrees</h3>
-    </div>
-    <div class="chart-box"><canvas id="chDegree"></canvas></div>
-  </div>
-</div>
-
-<div class="dash-grid">
-  <div class="card section">
-    <div class="section-head">
-      <span class="section-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg></span>
-      <h3>Students by Session</h3>
-    </div>
-    <div class="chart-box"><canvas id="chSession"></canvas></div>
-  </div>
-  <div class="card section">
-    <div class="section-head">
-      <span class="section-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="20" x2="12" y2="10"/><line x1="18" y1="20" x2="18" y2="4"/><line x1="6" y1="20" x2="6" y2="16"/></svg></span>
-      <h3>New Students &mdash; Last 6 Months</h3>
-    </div>
-    <div class="chart-box"><canvas id="chTrend"></canvas></div>
-    <p class="hint">{{ trend_current }} new this month, {{ trend_previous }} last month.</p>
-  </div>
-</div>
-
-<div class="dash-grid">
-  <div class="card section">
-    <div class="section-head">
-      <span class="section-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></span>
-      <h3>Department Snapshot</h3>
-    </div>
-    {% if dept_rows %}
-    <div class="table-scroll">
-      <table class="data-table">
-        <thead><tr><th>Department</th><th>Students</th><th>Pending Uploads</th><th>Viva Pending</th><th></th></tr></thead>
-        <tbody>
-          {% for d in dept_rows %}
-          <tr>
-            <td><strong>{{ d.name }}</strong></td>
-            <td>{{ d.students }}</td>
-            <td>{{ d.uploads_pending }}</td>
-            <td>{{ d.viva_pending }}</td>
-            <td class="nowrap"><a class="btn ghost sm" href="{{ url_for('admin_students', department='__unassigned' if d.name == 'Unassigned' else d.name) }}">View</a></td>
-          </tr>
-          {% endfor %}
-        </tbody>
-      </table>
-    </div>
-    {% else %}
-    <div class="empty"><p>No departments yet &mdash; create one from the Departments page.</p></div>
-    {% endif %}
-  </div>
-  <div class="card section">
-    <div class="section-head">
-      <span class="section-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></span>
-      <h3>Viva Outcomes This Month</h3>
+  <!-- 5. Viva Outcomes This Month -->
+  <section class="card dash-card">
+    <div class="dash-card-head">
+      <h3><span class="dash-ico teal">V</span> Viva Outcomes This Month</h3>
+      <a href="{{ url_for('admin_viva') }}">View All</a>
     </div>
     <div class="viva-strip">
       <div class="viva-box ok"><div class="n">{{ viva_month.pass }}</div><div class="t">Passed</div></div>
       <div class="viva-box bad"><div class="n">{{ viva_month.fail }}</div><div class="t">Failed</div></div>
       <div class="viva-box warn"><div class="n">{{ viva_month.pending }}</div><div class="t">Pending</div></div>
     </div>
-    <p class="hint">Based on viva dates in the current month. Full history is on the Viva Records page.</p>
-    <div class="section-head" style="margin-top:22px">
-      <span class="section-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg></span>
-      <h3>Data Quality</h3>
-    </div>
-    <div class="quality-grid">
-      <div class="quality-item"><div class="n">{{ quality.missing_cnic }}</div><div class="t">Missing CNIC</div></div>
-      <div class="quality-item"><div class="n">{{ quality.missing_degree }}</div><div class="t">Missing degree</div></div>
-      <div class="quality-item"><div class="n">{{ quality.missing_session }}</div><div class="t">Missing session</div></div>
-      <div class="quality-item"><div class="n">{{ quality.no_documents }}</div><div class="t">No documents</div></div>
-      <div class="quality-item"><div class="n">{{ quality.folder_pending }}</div><div class="t">Folder not completed</div></div>
-    </div>
-    <p class="hint"><a href="{{ url_for('admin_students', folder_file='Not Completed') }}">View students with incomplete folders</a> or open the full Student List to fix the rest.</p>
-  </div>
+    <p class="hint">Based on viva dates in the current month. Full history is available in the Viva Records page.</p>
+  </section>
 </div>
 
-<div class="dash-grid">
-  <div class="card section">
-    <div class="section-head">
-      <span class="section-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg></span>
-      <h3>Uploads Awaiting Review</h3>
+<!-- Row: Session + Top Degrees -->
+<div class="dash-row">
+  <!-- 6. Students by Academic Session -->
+  <section class="card dash-card">
+    <div class="dash-card-head">
+      <h3><span class="dash-ico blue">S</span> Students by Academic Session</h3>
+      <a href="{{ url_for('admin_students') }}">View All</a>
+    </div>
+    <div class="chart-box"><canvas id="chSession"></canvas></div>
+  </section>
+
+  <!-- 7. Top Degree Programmes -->
+  <section class="card dash-card">
+    <div class="dash-card-head">
+      <h3><span class="dash-ico purple">D</span> Top Degree Programmes</h3>
+      <a href="{{ url_for('admin_students') }}">View All</a>
+    </div>
+    <div class="donut-wrap">
+      <div class="donut-box"><canvas id="chProgram"></canvas><div class="donut-centre"><div class="n">{{ total }}</div><div class="t">Total</div></div></div>
+      <ul class="legend-list">
+        {% for name, n in top_programs %}
+        <li><span class="dot" style="background:{{ ['#6654a3', '#2457a7', '#15803d', '#d97706'][loop.index0 % 4] }}"></span>{{ name }}<strong>{{ n }} ({{ (n * 100 // total) if total else 0 }}%)</strong></li>
+        {% endfor %}
+      </ul>
+    </div>
+  </section>
+</div>
+
+<!-- 8. Department Overview -->
+<section class="card dash-card">
+  <div class="dash-card-head">
+    <h3><span class="dash-ico blue">D</span> Department Overview</h3>
+    <a href="{{ url_for('admin_departments') }}">View All</a>
+  </div>
+  {% if dept_rows %}
+  <div class="table-scroll">
+    <table class="data-table">
+      <thead><tr><th>Department</th><th>Students</th><th>Pending Uploads</th><th>Viva Pending</th><th></th></tr></thead>
+      <tbody>
+        {% for d in dept_rows %}
+        <tr>
+          <td><strong>{{ d.name }}</strong></td>
+          <td>{{ d.students }}</td>
+          <td>{{ d.uploads_pending }}</td>
+          <td>{{ d.viva_pending }}</td>
+          <td class="nowrap"><a class="btn ghost sm" href="{{ url_for('admin_students', department='__unassigned' if d.name == 'Unassigned' else d.name) }}">View</a></td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="empty"><p>No departments yet &mdash; create one from the Departments page.</p></div>
+  {% endif %}
+</section>
+
+<!-- Row: Uploads + Recent -->
+<div class="dash-row">
+  <!-- 9. Uploads Awaiting Review -->
+  <section class="card dash-card">
+    <div class="dash-card-head">
+      <h3><span class="dash-ico blue">U</span> Uploads Awaiting Review</h3>
+      <a href="{{ url_for('admin_uploads') }}">View All</a>
     </div>
     {% if uploads_queue %}
     <div class="doc-list">
@@ -207,65 +199,32 @@
       {% endfor %}
     </div>
     {% else %}
-    <div class="empty"><p>No uploads awaiting review.</p></div>
+    <div class="empty"><p>No uploads are awaiting review.</p></div>
     {% endif %}
-  </div>
-  <div class="card section">
-    <div class="section-head">
-      <span class="section-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></span>
-      <h3>Recent Activity</h3>
+  </section>
+
+  <!-- 10. Recent Uploads -->
+  <section class="card dash-card">
+    <div class="dash-card-head">
+      <h3><span class="dash-ico teal">R</span> Recent Uploads</h3>
     </div>
-    {% if activity %}
+    {% if recent %}
     <div class="doc-list">
-      {% for a in activity %}
+      {% for d in recent %}
       <div class="doc-row">
+        <span class="doc-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg></span>
         <div class="doc-meta">
-          <div class="doc-name">{{ a.actor }} &mdash; {{ a.action }}</div>
-          <div class="doc-sub">{{ a.detail }} &middot; {{ a.created_at }}</div>
+          <div class="doc-name">{{ d.file_name }}</div>
+          <div class="doc-sub">{{ d.student_name }} ({{ d.reg_no }}) &middot; {{ d.doc_label }} &middot; {{ d.uploaded_at }}</div>
         </div>
+        <a class="btn ghost sm" href="{{ url_for('admin_doc_download', doc_id=d.doc_id) }}">Download</a>
       </div>
       {% endfor %}
     </div>
-    <div class="row" style="margin-top:14px"><a class="btn ghost sm" href="{{ url_for('admin_activity') }}">View All Activity</a></div>
     {% else %}
-    <div class="empty"><p>No activity recorded yet.</p></div>
+    <div class="empty"><p>No uploads yet.</p></div>
     {% endif %}
-  </div>
-</div>
-
-<div class="card section">
-  <div class="section-head">
-    <span class="section-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg></span>
-    <h3>Document Health</h3>
-  </div>
-  <div class="health">
-    <div class="health-row">
-      <div class="health-num">{{ doc_total }}</div>
-      <div class="health-label">documents uploaded in total</div>
-    </div>
-    <div class="health-bar"><span style="width:{{ (with_docs * 100 // total) if total else 0 }}%"></span></div>
-    <p class="hint">{{ with_docs }} of {{ total }} students have uploaded at least one document ({{ (with_docs * 100 // total) if total else 0 }}%).</p>
-  </div>
-  <div class="section-head" style="margin-top:22px">
-    <span class="section-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></span>
-    <h3>Recent Uploads</h3>
-  </div>
-  {% if recent %}
-  <div class="doc-list">
-    {% for d in recent %}
-    <div class="doc-row">
-      <span class="doc-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg></span>
-      <div class="doc-meta">
-        <div class="doc-name">{{ d.student_name }} <span class="hint">({{ d.reg_no }})</span></div>
-        <div class="doc-sub">{{ d.doc_label }} — {{ d.file_name }} &middot; {{ d.uploaded_at }}</div>
-      </div>
-      <a class="btn ghost sm" href="{{ url_for('admin_doc_download', doc_id=d.doc_id) }}">Download</a>
-    </div>
-    {% endfor %}
-  </div>
-  {% else %}
-  <div class="empty"><p>No uploads yet.</p></div>
-  {% endif %}
+  </section>
 </div>
 {% endblock %}
 
@@ -274,47 +233,24 @@
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 <script>
 (function () {
-  var palette = ['#2457a7', '#15803d', '#6654a3', '#d97706', '#b91c1c', '#0e7490', '#7c3aed', '#db2777', '#475569'];
-  function baseOpts(extra) {
-    return Object.assign({
-      responsive: true, maintainAspectRatio: false,
-      plugins: { legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 11 } } } }
-    }, extra || {});
+  var palette = ['#2457a7', '#15803d', '#d97706', '#7c3aed', '#b91c1c', '#0e7490', '#db2777', '#475569', '#f59e0b'];
+  function doughnut(id, labels, data) {
+    new Chart(document.getElementById(id), {
+      type: 'doughnut',
+      data: { labels: labels, datasets: [{ data: data, backgroundColor: palette, borderWidth: 2, borderColor: '#fff' }] },
+      options: { responsive: true, maintainAspectRatio: false, cutout: '68%', plugins: { legend: { display: false } } }
+    });
   }
-  new Chart(document.getElementById('chStatus'), {
-    type: 'doughnut',
-    data: {
-      labels: {{ status_list|tojson }},
-      datasets: [{ data: {{ status_counts|tojson }}, backgroundColor: palette, borderWidth: 2, borderColor: '#fff' }]
-    },
-    options: baseOpts({ cutout: '62%' })
-  });
-  new Chart(document.getElementById('chDegree'), {
-    type: 'bar',
-    data: {
-      labels: {{ degrees|map(attribute=0)|list|tojson }},
-      datasets: [{ data: {{ degrees|map(attribute=1)|list|tojson }}, backgroundColor: '#2457a7', borderRadius: 6, barThickness: 18 }]
-    },
-    options: baseOpts({ indexAxis: 'y', plugins: { legend: { display: false } },
-      scales: { x: { beginAtZero: true, ticks: { precision: 0 } } } })
-  });
+  doughnut('chStatus', {{ status_list|tojson }}, {{ status_counts|tojson }});
+  doughnut('chProgram', {{ top_programs|map(attribute=0)|list|tojson }}, {{ top_programs|map(attribute=1)|list|tojson }});
   new Chart(document.getElementById('chSession'), {
     type: 'bar',
     data: {
       labels: {{ sessions|map(attribute=0)|list|tojson }},
-      datasets: [{ data: {{ sessions|map(attribute=1)|list|tojson }}, backgroundColor: palette, borderRadius: 6 }]
+      datasets: [{ data: {{ sessions|map(attribute=1)|list|tojson }}, backgroundColor: palette, borderRadius: 8, barThickness: 42 }]
     },
-    options: baseOpts({ plugins: { legend: { display: false } },
-      scales: { y: { beginAtZero: true, ticks: { precision: 0 } } } })
-  });
-  new Chart(document.getElementById('chTrend'), {
-    type: 'bar',
-    data: {
-      labels: {{ trend_months|tojson }},
-      datasets: [{ data: {{ trend_counts|tojson }}, backgroundColor: '#6654a3', borderRadius: 6 }]
-    },
-    options: baseOpts({ plugins: { legend: { display: false } },
-      scales: { y: { beginAtZero: true, ticks: { precision: 0 } } } })
+    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } },
+      scales: { y: { beginAtZero: true, ticks: { precision: 0 }, grid: { color: '#eef2f7' } }, x: { grid: { display: false } } } }
   });
 })();
 </script>

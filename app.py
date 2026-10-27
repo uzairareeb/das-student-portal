@@ -880,6 +880,15 @@ def admin_dashboard():
             "SELECT COUNT(*) AS n FROM viva_records"
             " WHERE result='Pending' AND viva_date LIKE ?", (ym_pat,)),
     }
+    # Top Degree Programmes: group full degree strings by first word
+    # (e.g. "MPhil Biochemistry" -> MPhil), counted in Python, both DBs.
+    prog = {}
+    for name, n in degrees:
+        prog[name.split(" ")[0] if name else "Other"] = \
+            prog.get(name.split(" ")[0] if name else "Other", 0) + n
+    top_programs = sorted(prog.items(), key=lambda kv: -kv[1])
+    greeting = ("Good Morning" if now.hour < 12 else
+                "Good Afternoon" if now.hour < 17 else "Good Evening")
     return render_template(
         "admin_dashboard.html", uni=UNI_NAME, title=PORTAL_TITLE,
         total=total, stats=stats, status_list=STATUS_LIST,
@@ -891,7 +900,8 @@ def admin_dashboard():
         trend_months=months, trend_counts=trend_counts,
         trend_current=by_month.get(cur_month, 0),
         trend_previous=by_month.get(prev_month, 0),
-        viva_month=viva_month, today_str=now.strftime("%A, %d %B %Y"))
+        viva_month=viva_month, today_str=now.strftime("%A, %d %B %Y"),
+        greeting=greeting, top_programs=top_programs)
 
 
 @app.route("/admin/students")
