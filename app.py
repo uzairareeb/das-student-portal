@@ -774,13 +774,124 @@ def admin_dashboard():
     from pending_actions import compute_pending
     pending = compute_pending(db, datetime.now(), parse_coe, parse_dt,
                               fmt_coe, fmt_stamp)
+    # ---- dashboard-only additions: read-only aggregates, no schema change
+    def _cnt(sql, params=()):
+        r = db.fetchone(sql, params)
+        return (r["n"] if isinstance(r, dict) else r[0]) if r else 0
+    now = datetime.now()
+    pipeline = [
+        ("Synopsis Received", _cnt(
+            "SELECT COUNT(*) AS n FROM students WHERE synopsis='Received'")),
+        ("Semi-Final Received", _cnt(
+            "SELECT COUNT(*) AS n FROM students"
+            " WHERE semi_final_thesis='Received'")),
+        ("Final Received", _cnt(
+            "SELECT COUNT(*) AS n FROM students"
+            " WHERE final_thesis='Received'")),
+        ("Sent to COE", _cnt(
+            "SELECT COUNT(*) AS n FROM students"
+            " WHERE thesis_forward_coe IS NOT NULL")),
+        ("Viva Passed", _cnt(
+            "SELECT COUNT(DISTINCT student_id) AS n FROM viva_records"
+            " WHERE result='Pass'")),
+        ("Pass Out", stats.get("Pass Out", 0)),
+    ]
+    pipeline = [{"stage": s, "count": c,
+                 "pct": (c * 100 // total) if total else 0}
+                for s, c in pipeline]
+    dept_rows = []
+    for d in dept_names():
+        dept_rows.append({
+            "name": d,
+            "students": _cnt(
+                "SELECT COUNT(*) AS n FROM students WHERE department=?", (d,)),
+            "uploads_pending": _cnt(
+                "SELECT COUNT(*) AS n FROM dept_uploads u"
+                " JOIN departments dep ON dep.id=u.department_id"
+                " WHERE dep.name=? AND u.status='pending'", (d,)),
+            "viva_pending": _cnt(
+                "SELECT COUNT(*) AS n FROM viva_records v"
+                " JOIN students s ON s.id=v.student_id"
+                " WHERE s.department=? AND v.result='Pending'", (d,)),
+        })
+    unassigned = _cnt(
+        "SELECT COUNT(*) AS n FROM students"
+        " WHERE department IS NULL OR department=''")
+    if unassigned:
+        dept_rows.append({"name": "Unassigned", "students": unassigned,
+                          "uploads_pending": 0, "viva_pending": _cnt(
+                              "SELECT COUNT(*) AS n FROM viva_records v"
+                              " JOIN students s ON s.id=v.student_id"
+                              " WHERE (s.department IS NULL OR s.department='')"
+                              " AND v.result='Pending'")})
+    uploads_queue = [dict(r) for r in db.fetchall(
+        "SELECT u.id, u.file_name, u.row_count, u.created_at,"
+        " dep.name AS dept_name FROM dept_uploads u"
+        " JOIN departments dep ON dep.id=u.department_id"
+        " WHERE u.status='pending' ORDER BY u.id DESC LIMIT 5")]
+    activity = [dict(r) for r in db.fetchall(
+        "SELECT actor, action, detail, created_at FROM activity_log"
+        " ORDER BY id DESC LIMIT 8")]
+    quality = {
+        "missing_cnic": _cnt(
+            "SELECT COUNT(*) AS n FROM students"
+            " WHERE cnic IS NULL OR cnic=''"),
+        "missing_degree": _cnt(
+            "SELECT COUNT(*) AS n FROM students"
+            " WHERE degree IS NULL OR degree=''"),
+        "missing_session": _cnt(
+            "SELECT COUNT(*) AS n FROM students"
+            " WHERE session IS NULL OR session=''"),
+        "no_documents": _cnt(
+            "SELECT COUNT(*) AS n FROM students s"
+            " WHERE NOT EXISTS (SELECT 1 FROM documents d"
+            " WHERE d.student_id=s.id)"),
+        "folder_pending": _cnt(
+            "SELECT COUNT(*) AS n FROM students"
+            " WHERE folder_file<>'Completed'"),
+    }
+    # monthly trend: last 6 months, counted in Python (TEXT dates, both DBs)
+    months, trend_counts = [], []
+    y, m = now.year, now.month
+    for _ in range(6):
+        months.append(f"{y:04d}-{m:02d}")
+        if m == 1:
+            y, m = y - 1, 12
+        else:
+            m -= 1
+    months.reverse()
+    by_month = {}
+    for r in db.fetchall("SELECT created_at FROM students"):
+        v = (dict(r).get("created_at") or "")[:7]
+        if v in months:
+            by_month[v] = by_month.get(v, 0) + 1
+    trend_counts = [by_month.get(x, 0) for x in months]
+    cur_month = months[-1]
+    prev_month = months[-2]
+    ym_pat = cur_month + "%"
+    viva_month = {
+        "pass": _cnt(
+            "SELECT COUNT(*) AS n FROM viva_records"
+            " WHERE result='Pass' AND viva_date LIKE ?", (ym_pat,)),
+        "fail": _cnt(
+            "SELECT COUNT(*) AS n FROM viva_records"
+            " WHERE result='Fail' AND viva_date LIKE ?", (ym_pat,)),
+        "pending": _cnt(
+            "SELECT COUNT(*) AS n FROM viva_records"
+            " WHERE result='Pending' AND viva_date LIKE ?", (ym_pat,)),
+    }
     return render_template(
         "admin_dashboard.html", uni=UNI_NAME, title=PORTAL_TITLE,
         total=total, stats=stats, status_list=STATUS_LIST,
         status_counts=[stats.get(st, 0) for st in STATUS_LIST],
         degrees=degrees, sessions=sessions,
         doc_total=doc_total, with_docs=with_docs, recent=recent,
-        pending=pending)
+        pending=pending, pipeline=pipeline, dept_rows=dept_rows,
+        uploads_queue=uploads_queue, activity=activity, quality=quality,
+        trend_months=months, trend_counts=trend_counts,
+        trend_current=by_month.get(cur_month, 0),
+        trend_previous=by_month.get(prev_month, 0),
+        viva_month=viva_month, today_str=now.strftime("%A, %d %B %Y"))
 
 
 @app.route("/admin/students")

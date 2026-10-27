@@ -1,5 +1,6 @@
 {% extends "base.html" %}
-{% block body_class %}has-sidebar{% endblock %}
+{% block body_class %}has-sidebar admin-portal{% endblock %}
+{% block extra_css %}<link rel="stylesheet" href="{{ url_for('static', filename='css/admin-dashboard.css') }}">{% endblock %}
 {% block sidebar %}
 <aside class="sidebar" id="sidebar">
   <div class="side-brand">
