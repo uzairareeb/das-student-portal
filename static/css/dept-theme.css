@@ -1,0 +1,212 @@
+/* Department Portal — Soft Modern UI + Minimal Academic theme.
+   Scoped to body.dept-portal ONLY, so Admin / Student portals keep
+   their existing look untouched. Loaded after style.css via the
+   extra_css block in dept_base.html / dept_login.html.
+   No backend, route, auth or schema change lives here. */
+body.dept-portal {
+  --primary: #2457a7;
+  --primary-dark: #17365d;
+  --primary-tint: #eef2fb;
+  --accent: #6654a3;
+  --accent-tint: #f1eefb;
+  --ink: #1f2937;
+  --muted: #64748b;
+  --line: #e2e8f0;
+  --bg: #f5f7fb;
+  --card: #ffffff;
+  --ok: #15803d;
+  --ok-bg: #e7f6ec;
+  --warn: #b45309;
+  --warn-bg: #fef3c7;
+  --bad: #b91c1c;
+  --bad-bg: #fee2e2;
+  --radius: 16px;
+  --radius-md: 12px;
+  --radius-sm: 10px;
+  --shadow: 0 1px 2px rgba(23, 54, 93, .06), 0 10px 28px rgba(23, 54, 93, .07);
+  --shadow-sm: 0 1px 2px rgba(23, 54, 93, .06), 0 4px 14px rgba(23, 54, 93, .05);
+  background: var(--bg);
+  color: var(--ink);
+}
+
+/* ---------- shell / topbar ---------- */
+body.dept-portal .topbar { background: var(--primary-dark); box-shadow: 0 2px 14px rgba(23, 54, 93, .22); }
+body.dept-portal .brand-mark { background: #fff; color: var(--primary-dark); border-radius: 12px; }
+body.dept-portal .site-foot { color: var(--muted); }
+body.dept-portal .container { padding: 32px 0 64px; }
+
+/* ---------- sidebar ---------- */
+body.dept-portal .sidebar {
+  background: var(--primary-dark);
+  box-shadow: 4px 0 24px rgba(23, 54, 93, .22);
+}
+body.dept-portal .side-brand .mark { background: #fff; color: var(--primary-dark); border-radius: 12px; }
+body.dept-portal .side-brand { border-bottom-color: rgba(255, 255, 255, .14); }
+body.dept-portal .side-section {
+  padding: 14px 14px 4px; font-size: 11px; font-weight: 800;
+  letter-spacing: .08em; text-transform: uppercase; color: rgba(255, 255, 255, .5);
+}
+body.dept-portal .side-nav a { border-radius: var(--radius-sm); color: rgba(255, 255, 255, .86); }
+body.dept-portal .side-nav a:hover { background: rgba(255, 255, 255, .11); color: #fff; }
+body.dept-portal .side-nav a.active { background: #fff; color: var(--primary-dark); box-shadow: 0 4px 14px rgba(0, 0, 0, .18); }
+body.dept-portal .side-foot { border-top-color: rgba(255, 255, 255, .14); }
+body.dept-portal .side-foot a { border-radius: var(--radius-sm); color: #fecaca; }
+body.dept-portal .side-toggle { background: var(--primary-dark); border-radius: 12px; }
+body.dept-portal .notif-badge { background: var(--bad); color: #fff; }
+
+/* ---------- headings / breadcrumbs ---------- */
+body.dept-portal .crumb { font-size: 12.5px; color: var(--muted); margin: 0 0 8px; font-weight: 600; }
+body.dept-portal .crumb span { color: var(--primary); }
+body.dept-portal .page-head h2 { font-size: 26px; color: var(--primary-dark); }
+body.dept-portal .page-head p { color: var(--muted); }
+
+/* ---------- cards / sections ---------- */
+body.dept-portal .card {
+  border-radius: var(--radius); border-color: var(--line);
+  box-shadow: var(--shadow-sm); padding: 24px;
+}
+body.dept-portal .section-head h3 { color: var(--primary-dark); }
+body.dept-portal .section-icon { background: var(--primary-tint); color: var(--primary); border-radius: 12px; }
+body.dept-portal .section-icon.ok { background: var(--ok-bg); color: var(--ok); }
+body.dept-portal .section-icon.warn { background: var(--warn-bg); color: var(--warn); }
+body.dept-portal .section-icon.bad { background: var(--bad-bg); color: var(--bad); }
+
+/* ---------- stat cards ---------- */
+body.dept-portal .stats { gap: 14px; }
+body.dept-portal .stat {
+  border-radius: var(--radius); border-color: var(--line);
+  box-shadow: var(--shadow-sm); padding: 18px;
+}
+body.dept-portal .stat .n { font-size: 26px; color: var(--primary-dark); }
+body.dept-portal .stat .t { color: var(--muted); font-size: 12.5px; }
+
+/* ---------- buttons ---------- */
+body.dept-portal .btn {
+  border-radius: 11px; background: var(--primary); border-color: var(--primary);
+  box-shadow: 0 1px 2px rgba(23, 54, 93, .12);
+}
+body.dept-portal .btn:hover { background: var(--primary-dark); border-color: var(--primary-dark); }
+body.dept-portal .btn.ghost { background: #fff; color: var(--primary); border-color: #cbd5e1; }
+body.dept-portal .btn.ghost:hover { background: var(--primary-tint); border-color: var(--primary); }
+body.dept-portal .btn.danger { background: #fff; color: var(--bad); border-color: #fecaca; }
+body.dept-portal .btn.danger:hover { background: var(--bad-bg); border-color: var(--bad); }
+body.dept-portal .btn.sm { border-radius: 9px; }
+body.dept-portal .btn.outline-w { background: transparent; color: #fff; border-color: rgba(255, 255, 255, .55); }
+body.dept-portal .btn.outline-w:hover { background: rgba(255, 255, 255, .14); border-color: #fff; }
+
+/* ---------- forms ---------- */
+body.dept-portal label.f-label { color: var(--ink); font-size: 13px; }
+body.dept-portal input[type="text"], body.dept-portal input[type="password"],
+body.dept-portal input[type="email"], body.dept-portal input[type="number"],
+body.dept-portal input[type="date"], body.dept-portal input[type="datetime-local"],
+body.dept-portal select, body.dept-portal textarea {
+  border-radius: 11px; border-color: var(--line); background: #fff;
+  padding: 12px 14px; font-size: 15px; color: var(--ink);
+}
+body.dept-portal input[type="text"].no-icon, body.dept-portal select.no-icon,
+body.dept-portal textarea.no-icon { padding-left: 14px; }
+body.dept-portal input:focus, body.dept-portal select:focus, body.dept-portal textarea:focus {
+  border-color: var(--primary); background: #fff;
+  box-shadow: 0 0 0 4px rgba(36, 87, 167, .14);
+}
+body.dept-portal .form-error { border-radius: 11px; background: var(--bad-bg); border-color: #fecaca; color: var(--bad); }
+body.dept-portal .hint { color: var(--muted); }
+body.dept-portal .hint a { color: var(--primary); }
+body.dept-portal input[type="checkbox"] { accent-color: var(--primary); }
+
+/* ---------- tables ---------- */
+body.dept-portal .table-scroll { overflow-x: auto; border: 1px solid var(--line); border-radius: 12px; }
+body.dept-portal .table-scroll table { border: none; }
+body.dept-portal table.data-table { background: #fff; }
+body.dept-portal th {
+  background: #f1f5f9; color: #475569; border-bottom-color: var(--line);
+  font-size: 12px; letter-spacing: .5px;
+}
+body.dept-portal th, body.dept-portal td { border-bottom-color: var(--line); }
+body.dept-portal tbody tr:hover { background: #f8fafc; }
+body.dept-portal .table-scroll thead th { position: sticky; top: 0; z-index: 1; }
+body.dept-portal .pagination { margin-top: 20px; }
+
+/* ---------- pills / badges ---------- */
+body.dept-portal .pill { border-radius: 999px; font-size: 12.5px; padding: 5px 12px; }
+body.dept-portal .pill.q { background: var(--ok-bg); color: var(--ok); }
+body.dept-portal .pill.nq { background: var(--bad-bg); color: var(--bad); }
+body.dept-portal .pill.warn { background: var(--warn-bg); color: var(--warn); }
+body.dept-portal .pill.info, body.dept-portal .pill { background: var(--primary-tint); color: var(--primary); }
+body.dept-portal .pill.q, body.dept-portal .pill.nq, body.dept-portal .pill.warn { /* keep semantic colours above */ }
+
+/* ---------- dropzone / notes / empty ---------- */
+body.dept-portal .dropzone {
+  border-radius: var(--radius); border-color: #cbd5e1; background: #f8fafc;
+}
+body.dept-portal .dropzone:hover, body.dept-portal .dropzone.drag { border-color: var(--primary); background: var(--primary-tint); }
+body.dept-portal .dropzone .dz-icon { background: var(--primary-tint); color: var(--primary); border-radius: 14px; }
+body.dept-portal .admin-note { border-radius: 11px; background: #fffbeb; border-color: #fde68a; color: #92400e; }
+body.dept-portal .empty { color: var(--muted); }
+body.dept-portal .flash p { border-radius: 11px; background: var(--primary-tint); border-color: #bfdbfe; color: var(--primary-dark); }
+
+/* ---------- profile hero / stats / records ---------- */
+body.dept-portal .sp-hero {
+  background: linear-gradient(120deg, #17365d 0%, #2457a7 70%, #6654a3 100%);
+  border-radius: var(--radius); box-shadow: var(--shadow);
+}
+body.dept-portal .sp-avatar { border-color: rgba(255, 255, 255, .5); }
+body.dept-portal .sp-stat { border-radius: var(--radius); border-color: var(--line); box-shadow: var(--shadow-sm); }
+body.dept-portal .sp-stat .k { color: var(--muted); }
+body.dept-portal .record-list dt { color: #334155; }
+body.dept-portal .record-list > div { border-bottom-color: var(--line); }
+body.dept-portal .doc-row { border-radius: 12px; border-color: var(--line); background: #fbfcfe; }
+body.dept-portal .doc-row .doc-icon { background: var(--primary-tint); color: var(--primary); border-radius: 11px; }
+body.dept-portal .notif-unread { background: var(--primary-tint); }
+body.dept-portal .notif-icon.kind-upload { background: var(--primary-tint); color: var(--primary); }
+body.dept-portal .notif-icon.kind-viva { background: var(--accent-tint); color: var(--accent); }
+body.dept-portal .notif-icon.kind-student { background: var(--ok-bg); color: var(--ok); }
+
+/* ---------- viva calendar ---------- */
+body.dept-portal .cal-day { border-radius: 12px; border-color: var(--line); }
+body.dept-portal .cal-day.has-viva { border-color: #bfdbfe; background: var(--primary-tint); }
+body.dept-portal .cal-viva { background: var(--primary); border-radius: 6px; }
+body.dept-portal .cal-head span { color: var(--muted); }
+
+/* ---------- modals ---------- */
+body.dept-portal .modal { border-radius: 20px; }
+body.dept-portal .modal h3 { color: var(--primary-dark); }
+body.dept-portal .modal p { color: var(--muted); }
+body.dept-portal .modal-icon.warn { background: var(--warn-bg); color: var(--warn); }
+
+/* ---------- login ---------- */
+body.dept-portal .auth-card { border-radius: 20px; box-shadow: var(--shadow); overflow: hidden; }
+body.dept-portal .auth-card::before { content: ""; display: block; height: 6px; margin: -32px -32px 24px; background: linear-gradient(90deg, var(--primary-dark), var(--primary), var(--accent)); }
+body.dept-portal .auth-icon { background: var(--primary-tint); color: var(--primary); border-radius: 18px; }
+body.dept-portal .auth-card h2 { color: var(--primary-dark); }
+body.dept-portal .auth-back { display: inline-block; margin-top: 16px; font-size: 13.5px; font-weight: 600; color: var(--primary); text-decoration: none; }
+body.dept-portal .auth-back:hover { text-decoration: underline; }
+
+/* ---------- focus / motion / responsive ---------- */
+body.dept-portal a:focus-visible, body.dept-portal button:focus-visible,
+body.dept-portal input:focus-visible, body.dept-portal select:focus-visible {
+  outline: 3px solid rgba(36, 87, 167, .35); outline-offset: 2px;
+}
+@media (prefers-reduced-motion: reduce) {
+  body.dept-portal *, body.dept-portal *::before, body.dept-portal *::after {
+    animation-duration: .01ms !important; transition-duration: .01ms !important;
+  }
+}
+@media (max-width: 960px) {
+  body.dept-portal .stats { grid-template-columns: repeat(2, 1fr); }
+  body.dept-portal .container { padding: 26px 0 56px; }
+}
+@media (max-width: 720px) {
+  body.dept-portal .card { padding: 20px 16px; }
+  body.dept-portal .page-head { flex-direction: column; align-items: flex-start; }
+  body.dept-portal .form-grid { grid-template-columns: 1fr; }
+  body.dept-portal .sp-stats { grid-template-columns: repeat(2, 1fr); }
+  body.dept-portal .sp-hero { padding: 24px 20px; }
+  body.dept-portal .record-list dt { width: 150px; }
+  body.dept-portal .cal-day { min-height: 56px; padding: 4px; }
+  body.dept-portal .cal-viva { font-size: 9px; }
+}
+@media (max-width: 560px) {
+  body.dept-portal .stats { grid-template-columns: 1fr; }
+  body.dept-portal .sp-stats { grid-template-columns: 1fr; }
+}
