@@ -1,4 +1,5 @@
 {% extends "admin_base.html" %}
+{% block container_extra %} wide{% endblock %}
 {% block content %}
 <!-- Banner -->
 <div class="dash-banner">
@@ -11,10 +12,6 @@
       <button type="submit" class="btn primary sm">Search</button>
     </form>
   </div>
-  <div class="banner-right">
-    <img src="{{ url_for('static', filename='img/cuvas-logo.png') }}" alt="CUVAS logo">
-    <p>Excellence in Veterinary<br>Education and Research</p>
-  </div>
 </div>
 
 <!-- Row 1: Statistics + Quick Actions -->
@@ -22,12 +19,12 @@
   <!-- 1. Student Statistics -->
   <section class="card dash-card">
     <div class="dash-card-head">
-      <h3><span class="dash-ico blue">S</span> Student Statistics</h3>
+      <h3><span class="dash-ico blue"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></span> Student Statistics</h3>
       <a href="{{ url_for('admin_students') }}">View All</a>
     </div>
     <div class="tile-grid">
       <a class="tile t-blue" href="{{ url_for('admin_students') }}">
-        <span class="tile-ico">S</span><div><div class="n">{{ total }}</div><div class="t">Total Students</div></div>
+        <span class="tile-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></span><div><div class="n">{{ total }}</div><div class="t">Total Students</div></div>
       </a>
       {% for st in status_list %}
       {% if st == 'Continue' %}{% set tc = 't-green' %}
@@ -41,7 +38,7 @@
       {% elif st == 'Pass Out' %}{% set tc = 't-red2' %}
       {% else %}{% set tc = 't-slate' %}{% endif %}
       <a class="tile {{ tc }}" href="{{ url_for('admin_students', status=st) }}">
-        <span class="tile-ico">{{ st[0] }}</span><div><div class="n">{{ stats.get(st, 0) }}</div><div class="t">{{ st }}</div></div>
+        <span class="tile-ico">{% if st == 'Continue' %}<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="6 3 20 12 6 21 6 3"/></svg>{% elif st == 'Freeze' %}<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="14" y="4" width="4" height="16" rx="1"/><rect x="6" y="4" width="4" height="16" rx="1"/></svg>{% elif st == 'Left' %}<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>{% elif st == 'Admission Cancelled' %}<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>{% elif st == 'Viva Done' %}<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>{% elif st == 'Viva Pending' %}<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>{% elif st == 'Defense Pending' %}<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>{% elif st == 'Sent to COE' %}<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>{% elif st == 'Pass Out' %}<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 10L12 5 2 10l10 5 10-5z"/><path d="M6 12v5c0 1.7 2.7 3 6 3s6-1.3 6-3v-5"/><line x1="22" y1="10" x2="22" y2="16"/></svg>{% endif %}</span><div><div class="n">{{ stats.get(st, 0) }}</div><div class="t">{{ st }}</div></div>
       </a>
       {% endfor %}
     </div>
@@ -50,14 +47,14 @@
   <!-- 2. Quick Actions -->
   <section class="card dash-card">
     <div class="dash-card-head">
-      <h3><span class="dash-ico purple">Q</span> Quick Actions</h3>
+      <h3><span class="dash-ico purple"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg></span> Quick Actions</h3>
     </div>
     <div class="quick-list">
-      <a class="quick-row" href="{{ url_for('admin_student_new') }}"><span class="q-ico blue">+</span><span><strong>Add Student</strong><small>Create a new student record</small></span></a>
-      <a class="quick-row" href="{{ url_for('admin_import') }}"><span class="q-ico green">I</span><span><strong>Import Students</strong><small>Upload an Excel file</small></span></a>
-      <a class="quick-row" href="{{ url_for('admin_students') }}"><span class="q-ico purple">L</span><span><strong>Student List</strong><small>Search and manage student records</small></span></a>
-      <a class="quick-row" href="{{ url_for('admin_export') }}"><span class="q-ico teal">E</span><span><strong>Export to Excel</strong><small>All student records</small></span></a>
-      <a class="quick-row" href="{{ url_for('admin_export_pdf') }}"><span class="q-ico red">P</span><span><strong>Export to PDF</strong><small>Printable student list</small></span></a>
+      <a class="quick-row" href="{{ url_for('admin_student_new') }}"><span class="q-ico blue"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg></span><span><strong>Add Student</strong><small>Create a new student record</small></span></a>
+      <a class="quick-row" href="{{ url_for('admin_import') }}"><span class="q-ico green"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg></span><span><strong>Import Students</strong><small>Upload an Excel file</small></span></a>
+      <a class="quick-row" href="{{ url_for('admin_students') }}"><span class="q-ico purple"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg></span><span><strong>Student List</strong><small>Search and manage student records</small></span></a>
+      <a class="quick-row" href="{{ url_for('admin_export') }}"><span class="q-ico teal"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/></svg></span><span><strong>Export to Excel</strong><small>All student records</small></span></a>
+      <a class="quick-row" href="{{ url_for('admin_export_pdf') }}"><span class="q-ico red"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg></span><span><strong>Export to PDF</strong><small>Printable student list</small></span></a>
     </div>
   </section>
 </div>
@@ -65,7 +62,7 @@
 <!-- 3. Attention Needed -->
 <section class="card dash-card pending-card">
   <div class="dash-card-head">
-    <h3><span class="dash-ico amber">!</span> Attention Needed</h3>
+    <h3><span class="dash-ico amber"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg></span> Attention Needed</h3>
     {% if pending.total %}<span class="pill warn">{{ pending.total }} pending</span>{% endif %}
   </div>
   {% if pending.groups %}
@@ -93,7 +90,7 @@
   <!-- 4. Students by Status -->
   <section class="card dash-card">
     <div class="dash-card-head">
-      <h3><span class="dash-ico blue">S</span> Students by Status</h3>
+      <h3><span class="dash-ico blue"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.21 15.89A10 10 0 1 1 8 2.83"/><path d="M22 12A10 10 0 0 0 12 2v10z"/></svg></span> Students by Status</h3>
       <a href="{{ url_for('admin_students') }}">View All</a>
     </div>
     <div class="donut-wrap">
@@ -109,13 +106,13 @@
   <!-- 5. Viva Outcomes This Month -->
   <section class="card dash-card">
     <div class="dash-card-head">
-      <h3><span class="dash-ico teal">V</span> Viva Outcomes This Month</h3>
+      <h3><span class="dash-ico teal"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg></span> Viva Outcomes This Month</h3>
       <a href="{{ url_for('admin_viva') }}">View All</a>
     </div>
     <div class="viva-strip">
-      <div class="viva-box ok"><div class="n">{{ viva_month.pass }}</div><div class="t">Passed</div></div>
-      <div class="viva-box bad"><div class="n">{{ viva_month.fail }}</div><div class="t">Failed</div></div>
-      <div class="viva-box warn"><div class="n">{{ viva_month.pending }}</div><div class="t">Pending</div></div>
+      <div class="viva-box ok"><span class="viva-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg></span><div><div class="n">{{ viva_month.pass }}</div><div class="t">Passed</div></div></div>
+      <div class="viva-box bad"><span class="viva-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg></span><div><div class="n">{{ viva_month.fail }}</div><div class="t">Failed</div></div></div>
+      <div class="viva-box warn"><span class="viva-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></span><div><div class="n">{{ viva_month.pending }}</div><div class="t">Pending</div></div></div>
     </div>
     <p class="hint">Based on viva dates in the current month. Full history is available in the Viva Records page.</p>
   </section>
@@ -126,7 +123,7 @@
   <!-- 6. Students by Academic Session -->
   <section class="card dash-card">
     <div class="dash-card-head">
-      <h3><span class="dash-ico blue">S</span> Students by Academic Session</h3>
+      <h3><span class="dash-ico blue"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="20" x2="12" y2="10"/><line x1="18" y1="20" x2="18" y2="4"/><line x1="6" y1="20" x2="6" y2="16"/></svg></span> Students by Academic Session</h3>
       <a href="{{ url_for('admin_students') }}">View All</a>
     </div>
     <div class="chart-box"><canvas id="chSession"></canvas></div>
@@ -135,7 +132,7 @@
   <!-- 7. Top Degree Programmes -->
   <section class="card dash-card">
     <div class="dash-card-head">
-      <h3><span class="dash-ico purple">D</span> Top Degree Programmes</h3>
+      <h3><span class="dash-ico purple"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 10L12 5 2 10l10 5 10-5z"/><path d="M6 12v5c0 1.7 2.7 3 6 3s6-1.3 6-3v-5"/><line x1="22" y1="10" x2="22" y2="16"/></svg></span> Top Degree Programmes</h3>
       <a href="{{ url_for('admin_students') }}">View All</a>
     </div>
     <div class="donut-wrap">
@@ -152,7 +149,7 @@
 <!-- 8. Department Overview -->
 <section class="card dash-card">
   <div class="dash-card-head">
-    <h3><span class="dash-ico blue">D</span> Department Overview</h3>
+    <h3><span class="dash-ico blue"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="2" width="16" height="20" rx="2"/><line x1="9" y1="6" x2="15" y2="6"/><line x1="9" y1="10" x2="15" y2="10"/><line x1="9" y1="14" x2="15" y2="14"/><line x1="9" y1="18" x2="15" y2="18"/></svg></span> Department Overview</h3>
     <a href="{{ url_for('admin_departments') }}">View All</a>
   </div>
   {% if dept_rows %}
@@ -182,7 +179,7 @@
   <!-- 9. Uploads Awaiting Review -->
   <section class="card dash-card">
     <div class="dash-card-head">
-      <h3><span class="dash-ico blue">U</span> Uploads Awaiting Review</h3>
+      <h3><span class="dash-ico blue"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg></span> Uploads Awaiting Review</h3>
       <a href="{{ url_for('admin_uploads') }}">View All</a>
     </div>
     {% if uploads_queue %}
@@ -206,7 +203,7 @@
   <!-- 10. Recent Uploads -->
   <section class="card dash-card">
     <div class="dash-card-head">
-      <h3><span class="dash-ico teal">R</span> Recent Uploads</h3>
+      <h3><span class="dash-ico teal"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></span> Recent Uploads</h3>
     </div>
     {% if recent %}
     <div class="doc-list">
