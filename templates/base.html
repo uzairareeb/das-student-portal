@@ -119,21 +119,23 @@
   </script>
 <script>
 (function () {
-  var btn = document.getElementById('profileBtn');
-  var menu = document.getElementById('profileMenu');
-  if (!btn || !menu) return;
-  btn.addEventListener('click', function (e) {
-    e.stopPropagation();
-    var open = menu.hasAttribute('hidden');
-    if (open) { menu.removeAttribute('hidden'); btn.setAttribute('aria-expanded', 'true'); }
-    else { menu.setAttribute('hidden', ''); btn.setAttribute('aria-expanded', 'false'); }
+  var pairs = [['profileBtn', 'profileMenu'], ['bellBtn', 'bellMenu']];
+  var menus = [];
+  pairs.forEach(function (pair) {
+    var btn = document.getElementById(pair[0]);
+    var menu = document.getElementById(pair[1]);
+    if (!btn || !menu) return;
+    menus.push({ btn: btn, menu: menu });
+    btn.addEventListener('click', function (e) {
+      e.stopPropagation();
+      var willOpen = menu.hasAttribute('hidden');
+      menus.forEach(function (m) { m.menu.setAttribute('hidden', ''); m.btn.setAttribute('aria-expanded', 'false'); });
+      if (willOpen) { menu.removeAttribute('hidden'); btn.setAttribute('aria-expanded', 'true'); }
+    });
   });
-  document.addEventListener('click', function (e) {
-    if (!menu.contains(e.target) && e.target !== btn) { menu.setAttribute('hidden', ''); btn.setAttribute('aria-expanded', 'false'); }
-  });
-  document.addEventListener('keydown', function (e) {
-    if (e.key === 'Escape') { menu.setAttribute('hidden', ''); btn.setAttribute('aria-expanded', 'false'); }
-  });
+  function closeAll() { menus.forEach(function (m) { m.menu.setAttribute('hidden', ''); m.btn.setAttribute('aria-expanded', 'false'); }); }
+  document.addEventListener('click', closeAll);
+  document.addEventListener('keydown', function (e) { if (e.key === 'Escape') closeAll(); });
 })();
 </script>
 </body>

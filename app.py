@@ -1829,8 +1829,12 @@ def _inject_dept_notif():
     try:
         if request.path.startswith("/dept") and "dept_id" in session:
             return {"dept_unread": dept_unread_count(session["dept_id"])}
-        if request.path.startswith("/admin") and session.get("admin_ok"):
-            return {"admin_unread": admin_unread_count()}
+        if request.path.startswith("/admin") and session.get("admin"):
+            notes = [dict(r) for r in get_db().fetchall(
+                "SELECT id, kind, title, message, link, created_at"
+                " FROM admin_notifications ORDER BY id DESC LIMIT 8")]
+            return {"admin_unread": admin_unread_count(),
+                    "admin_recent_notes": notes}
         if request.path.startswith("/student") and session.get("student_id"):
             return {"student_unread": student_unread_count(session["student_id"])}
     except Exception:

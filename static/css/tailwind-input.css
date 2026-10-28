@@ -44,6 +44,9 @@
     .side-toggle { display: inline-flex; }
     body.has-sidebar .topbar .wrap { padding-left: 70px; }
   }
+  @media (min-width: 961px) {
+    body.has-sidebar .topbar .wrap { @apply max-w-none px-7; }
+  }
   @media print {
     .sidebar, .topbar, .site-foot, .side-toggle, .no-print { display: none !important; }
     body.has-sidebar .page-shell { margin-left: 0; }
@@ -496,13 +499,11 @@
   body.admin-portal .quality-item { @apply rounded-xl border border-line bg-slate-50 px-2 py-3.5 text-center; }
   body.admin-portal .quality-item .n { @apply text-[22px] font-extrabold text-navy; }
   body.admin-portal .quality-item .t { @apply mt-0.5 text-xs text-muted; }
-  body.admin-portal .dash-banner { @apply mb-6 flex flex-col items-start justify-between gap-5 rounded-[14px] border border-line bg-white px-7 py-6 shadow-sm md:flex-row md:items-center; }
-  body.admin-portal .banner-greet { @apply mb-1 text-[13px] font-bold text-slate-600; }
+  body.admin-portal .dash-banner { @apply mb-6 flex flex-col items-start justify-between gap-5 rounded-[14px] border border-line bg-[linear-gradient(120deg,#eaf2ff_0%,#f0edff_55%,#ffffff_100%)] px-7 py-6 shadow-sm md:flex-row md:items-center; }
+  body.admin-portal .banner-greet { @apply mb-1 text-[13px] font-bold text-primary; }
   body.admin-portal .dash-banner h2 { @apply m-0 text-[26px] text-navy; }
   body.admin-portal .banner-sub { @apply mt-1.5 text-[13.5px] text-muted; }
-  body.admin-portal .banner-search { @apply mt-4 flex gap-2; }
-  body.admin-portal .banner-search input[type="text"] { @apply min-w-[280px] flex-1 bg-white; }
-  body.admin-portal .dash-top { @apply mb-6 grid grid-cols-1 items-stretch gap-6 xl:grid-cols-[2fr_1fr]; }
+    body.admin-portal .dash-top { @apply mb-6 grid grid-cols-1 items-stretch gap-6 xl:grid-cols-[2fr_1fr]; }
   body.admin-portal .dash-row { @apply mb-6 grid grid-cols-1 items-stretch gap-6 lg:grid-cols-2; }
   body.admin-portal .dash-card { @apply mb-6 rounded-[14px] border border-line bg-white p-[22px] text-left shadow-sm; }
   body.admin-portal .dash-top .dash-card, body.admin-portal .dash-row .dash-card { @apply mb-0; }
@@ -516,10 +517,17 @@
   body.admin-portal .dash-ico.amber { @apply bg-amber-600; }
   body.admin-portal .dash-ico svg { @apply h-[17px] w-[17px]; }
   body.admin-portal .tile-grid { @apply grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-5; }
-  body.admin-portal .tile { @apply flex items-center gap-2.5 rounded-xl border border-line bg-white px-3 py-3.5 text-ink no-underline hover:-translate-y-px hover:shadow-sm; }
-  body.admin-portal .tile-ico { @apply inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-[15px] font-extrabold text-white; }
-  body.admin-portal .tile-ico svg { @apply h-[18px] w-[18px]; }
-  body.admin-portal .tile .n { @apply text-[21px] leading-tight font-extrabold; }
+  body.admin-portal .dash-top > section:first-child { @apply flex flex-col; }
+  body.admin-portal .dash-top > section:first-child .tile-grid { @apply flex-1 content-evenly; }
+  body.admin-portal .tile > div { @apply min-w-0 flex-1; }
+  body.admin-portal .tile-bar { @apply mt-2.5 h-1 w-full overflow-hidden rounded-full bg-slate-100; }
+  body.admin-portal .tile-bar span { @apply block h-full rounded-full; }
+  body.admin-portal .tile-pct { @apply mt-1.5 text-[11px] font-semibold text-muted; }
+  body.admin-portal .tile { @apply flex items-center gap-3.5 rounded-xl border border-line bg-white px-4 py-5 text-ink no-underline hover:-translate-y-px hover:border-primary/50; }
+  body.admin-portal .tile:hover { box-shadow: 0 0 0 1px rgba(23,105,232,.22), 0 14px 32px rgba(23,105,232,.16); }
+  body.admin-portal .tile-ico { @apply inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-[15px] font-extrabold text-white; }
+  body.admin-portal .tile-ico svg { @apply h-5 w-5; }
+  body.admin-portal .tile .n { @apply text-[23px] leading-tight font-extrabold text-navy; }
   body.admin-portal .tile .t { @apply mt-0.5 text-xs leading-snug text-slate-600; }
   body.admin-portal .tile.t-blue { @apply bg-white; }
   body.admin-portal .tile.t-blue .tile-ico { @apply bg-primary; }

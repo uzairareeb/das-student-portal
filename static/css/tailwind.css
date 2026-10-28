@@ -291,6 +291,9 @@
   .mx-auto {
     margin-inline: auto;
   }
+  .mt-1 {
+    margin-top: var(--spacing);
+  }
   .mt-2 {
     margin-top: calc(var(--spacing) * 2);
   }
@@ -345,6 +348,9 @@
   .h-\[72px\] {
     height: 72px;
   }
+  .max-h-80 {
+    max-height: calc(var(--spacing) * 80);
+  }
   .w-10 {
     width: calc(var(--spacing) * 10);
   }
@@ -354,11 +360,17 @@
   .w-72 {
     width: calc(var(--spacing) * 72);
   }
+  .w-80 {
+    width: calc(var(--spacing) * 80);
+  }
   .w-\[72px\] {
     width: 72px;
   }
   .max-w-\[760px\] {
     max-width: 760px;
+  }
+  .max-w-\[calc\(100vw-2rem\)\] {
+    max-width: calc(100vw - 2rem);
   }
   .min-w-4 {
     min-width: calc(var(--spacing) * 4);
@@ -399,6 +411,9 @@
   }
   .overflow-hidden {
     overflow: hidden;
+  }
+  .overflow-y-auto {
+    overflow-y: auto;
   }
   .rounded-\[10px\] {
     border-radius: 10px;
@@ -525,6 +540,9 @@
   }
   .text-\[10px\] {
     font-size: 10px;
+  }
+  .text-\[11px\] {
+    font-size: 11px;
   }
   .text-\[15\.5px\] {
     font-size: 15.5px;
@@ -681,6 +699,9 @@
     .md\:block {
       display: block;
     }
+    .md\:w-80 {
+      width: calc(var(--spacing) * 80);
+    }
     .md\:grid-cols-2 {
       grid-template-columns: repeat(2, minmax(0, 1fr));
     }
@@ -691,6 +712,9 @@
     }
   }
   @media (width >= 80rem) {
+    .xl\:w-96 {
+      width: calc(var(--spacing) * 96);
+    }
     .xl\:grid-cols-3 {
       grid-template-columns: repeat(3, minmax(0, 1fr));
     }
@@ -740,6 +764,12 @@
     }
     body.has-sidebar .topbar .wrap {
       padding-left: 70px;
+    }
+  }
+  @media (min-width: 961px) {
+    body.has-sidebar .topbar .wrap {
+      max-width: none;
+      padding-inline: calc(var(--spacing) * 7);
     }
   }
   @media print {
@@ -3348,7 +3378,7 @@
     border-style: var(--tw-border-style);
     border-width: 1px;
     border-color: var(--color-line);
-    background-color: var(--color-white);
+    background-image: linear-gradient(120deg,#eaf2ff 0%,#f0edff 55%,#ffffff 100%);
     padding-inline: calc(var(--spacing) * 7);
     padding-block: calc(var(--spacing) * 6);
     --tw-shadow: 0 1px 3px 0 var(--tw-shadow-color, rgb(0 0 0 / 0.1)), 0 1px 2px -1px var(--tw-shadow-color, rgb(0 0 0 / 0.1));
@@ -3365,7 +3395,7 @@
     font-size: 13px;
     --tw-font-weight: var(--font-weight-bold);
     font-weight: var(--font-weight-bold);
-    color: var(--color-slate-600);
+    color: var(--color-primary);
   }
   body.admin-portal .dash-banner h2 {
     margin: 0px;
@@ -3376,16 +3406,6 @@
     margin-top: calc(var(--spacing) * 1.5);
     font-size: 13.5px;
     color: var(--color-muted);
-  }
-  body.admin-portal .banner-search {
-    margin-top: calc(var(--spacing) * 4);
-    display: flex;
-    gap: calc(var(--spacing) * 2);
-  }
-  body.admin-portal .banner-search input[type="text"] {
-    min-width: 280px;
-    flex: 1;
-    background-color: var(--color-white);
   }
   body.admin-portal .dash-top {
     margin-bottom: calc(var(--spacing) * 6);
@@ -3487,17 +3507,49 @@
       grid-template-columns: repeat(5, minmax(0, 1fr));
     }
   }
+  body.admin-portal .dash-top > section:first-child {
+    display: flex;
+    flex-direction: column;
+  }
+  body.admin-portal .dash-top > section:first-child .tile-grid {
+    flex: 1;
+    align-content: space-evenly;
+  }
+  body.admin-portal .tile > div {
+    min-width: 0px;
+    flex: 1;
+  }
+  body.admin-portal .tile-bar {
+    margin-top: calc(var(--spacing) * 2.5);
+    height: var(--spacing);
+    width: 100%;
+    overflow: hidden;
+    border-radius: calc(infinity * 1px);
+    background-color: var(--color-slate-100);
+  }
+  body.admin-portal .tile-bar span {
+    display: block;
+    height: 100%;
+    border-radius: calc(infinity * 1px);
+  }
+  body.admin-portal .tile-pct {
+    margin-top: calc(var(--spacing) * 1.5);
+    font-size: 11px;
+    --tw-font-weight: var(--font-weight-semibold);
+    font-weight: var(--font-weight-semibold);
+    color: var(--color-muted);
+  }
   body.admin-portal .tile {
     display: flex;
     align-items: center;
-    gap: calc(var(--spacing) * 2.5);
+    gap: calc(var(--spacing) * 3.5);
     border-radius: var(--radius-xl);
     border-style: var(--tw-border-style);
     border-width: 1px;
     border-color: var(--color-line);
     background-color: var(--color-white);
-    padding-inline: calc(var(--spacing) * 3);
-    padding-block: calc(var(--spacing) * 3.5);
+    padding-inline: calc(var(--spacing) * 4);
+    padding-block: calc(var(--spacing) * 5);
     color: var(--color-ink);
     text-decoration-line: none;
     &:hover {
@@ -3508,15 +3560,20 @@
     }
     &:hover {
       @media (hover: hover) {
-        --tw-shadow: 0 1px 3px 0 var(--tw-shadow-color, rgb(0 0 0 / 0.1)), 0 1px 2px -1px var(--tw-shadow-color, rgb(0 0 0 / 0.1));
-        box-shadow: var(--tw-inset-shadow), var(--tw-inset-ring-shadow), var(--tw-ring-offset-shadow), var(--tw-ring-shadow), var(--tw-shadow);
+        border-color: color-mix(in srgb, #1769e8 50%, transparent);
+        @supports (color: color-mix(in lab, red, red)) {
+          border-color: color-mix(in oklab, var(--color-primary) 50%, transparent);
+        }
       }
     }
   }
+  body.admin-portal .tile:hover {
+    box-shadow: 0 0 0 1px rgba(23,105,232,.22), 0 14px 32px rgba(23,105,232,.16);
+  }
   body.admin-portal .tile-ico {
     display: inline-flex;
-    height: calc(var(--spacing) * 9);
-    width: calc(var(--spacing) * 9);
+    height: calc(var(--spacing) * 11);
+    width: calc(var(--spacing) * 11);
     flex-shrink: 0;
     align-items: center;
     justify-content: center;
@@ -3527,15 +3584,16 @@
     color: var(--color-white);
   }
   body.admin-portal .tile-ico svg {
-    height: 18px;
-    width: 18px;
+    height: calc(var(--spacing) * 5);
+    width: calc(var(--spacing) * 5);
   }
   body.admin-portal .tile .n {
-    font-size: 21px;
+    font-size: 23px;
     --tw-leading: var(--leading-tight);
     line-height: var(--leading-tight);
     --tw-font-weight: var(--font-weight-extrabold);
     font-weight: var(--font-weight-extrabold);
+    color: var(--color-navy);
   }
   body.admin-portal .tile .t {
     margin-top: calc(var(--spacing) * 0.5);
