@@ -7,7 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/tailwind.css') }}">
   {% block extra_css %}{% endblock %}
 </head>
 <body class="{% block body_class %}{% endblock %}">
@@ -31,7 +31,7 @@
     {% endwith %}
     {% block content %}{% endblock %}
   </main>
-  <footer class="site-foot">
+  <footer class="py-6 pb-8 text-center text-xs text-muted">
     <div class="wrap">&copy; 2026 Advanced Studies Office — Student Data Management System</div>
   </footer>
   </div>
@@ -46,8 +46,8 @@
       <h3>Please Confirm</h3>
       <p id="confirmMsg"></p>
       <div class="modal-actions">
-        <button type="button" class="btn ghost" id="confirmCancel">Cancel</button>
-        <button type="button" class="btn danger" id="confirmOk">Yes, Continue</button>
+        <button type="button" class="inline-flex cursor-pointer items-center justify-center gap-2 rounded-[10px] border-[1.5px] border-indigo-200 bg-white px-5 py-3 text-[15px] font-semibold text-primary hover:border-primary hover:bg-blue-50" id="confirmCancel">Cancel</button>
+        <button type="button" class="inline-flex cursor-pointer items-center justify-center gap-2 rounded-[10px] border-[1.5px] border-red-200 bg-white px-5 py-3 text-[15px] font-semibold text-red-700 hover:border-red-700 hover:bg-red-50" id="confirmOk">Yes, Continue</button>
       </div>
     </div>
   </div>
@@ -62,7 +62,7 @@
       <h3>Work Done!</h3>
       <p id="successMsg"></p>
       <div class="modal-actions" style="justify-content:center">
-        <button type="button" class="btn primary" id="successOk">OK</button>
+        <button type="button" class="inline-flex cursor-pointer items-center justify-center gap-2 rounded-[10px] border-[1.5px] border-primary bg-primary px-5 py-3 text-[15px] font-semibold text-white hover:border-navy hover:bg-navy" id="successOk">OK</button>
       </div>
     </div>
   </div>
