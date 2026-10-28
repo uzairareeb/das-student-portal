@@ -1753,6 +1753,20 @@ def admin_viva_export_pdf():
     return resp
 
 
+TASK_LABELS = {
+    "student_add": "Student added", "student_edit": "Student record updated",
+    "student_delete": "Student deleted", "student_bulk_delete": "Students deleted (bulk)",
+    "student_bulk_update": "Bulk update applied", "student_delete_all": "All students deleted",
+    "import": "Students imported", "upload_approve": "Department upload approved",
+    "upload_reject": "Department upload rejected", "upload": "File uploaded (department)",
+    "doc_upload": "Document uploaded", "doc_delete": "Document deleted",
+    "department_add": "Department added", "department_edit": "Department updated",
+    "department_delete": "Department deleted", "viva_add": "Viva record added",
+    "viva_edit": "Viva record updated", "viva_delete": "Viva record deleted",
+    "viva_bulk": "Viva records added (bulk)",
+}
+
+
 @app.route("/admin/notifications")
 @admin_required
 def admin_notifications():
@@ -1760,10 +1774,16 @@ def admin_notifications():
     db = get_db()
     notes = [dict(r) for r in db.fetchall(
         "SELECT * FROM admin_notifications ORDER BY id DESC LIMIT 50")]
+    tasks = [dict(r) for r in db.fetchall(
+        "SELECT actor, action, detail, created_at FROM activity_log"
+        " WHERE action != 'login' ORDER BY id DESC LIMIT 50")]
+    for task in tasks:
+        task["label"] = TASK_LABELS.get(task["action"],
+                                        task["action"].replace("_", " ").title())
     db.execute("UPDATE admin_notifications SET is_read=1")
     db.commit()
     return render_template("admin_notifications.html", uni=UNI_NAME,
-                           title=PORTAL_TITLE, notes=notes)
+                           title=PORTAL_TITLE, notes=notes, tasks=tasks)
 
 
 @app.route("/admin/viva/card/<int:vid>")

@@ -1,10 +1,31 @@
 {% extends "admin_base.html" %}
-{% block container_extra %} wide{% endblock %}
+{% block container_extra %} wide<div class="card section" style="margin-top: 22px">
+  <h3 style="margin: 0 0 4px">Recently Performed Tasks</h3>
+  <p class="muted" style="margin: 0 0 14px">Every action taken in the system — student additions, edits, imports, approvals and more.</p>
+  {% if tasks %}
+  <div class="doc-list">
+    {% for task in tasks %}
+    <div class="doc-row">
+      <span class="doc-icon notif-icon kind-info">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+      </span>
+      <div class="doc-meta">
+        <div class="doc-name">{{ task.label }}{% if task.detail %} — {{ task.detail }}{% endif %}</div>
+        <div class="doc-sub">By {{ task.actor }} · {{ task.created_at }}</div>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+  {% else %}
+  <div class="empty"><p>No tasks performed yet.</p></div>
+  {% endif %}
+</div>
+{% endblock %}
 {% block content %}
 <div class="page-head">
   <div>
     <h2>Notifications</h2>
-    <p>Updates from departments — viva entries, uploads and more</p>
+    <p>Updates from departments — viva entries, uploads and more — plus every task performed in the system</p>
   </div>
 </div>
 

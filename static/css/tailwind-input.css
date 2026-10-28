@@ -67,7 +67,7 @@
   @media (max-width: 960px) {
     .container { @apply py-7 pb-14; }
   }
-  .topbar { @apply border-b border-line bg-white py-3 text-ink shadow-sm; }
+  .topbar { @apply sticky top-0 z-[100] border-b border-line bg-white py-3 text-ink shadow-sm; }
   .topbar .wrap { @apply flex items-center; }
   .brand { @apply flex items-center gap-3.5; }
   .brand-mark {
@@ -524,25 +524,25 @@
   body.admin-portal .tile.t-blue { @apply bg-white; }
   body.admin-portal .tile.t-blue .tile-ico { @apply bg-primary; }
   body.admin-portal .tile.t-green { @apply bg-white; }
-  body.admin-portal .tile.t-green .tile-ico { @apply bg-white; }
+  body.admin-portal .tile.t-green .tile-ico { @apply bg-emerald-700; }
   body.admin-portal .tile.t-green2 { @apply bg-white; }
-  body.admin-portal .tile.t-green2 .tile-ico { @apply bg-white; }
+  body.admin-portal .tile.t-green2 .tile-ico { @apply bg-emerald-600; }
   body.admin-portal .tile.t-amber { @apply bg-white; }
-  body.admin-portal .tile.t-amber .tile-ico { @apply bg-white; }
-  body.admin-portal .tile.t-purple { @apply bg-lavender; }
+  body.admin-portal .tile.t-amber .tile-ico { @apply bg-amber-600; }
+  body.admin-portal .tile.t-purple { @apply bg-white; }
   body.admin-portal .tile.t-purple .tile-ico { @apply bg-accent; }
-  body.admin-portal .tile.t-purple2 { @apply bg-lavender; }
-  body.admin-portal .tile.t-purple2 .tile-ico { @apply bg-white; }
+  body.admin-portal .tile.t-purple2 { @apply bg-white; }
+  body.admin-portal .tile.t-purple2 .tile-ico { @apply bg-violet-600; }
   body.admin-portal .tile.t-red { @apply bg-white; }
-  body.admin-portal .tile.t-red .tile-ico { @apply bg-white; }
+  body.admin-portal .tile.t-red .tile-ico { @apply bg-red-700; }
   body.admin-portal .tile.t-red2 { @apply bg-white; }
-  body.admin-portal .tile.t-red2 .tile-ico { @apply bg-white; }
+  body.admin-portal .tile.t-red2 .tile-ico { @apply bg-rose-600; }
   body.admin-portal .tile.t-blue2 { @apply bg-white; }
-  body.admin-portal .tile.t-blue2 .tile-ico { @apply bg-white; }
+  body.admin-portal .tile.t-blue2 .tile-ico { @apply bg-blue-600; }
   body.admin-portal .tile.t-blue3 { @apply bg-white; }
-  body.admin-portal .tile.t-blue3 .tile-ico { @apply bg-white; }
+  body.admin-portal .tile.t-blue3 .tile-ico { @apply bg-sky-600; }
   body.admin-portal .tile.t-slate { @apply bg-white; }
-  body.admin-portal .tile.t-slate .tile-ico { @apply bg-white; }
+  body.admin-portal .tile.t-slate .tile-ico { @apply bg-slate-600; }
   body.admin-portal .quick-list { @apply flex flex-col gap-2.5; }
   body.admin-portal .quick-row { @apply flex items-center gap-3 rounded-xl border border-line bg-white px-3 py-3 text-ink no-underline hover:bg-slate-50; }
   body.admin-portal .q-ico { @apply inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-[10px] text-base font-extrabold text-white; }
