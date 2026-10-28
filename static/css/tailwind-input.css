@@ -447,6 +447,23 @@
   /* ---------- admin dashboard (Minimal Academic refresh) ---------- */
   body.admin-portal .container { @apply pt-8 pb-16; }
   body.admin-portal .page-head { @apply mb-6; }
+  /* ---------- admin premium: organised buttons, heads, cards, tables ---------- */
+  body.admin-portal .page-head h2 { @apply relative pb-2.5 text-navy; }
+  body.admin-portal .page-head h2::after { @apply absolute bottom-0 left-0 h-[3px] w-11 rounded-full bg-gradient-to-r from-navy via-primary to-accent; content: ""; }
+  body.admin-portal .page-head > div:not(:first-child) { @apply flex flex-wrap items-center gap-2; }
+  body.admin-portal .btn.primary { @apply border-transparent bg-gradient-to-r from-primary to-secondary shadow-md hover:border-transparent hover:from-navy hover:to-primary; }
+  body.admin-portal .btn { @apply shadow-sm; }
+  body.admin-portal .card:not(.dash-card) { @apply rounded-[16px] shadow-md; }
+  body.admin-portal .filters { @apply rounded-[14px] border border-line bg-[#f7f9fc] p-4; }
+  body.admin-portal tbody tr:hover { @apply bg-soft; }
+  body.admin-portal .modal { @apply rounded-[16px]; }
+  /* ---------- professional login pages ---------- */
+  body.auth-page { background: linear-gradient(160deg, #eaf2ff 0%, #f7f9fc 45%, #f0edff 100%); background-attachment: fixed; }
+  .auth-card.premium { @apply rounded-[22px] shadow-xl; }
+  .auth-card.premium::before { @apply bg-gradient-to-r from-navy via-primary to-accent; }
+  .auth-card.premium .auth-icon { @apply bg-[linear-gradient(135deg,#eaf2ff,#f0edff)] text-primary shadow-sm ring-1 ring-line; }
+  .auth-card.premium h2 { @apply text-navy; }
+  .auth-card.premium .btn.primary { @apply border-transparent bg-gradient-to-r from-primary to-accent shadow-md hover:border-transparent hover:from-navy hover:to-primary; }
   body.admin-portal .card.section { @apply mb-6 rounded-2xl p-6; }
   body.admin-portal .admin-head { @apply items-start; }
   body.admin-portal .admin-search { @apply flex gap-2; }
