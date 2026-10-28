@@ -322,6 +322,7 @@ def init_db():
     _migrate_add_viva_admin_seen(db)
     _migrate_add_viva_marks(db)
     _migrate_add_thesis_dates(db)
+    _fix_passout_rows(db)
     # Admin password comes from the env var (source of truth), stored hashed.
     pw_hash = generate_password_hash(
         os.environ.get("ADMIN_PASSWORD", "admin123") or "admin123")
@@ -448,6 +449,25 @@ def _migrate_add_thesis_dates(db):
                         "final_thesis_at"):
                 if col not in cols:
                     db.execute(f"ALTER TABLE students ADD COLUMN {col} TEXT")
+        db.commit()
+    except Exception:
+        try:
+            db.conn.rollback()
+        except Exception:
+            pass
+
+
+def _fix_passout_rows(db):
+    """Pass Out students always show folder + synopsis + both theses complete.
+    Applies to rows already in the DB (e.g. uploaded before this rule) and
+    is safe to rerun: it only touches Pass Out rows that are not yet complete,
+    and never writes any received-on date."""
+    try:
+        db.execute("""UPDATE students SET folder_file='Completed',
+            synopsis='Received', semi_final_thesis='Received',
+            final_thesis='Received' WHERE status='Pass Out'
+            AND (folder_file<>'Completed' OR synopsis<>'Received'
+            OR semi_final_thesis<>'Received' OR final_thesis<>'Received')""")
         db.commit()
     except Exception:
         try:
@@ -599,9 +619,9 @@ def _thesis_stamp(new_status, posted_raw, old_status, old_val):
 
 
 def pick(val, options, default):
-    v = (val or "").strip()
+    v = (val or "").strip().replace(" ", "").lower()
     for o in options:
-        if v.lower() == o.lower():
+        if v == o.replace(" ", "").lower():
             return o
     return default
 
@@ -1222,6 +1242,9 @@ def parse_import_rows(file_storage):
         rec["final_thesis"] = pick(rec.get("final_thesis"), RECEIVED_OPTS,
                                    "Not Received")
         rec["status"] = pick(rec.get("status"), STATUS_LIST, "Continue")
+        if rec["status"] == "Pass Out":
+            rec["folder_file"] = "Completed"
+            rec["synopsis"] = rec["semi_final_thesis"] = rec["final_thesis"] = "Received"
         cm = rec.get("comments_missing", "").strip()
         rec["comments_missing"] = cm if cm else "N/A"
         rec["thesis_forward_coe"] = parse_coe(rec.get("thesis_forward_coe")) or None
@@ -2602,6 +2625,10 @@ def admin_student_new():
                                    received=RECEIVED_OPTS)
         db = get_db()
         now = datetime.now().strftime("%Y-%m-%d %H:%M")
+        if pick(f.get("status"), STATUS_LIST, "Continue") == "Pass Out":
+            f = dict(f)
+            f["folder_file"] = "Completed"
+            f["synopsis"] = f["semi_final_thesis"] = f["final_thesis"] = "Received"
         try:
             db.execute(
                 """INSERT INTO students (cnic, name, father_name, reg_no, gender,
@@ -2693,6 +2720,13 @@ def admin_student_save(sid):
     final_at = _thesis_stamp(final_status, f.get("final_thesis_at"),
                              s.get("final_thesis"),
                              s.get("final_thesis_at"))
+    if pick(f.get("status"), STATUS_LIST, "Continue") == "Pass Out":
+        syn_status = semi_status = final_status = "Received"
+        syn_at, semi_at, final_at = (s.get("synopsis_at"),
+                                     s.get("semi_final_thesis_at"),
+                                     s.get("final_thesis_at"))
+        f = dict(f)
+        f["folder_file"] = "Completed"
     dept = (f.get("department") or "").strip()
     if dept and dept not in set(dept_names()):
         dept = (s.get("department") or "").strip()  # ignore tampered values
@@ -2818,6 +2852,11 @@ def admin_students_bulk_update():
         vals.append(pick(status, STATUS_LIST, "Continue"))
         sets.append("status=?")
         done.append(f"status '{vals[-1]}'")
+        if vals[-1] == "Pass Out":
+            sets += ["folder_file=?", "synopsis=?",
+                     "semi_final_thesis=?", "final_thesis=?"]
+            vals += ["Completed", "Received", "Received", "Received"]
+            done.append("folder + synopsis + theses marked complete")
     if coe_raw:
         coe = parse_coe(coe_raw)
         if coe:
