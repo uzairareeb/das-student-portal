@@ -1,0 +1,100 @@
+{% extends "student_base.html" %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <h2>Student Profile Sheet</h2>
+    <p>{{ s.name }} &middot; {{ s.reg_no }} &middot; Printable one-page record</p>
+  </div>
+  <div class="no-print">
+    <button type="button" class="btn primary sm" onclick="window.print()">Print / Save as PDF</button>
+  </div>
+</div>
+
+<div class="card section">
+  <div class="section-head">
+    <span class="section-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></span>
+    <h3>{{ uni }}</h3>
+  </div>
+  <p class="hint">Directorate of Advanced Studies &middot; Student Profile Sheet</p>
+  <dl class="record-list">
+    <div><dt>Name</dt><dd>{{ s.name }}</dd></div>
+    <div><dt>Registration No.</dt><dd>{{ s.reg_no }}</dd></div>
+    <div><dt>CNIC</dt><dd>{{ s.cnic }}</dd></div>
+    <div><dt>Father Name</dt><dd>{{ s.father_name or '—' }}</dd></div>
+    <div><dt>Gender</dt><dd>{{ s.gender or '—' }}</dd></div>
+    <div><dt>Degree</dt><dd>{{ s.degree or '—' }}</dd></div>
+    <div><dt>Session</dt><dd>{{ s.session or '—' }}</dd></div>
+    <div><dt>Department</dt><dd>{{ s.department or '—' }}</dd></div>
+    <div><dt>Status</dt><dd>{{ s.status or '—' }}</dd></div>
+  </dl>
+</div>
+
+<div class="card section">
+  <div class="section-head">
+    <span class="section-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg></span>
+    <h3>Academic Progress</h3>
+  </div>
+  <dl class="record-list">
+    <div><dt>Folder / File</dt><dd>{% if s.folder_file == 'Completed' %}<span class="pill q">Completed</span>{% else %}<span class="pill nq">Not Completed</span>{% endif %}</dd></div>
+    <div><dt>Synopsis</dt><dd>{% if s.synopsis == 'Received' %}<span class="pill q">Received</span>{% if s.synopsis_display %} ({{ s.synopsis_display }}){% endif %}{% else %}<span class="pill nq">Not Received</span>{% endif %}</dd></div>
+    <div><dt>Semi-Final Thesis</dt><dd>{% if s.semi_final_thesis == 'Received' %}<span class="pill q">Received</span>{% if s.semi_display %} ({{ s.semi_display }}){% endif %}{% else %}<span class="pill nq">Not Received</span>{% endif %}</dd></div>
+    <div><dt>Final Thesis</dt><dd>{% if s.final_thesis == 'Received' %}<span class="pill q">Received</span>{% if s.final_display %} ({{ s.final_display }}){% endif %}{% else %}<span class="pill nq">Not Received</span>{% endif %}</dd></div>
+    <div><dt>Thesis Forward (COE)</dt><dd>{{ s.coe_display }}</dd></div>
+    <div><dt>Comments (Missing)</dt><dd>{{ s.comments_missing or '—' }}</dd></div>
+  </dl>
+</div>
+
+<div class="card section">
+  <div class="section-head">
+    <span class="section-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg></span>
+    <h3>Viva Records <span class="hint">({{ vivas|length }})</span></h3>
+  </div>
+  {% if vivas %}
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Date</th><th>Examiner</th><th>Result</th><th>Marks</th></tr></thead>
+      <tbody>
+        {% for v in vivas %}
+        <tr>
+          <td>{{ v.viva_date or '—' }}</td>
+          <td>{{ v.examiner_name or '—' }}{% if v.examiner_affiliation %} ({{ v.examiner_affiliation }}){% endif %}</td>
+          <td>{{ v.result or '—' }}</td>
+          <td>{% if v.obtained_marks is not none %}{{ v.obtained_marks }}/{{ v.total_marks or 120 }}{% else %}—{% endif %}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="empty"><p>No viva records yet.</p></div>
+  {% endif %}
+</div>
+
+<div class="card section">
+  <div class="section-head">
+    <span class="section-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg></span>
+    <h3>Documents <span class="hint">({{ docs|length }})</span></h3>
+  </div>
+  {% if docs %}
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Document</th><th>File</th><th>Uploaded</th><th>Status</th><th>Office Remark</th></tr></thead>
+      <tbody>
+        {% for d in docs %}
+        <tr>
+          <td>{{ d.doc_label }}</td>
+          <td>{{ d.file_name }}</td>
+          <td>{{ d.uploaded_at }}</td>
+          <td>{% if d.status == 'Verified' %}<span class="pill q">Verified</span>{% else %}<span class="pill warn">Pending</span>{% endif %}</td>
+          <td>{{ d.remark or '—' }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="empty"><p>No documents yet.</p></div>
+  {% endif %}
+  <p class="hint">This sheet is generated from the office record. If anything looks wrong, contact the DAS office.</p>
+</div>
+{% endblock %}

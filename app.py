@@ -337,6 +337,7 @@ def init_db():
     _migrate_add_viva_admin_seen(db)
     _migrate_add_viva_marks(db)
     _migrate_add_thesis_dates(db)
+    _migrate_add_doc_status(db)
     _fix_passout_rows(db)
     # Admin password comes from the env var (source of truth), stored hashed.
     pw_hash = generate_password_hash(
@@ -470,6 +471,26 @@ def _migrate_add_thesis_dates(db):
             db.conn.rollback()
         except Exception:
             pass
+
+
+def _migrate_add_doc_status(db):
+    """Add documents.status / remark for the verification workflow."""
+    try:
+        if USE_PG:
+            db.execute("ALTER TABLE documents ADD COLUMN IF NOT EXISTS"
+                       " status TEXT DEFAULT 'Pending'")
+            db.execute("ALTER TABLE documents ADD COLUMN IF NOT EXISTS"
+                       " remark TEXT")
+        else:
+            cols = [r[1] for r in db.fetchall("PRAGMA table_info(documents)")]
+            if "status" not in cols:
+                db.execute("ALTER TABLE documents ADD COLUMN"
+                           " status TEXT DEFAULT 'Pending'")
+            if "remark" not in cols:
+                db.execute("ALTER TABLE documents ADD COLUMN remark TEXT")
+        db.commit()
+    except Exception:
+        pass
 
 
 def _fix_passout_rows(db):
@@ -1775,6 +1796,7 @@ TASK_LABELS = {
     "import": "Students imported", "upload_approve": "Department upload approved",
     "upload_reject": "Department upload rejected", "upload": "File uploaded (department)",
     "doc_upload": "Document uploaded", "doc_delete": "Document deleted",
+    "doc_verify": "Document status updated",
     "department_add": "Department added", "department_edit": "Department updated",
     "department_delete": "Department deleted", "viva_add": "Viva record added",
     "viva_edit": "Viva record updated", "viva_delete": "Viva record deleted",
@@ -2484,8 +2506,16 @@ def dept_viva_delete(vid):
         "SELECT v.id FROM viva_records v JOIN students s ON s.id=v.student_id"
         " WHERE v.id=? AND s.department=?", (vid, dept["name"]))
     if row:
+        vrow = db.fetchone(
+            "SELECT v.student_id, s.name FROM viva_records v"
+            " JOIN students s ON s.id=v.student_id WHERE v.id=?", (vid,))
         db.execute("DELETE FROM viva_records WHERE id=?", (vid,))
         db.commit()
+        if vrow:
+            notify_student(vrow["student_id"] if isinstance(vrow, dict) else vrow[0],
+                           "viva", "Viva record removed",
+                           "Your viva record was removed by your department.",
+                           url_for("student_viva"))
         log_activity(f"dept:{dept['name']}", "viva_delete",
                      f"viva record #{vid} removed")
         flash("Viva record deleted.")
@@ -2646,7 +2676,7 @@ def get_student(sid):
 
 def get_docs(sid):
     rows = get_db().fetchall(
-        "SELECT id, student_id, doc_label, file_name, mime_type, uploaded_by,"
+        "SELECT id, student_id, doc_label, file_name, mime_type, status, remark, uploaded_by,"
         " uploaded_at, LENGTH(file_data) AS size FROM documents"
         " WHERE student_id=? ORDER BY uploaded_at DESC, id DESC", (sid,))
     return [dict(r) for r in rows]
@@ -3134,6 +3164,29 @@ def admin_doc_download(doc_id):
                              f'attachment; filename="{safe_filename(r.get("file_name"))}"'})
 
 
+@app.route("/admin/document/<int:doc_id>/verify", methods=["POST"])
+@admin_required
+def admin_doc_verify(doc_id):
+    """Set a document's verification status + admin remark."""
+    db = get_db()
+    row = db.fetchone("SELECT * FROM documents WHERE id=?", (doc_id,))
+    if not row:
+        flash("Document not found.")
+        return redirect(url_for("admin_students"))
+    status = request.form.get("status", "Pending")
+    if status not in ("Pending", "Verified"):
+        status = "Pending"
+    remark = (request.form.get("remark") or "").strip()
+    db.execute("UPDATE documents SET status=?, remark=? WHERE id=?",
+               (status, remark, doc_id))
+    db.commit()
+    sid = row["student_id"] if isinstance(row, dict) else row[1]
+    log_activity("admin", "doc_verify",
+                 f"doc #{doc_id} -> {status} (student id={sid})")
+    flash(f"Document marked as {status}.")
+    return redirect(url_for("admin_student_profile", sid=sid))
+
+
 @app.route("/admin/doc/<int:doc_id>/delete", methods=["POST"])
 @admin_required
 def admin_doc_delete(doc_id):
@@ -3238,6 +3291,28 @@ def student_record():
     s["coe_display"] = fmt_coe(s.get("thesis_forward_coe"))
     return render_template("student_record.html", uni=UNI_NAME,
                            title=PORTAL_TITLE, s=s)
+
+
+@app.route("/student/profile-sheet")
+@student_required
+def student_profile_sheet():
+    """One-page printable record: identity, progress, vivas, documents."""
+    s = current_student()
+    if not s:
+        session.pop("student_id", None)
+        return redirect(url_for("student_login"))
+    s["coe_display"] = fmt_coe(s.get("thesis_forward_coe"))
+    s["synopsis_display"] = fmt_stamp(s.get("synopsis_at"))
+    s["semi_display"] = fmt_stamp(s.get("semi_final_thesis_at"))
+    s["final_display"] = fmt_stamp(s.get("final_thesis_at"))
+    vivas = [dict(r) for r in get_db().fetchall(
+        "SELECT id, examiner_name, examiner_affiliation, viva_date, result,"
+        " remarks, total_marks, obtained_marks, next_viva_date"
+        " FROM viva_records WHERE student_id=? ORDER BY id DESC",
+        (s["id"],))]
+    docs = get_docs(s["id"])
+    return render_template("student_profile_sheet.html", uni=UNI_NAME,
+                           title=PORTAL_TITLE, s=s, vivas=vivas, docs=docs)
 
 
 @app.route("/student/viva")

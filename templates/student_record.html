@@ -5,6 +5,9 @@
     <h2>My Profile</h2>
     <p>{{ s.name }} &middot; {{ s.reg_no }}</p>
   </div>
+  <div class="no-print">
+    <a class="btn primary sm" href="{{ url_for('student_profile_sheet') }}">Print Profile Sheet</a>
+  </div>
 </div>
 
 <div class="card section">

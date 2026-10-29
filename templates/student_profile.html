@@ -211,7 +211,15 @@
       <span class="doc-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg></span>
       <div class="doc-meta">
         <div class="doc-name">{{ d.doc_label }} — {{ d.file_name }}</div>
-        <div class="doc-sub">Uploaded by {{ d.uploaded_by }} &middot; {{ d.uploaded_at }}{% if d.size %} &middot; {{ (d.size/1024)|round(1) }} KB{% endif %}</div>
+        <div class="doc-sub">Uploaded by {{ d.uploaded_by }} &middot; {{ d.uploaded_at }}{% if d.size %} &middot; {{ (d.size/1024)|round(1) }} KB{% endif %} &middot; {% if d.status == 'Verified' %}<span class="pill q">Verified</span>{% else %}<span class="pill warn">Pending</span>{% endif %}{% if d.remark %} &middot; Remark: {{ d.remark }}{% endif %}</div>
+        <form class="doc-verify" method="post" action="{{ url_for('admin_doc_verify', doc_id=d.id) }}">
+          <select name="status" class="no-icon" aria-label="Document status">
+            <option value="Pending" {% if d.status != 'Verified' %}selected{% endif %}>Pending</option>
+            <option value="Verified" {% if d.status == 'Verified' %}selected{% endif %}>Verified</option>
+          </select>
+          <input type="text" name="remark" class="no-icon" placeholder="Remark (optional)" value="{{ d.remark or '' }}">
+          <button type="submit" class="btn ghost sm">Save</button>
+        </form>
       </div>
       <a class="btn ghost sm" href="{{ url_for('admin_doc_download', doc_id=d.id) }}">Download</a>
       <form method="post" action="{{ url_for('admin_doc_delete', doc_id=d.id) }}" style="margin:0">

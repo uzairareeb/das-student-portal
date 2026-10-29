@@ -2022,6 +2022,23 @@
     line-height: var(--tw-leading, var(--text-xs--line-height));
     color: var(--color-muted);
   }
+  .doc-verify {
+    margin-top: calc(var(--spacing) * 2);
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: calc(var(--spacing) * 2);
+  }
+  .doc-verify select, .doc-verify input {
+    height: calc(var(--spacing) * 9);
+    padding-block: var(--spacing);
+    font-size: var(--text-sm);
+    line-height: var(--tw-leading, var(--text-sm--line-height));
+  }
+  .doc-verify input {
+    min-width: 180px;
+    flex: 1;
+  }
   .profile-grid {
     display: grid;
     grid-template-columns: repeat(1, minmax(0, 1fr));
