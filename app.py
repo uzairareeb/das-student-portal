@@ -217,6 +217,21 @@ def init_db():
         )
     """)
     db.execute(f"""
+        CREATE TABLE IF NOT EXISTS deleted_students (
+            {id_pg if USE_PG else id_lite},
+            orig_id INTEGER,
+            name TEXT,
+            reg_no TEXT,
+            cnic TEXT,
+            degree TEXT,
+            department TEXT,
+            status TEXT,
+            data_json TEXT,
+            deleted_at TEXT,
+            deleted_by TEXT
+        )
+    """)
+    db.execute(f"""
         CREATE TABLE IF NOT EXISTS documents (
             {id_pg if USE_PG else id_lite},
             student_id INTEGER NOT NULL REFERENCES students(id),
@@ -1854,7 +1869,12 @@ def inject_admin_counts():
             row = db.fetchone(
                 "SELECT COUNT(*) AS n FROM viva_records WHERE admin_seen=0")
             nv = (row["n"] if isinstance(row, dict) else row[0]) if row else 0
-            return {"pending_uploads": n, "new_vivas": nv}
+            try:
+                trow = db.fetchone("SELECT COUNT(*) AS n FROM deleted_students")
+                tc = (trow["n"] if isinstance(trow, dict) else trow[0]) if trow else 0
+            except Exception:
+                tc = 0
+            return {"pending_uploads": n, "new_vivas": nv, "trash_count": tc}
         except Exception:
             pass
     return {"pending_uploads": 0, "new_vivas": 0}
@@ -2796,6 +2816,162 @@ def admin_student_save(sid):
     return redirect(nxt or url_for("admin_student_profile", sid=sid))
 
 
+import base64 as _b64
+import json as _json
+
+
+def _row_jsonable(row):
+    out = {}
+    for k, v in dict(row).items():
+        if isinstance(v, (bytes, bytearray)):
+            out[k] = {"__b64__": _b64.b64encode(bytes(v)).decode("ascii")}
+        else:
+            out[k] = v
+    return out
+
+
+def _row_unjsonable(data):
+    out = {}
+    for k, v in (data or {}).items():
+        if isinstance(v, dict) and "__b64__" in v:
+            out[k] = _b64.b64decode(v["__b64__"])
+        else:
+            out[k] = v
+    return out
+
+
+def _trash_student_rows(db, rows, by="admin"):
+    """Move full student rows (plus their documents + viva records) to the bin."""
+    now = datetime.now().strftime("%Y-%m-%d %H:%M")
+    for row in rows:
+        sid = row["id"]
+        docs = [_row_jsonable(r) for r in db.fetchall(
+            "SELECT * FROM documents WHERE student_id=?", (sid,))]
+        vivas = [_row_jsonable(r) for r in db.fetchall(
+            "SELECT * FROM viva_records WHERE student_id=?", (sid,))]
+        payload = _json.dumps({"student": _row_jsonable(row),
+                               "documents": docs, "vivas": vivas})
+        db.execute(
+            "INSERT INTO deleted_students (orig_id, name, reg_no, cnic, degree,"
+            " department, status, data_json, deleted_at, deleted_by)"
+            " VALUES (?,?,?,?,?,?,?,?,?,?)",
+            (sid, row.get("name"), row.get("reg_no"), row.get("cnic"),
+             row.get("degree"), row.get("department"), row.get("status"),
+             payload, now, by))
+
+
+def _restore_trash_row(db, trash):
+    """Re-insert a trashed student (+ documents + vivas). Returns restored id or None."""
+    payload = _json.loads(trash["data_json"])
+    student = _row_unjsonable(payload.get("student") or {})
+    orig_id = student.pop("id", None)
+    if orig_id is not None:
+        exists = db.fetchone("SELECT id FROM students WHERE id=?", (orig_id,))
+    else:
+        exists = True
+    cols = list(student.keys())
+    if not cols:
+        return None
+    if not exists:
+        cols = ["id"] + cols
+        vals = [orig_id] + [student[k] for k in student]
+    else:
+        vals = [student[k] for k in cols]
+    ph = ", ".join(["?"] * len(cols))
+    if not exists:
+        db.execute(f"INSERT INTO students ({', '.join(cols)}) VALUES ({ph})", vals)
+        new_id = orig_id
+    elif USE_PG:
+        new_id = db.execute(
+            f"INSERT INTO students ({', '.join(cols)}) VALUES ({ph}) RETURNING id",
+            vals).fetchone()["id"]
+    else:
+        new_id = db.execute(
+            f"INSERT INTO students ({', '.join(cols)}) VALUES ({ph})", vals).lastrowid
+    for doc in payload.get("documents") or []:
+        doc = _row_unjsonable(doc)
+        doc.pop("id", None)
+        doc["student_id"] = new_id
+        dc = list(doc.keys())
+        db.execute(f"INSERT INTO documents ({', '.join(dc)})"
+                   f" VALUES ({', '.join(['?'] * len(dc))})",
+                   [doc[k] for k in dc])
+    for viva in payload.get("vivas") or []:
+        viva = _row_unjsonable(viva)
+        viva.pop("id", None)
+        viva["student_id"] = new_id
+        vc = list(viva.keys())
+        db.execute(f"INSERT INTO viva_records ({', '.join(vc)})"
+                   f" VALUES ({', '.join(['?'] * len(vc))})",
+                   [viva[k] for k in vc])
+    return new_id
+
+
+@app.route("/admin/trash")
+@admin_required
+def admin_trash():
+    """Recycle bin: deleted students, restorable for 30 days."""
+    db = get_db()
+    cutoff = (datetime.now() - timedelta(days=30)).strftime("%Y-%m-%d %H:%M")
+    db.execute("DELETE FROM deleted_students WHERE deleted_at < ?", (cutoff,))
+    db.commit()
+    rows = [dict(r) for r in db.fetchall(
+        "SELECT * FROM deleted_students ORDER BY id DESC")]
+    now = datetime.now()
+    for row in rows:
+        try:
+            gone = datetime.strptime(row["deleted_at"], "%Y-%m-%d %H:%M")
+            row["days_left"] = max(0, 30 - (now - gone).days)
+        except Exception:
+            row["days_left"] = 30
+    return render_template("admin_trash.html", uni=UNI_NAME,
+                           title=PORTAL_TITLE, rows=rows)
+
+
+@app.route("/admin/trash/<int:tid>/restore", methods=["POST"])
+@admin_required
+def admin_trash_restore(tid):
+    db = get_db()
+    row = db.fetchone("SELECT * FROM deleted_students WHERE id=?", (tid,))
+    if not row:
+        flash("That item is no longer in the Recycle Bin.")
+        return redirect(url_for("admin_trash"))
+    try:
+        new_id = _restore_trash_row(db, dict(row))
+    except Exception:
+        db.rollback()
+        flash("Could not restore this student — the record may be incomplete.")
+        return redirect(url_for("admin_trash"))
+    if new_id is None:
+        flash("Could not restore this student — the record is empty.")
+        return redirect(url_for("admin_trash"))
+    db.execute("DELETE FROM deleted_students WHERE id=?", (tid,))
+    db.commit()
+    log_activity("admin", "student_restore", f"restored from trash (id={new_id})")
+    flash(f"Student restored from the Recycle Bin.")
+    return redirect(url_for("admin_trash"))
+
+
+@app.route("/admin/trash/<int:tid>/delete", methods=["POST"])
+@admin_required
+def admin_trash_delete(tid):
+    db = get_db()
+    db.execute("DELETE FROM deleted_students WHERE id=?", (tid,))
+    db.commit()
+    flash("Permanently deleted from the Recycle Bin.")
+    return redirect(url_for("admin_trash"))
+
+
+@app.route("/admin/trash/empty", methods=["POST"])
+@admin_required
+def admin_trash_empty():
+    db = get_db()
+    db.execute("DELETE FROM deleted_students")
+    db.commit()
+    flash("Recycle Bin emptied.")
+    return redirect(url_for("admin_trash"))
+
+
 @app.route("/admin/students/delete-selected", methods=["POST"])
 @admin_required
 def admin_students_delete_selected():
@@ -2805,12 +2981,15 @@ def admin_students_delete_selected():
         return redirect(url_for("admin_students"))
     db = get_db()
     ph = ", ".join(["?"] * len(ids))
+    rows = [dict(r) for r in db.fetchall(
+        f"SELECT * FROM students WHERE id IN ({ph})", ids)]
+    _trash_student_rows(db, rows)
     db.execute(f"DELETE FROM viva_records WHERE student_id IN ({ph})", ids)
     db.execute(f"DELETE FROM documents WHERE student_id IN ({ph})", ids)
     db.execute(f"DELETE FROM students WHERE id IN ({ph})", ids)
     db.commit()
     log_activity("admin", "student_bulk_delete", f"{len(ids)} student(s) deleted")
-    flash(f"Deleted {len(ids)} student(s) and their documents.")
+    flash(f"Deleted {len(ids)} student(s) — they are in the Recycle Bin for 30 days.")
     return redirect(url_for("admin_students"))
 
 
@@ -2907,12 +3086,14 @@ def admin_students_bulk_update():
 @admin_required
 def admin_students_delete_all():
     db = get_db()
+    rows = [dict(r) for r in db.fetchall("SELECT * FROM students")]
+    _trash_student_rows(db, rows)
     db.execute("DELETE FROM viva_records")
     db.execute("DELETE FROM documents")
     db.execute("DELETE FROM students")
     db.commit()
     log_activity("admin", "student_delete_all", "ALL students and documents deleted")
-    flash("All student data has been deleted.")
+    flash("All student data moved to the Recycle Bin for 30 days.")
     return redirect(url_for("admin_students"))
 
 
@@ -2920,12 +3101,15 @@ def admin_students_delete_all():
 @admin_required
 def admin_student_delete(sid):
     db = get_db()
+    row = db.fetchone("SELECT * FROM students WHERE id=?", (sid,))
+    if row:
+        _trash_student_rows(db, [dict(row)])
     db.execute("DELETE FROM viva_records WHERE student_id=?", (sid,))
     db.execute("DELETE FROM documents WHERE student_id=?", (sid,))
     db.execute("DELETE FROM students WHERE id=?", (sid,))
     db.commit()
     log_activity("admin", "student_delete", f"id={sid} and documents deleted")
-    flash("Student and their documents deleted.")
+    flash("Student moved to the Recycle Bin for 30 days.")
     return redirect(url_for("admin_students"))
 
 

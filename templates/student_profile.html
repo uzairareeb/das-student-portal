@@ -14,7 +14,7 @@
     <div class="sp-actions">
       <a class="btn light sm" href="{{ url_for('admin_students') }}">&larr; Back to List</a>
       <form method="post" action="{{ url_for('admin_student_delete', sid=s.id) }}" style="margin:0">
-        <button type="submit" class="btn outline-w sm" data-confirm="Delete {{ s.name }} and ALL their documents? This cannot be undone.">Delete Student</button>
+        <button type="submit" class="btn outline-w sm" data-confirm="Delete {{ s.name }}? The record will move to the Recycle Bin and can be restored within 30 days.">Delete Student</button>
       </form>
     </div>
   </div>

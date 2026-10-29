@@ -8,6 +8,13 @@
   </div>
 </div>
 
+<div class="chip-row">
+  <a class="chip{% if not f.get('status') %} active{% endif %}" href="{{ url_for('admin_students') }}">All Students</a>
+  {% for chip in ['Viva Pending', 'Sent to COE', 'Pass Out', 'Freeze'] %}
+  <a class="chip{% if f.get('status') == chip %} active{% endif %}" href="{{ url_for('admin_students', status=chip) }}">{{ chip }}</a>
+  {% endfor %}
+</div>
+
 <div class="card section">
   <form method="get" action="{{ url_for('admin_students') }}">
     <div class="filters">
@@ -85,7 +92,7 @@
   {% if students %}
   <form id="bulkForm" method="post" action="{{ url_for('admin_students_delete_selected') }}">
     <div class="bulk-bar">
-      <button type="submit" class="btn danger sm" data-confirm="Delete the SELECTED students and all their documents? This cannot be undone.">Delete Selected</button>
+      <button type="submit" class="btn danger sm" data-confirm="Delete the SELECTED students? They will move to the Recycle Bin and can be restored within 30 days.">Delete Selected</button>
       <span class="bulk-sep"></span>
       <select class="no-icon" name="bulk_status" aria-label="Status to apply" style="max-width:190px">
         <option value="">Set status…</option>
@@ -150,7 +157,7 @@
   </form>
   <div class="danger-zone">
     <form method="post" action="{{ url_for('admin_students_delete_all') }}" style="margin:0">
-      <button type="submit" class="btn danger sm" data-confirm="DELETE ALL STUDENT DATA? Every student and every document will be permanently removed. This cannot be undone!">Delete All Students</button>
+      <button type="submit" class="btn danger sm" data-confirm="DELETE ALL STUDENT DATA? Every student and every document will move to the Recycle Bin for 30 days.">Delete All Students</button>
     </form>
     <span class="hint">Removes every student record and all uploaded documents.</span>
   </div>

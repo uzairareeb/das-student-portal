@@ -180,6 +180,9 @@
   @media (max-width: 1100px) {
     .form-grid.form-wide { @apply md:grid-cols-2; }
   }
+  .chip-row { @apply mb-4 flex flex-wrap gap-2; }
+  .chip { @apply inline-flex items-center rounded-full border border-line bg-white px-4 py-2 text-[13.5px] font-semibold text-slate-600 no-underline transition-colors hover:border-primary hover:text-primary; }
+  .chip.active { @apply border-primary bg-primary text-white; }
   .filters { @apply grid grid-cols-1 items-end gap-3 md:grid-cols-2 xl:grid-cols-6; }
   .filters .btn { @apply px-[18px] py-3; }
   .filter-actions { @apply flex gap-2.5; }

@@ -1,0 +1,42 @@
+{% extends "admin_base.html" %}
+{% block container_extra %} wide{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <h2>Recycle Bin</h2>
+    <p>Deleted students stay here for 30 days, then are permanently removed. Restoring brings back the student record, their documents and viva records.</p>
+  </div>
+  {% if rows %}
+  <form method="post" action="{{ url_for('admin_trash_empty') }}">
+    <button type="submit" class="btn danger sm" data-confirm="Empty the entire Recycle Bin? Everything in it will be permanently deleted.">Empty Trash</button>
+  </form>
+  {% endif %}
+</div>
+
+<div class="card section">
+  {% if rows %}
+  <div class="doc-list">
+    {% for r in rows %}
+    <div class="doc-row">
+      <span class="doc-icon notif-icon kind-info">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+      </span>
+      <div class="doc-meta">
+        <div class="doc-name">{{ r.name }} <span class="hint">({{ r.reg_no }})</span></div>
+        <div class="doc-sub">{{ r.degree or '' }}{% if r.department %} &middot; {{ r.department }}{% endif %} &middot; {{ r.status or '' }}</div>
+        <div class="doc-sub">Deleted {{ r.deleted_at }} &middot; {{ r.days_left }} day(s) left</div>
+      </div>
+      <form method="post" action="{{ url_for('admin_trash_restore', tid=r.id) }}">
+        <button type="submit" class="btn primary sm">Restore</button>
+      </form>
+      <form method="post" action="{{ url_for('admin_trash_delete', tid=r.id) }}">
+        <button type="submit" class="btn danger sm" data-confirm="Permanently delete {{ r.name }}? This cannot be undone.">Delete Forever</button>
+      </form>
+    </div>
+    {% endfor %}
+  </div>
+  {% else %}
+  <div class="empty"><p>Recycle Bin is empty.</p></div>
+  {% endif %}
+</div>
+{% endblock %}
