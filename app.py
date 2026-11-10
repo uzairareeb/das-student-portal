@@ -16,7 +16,7 @@ import io
 import os
 import re
 import sqlite3
-from datetime import datetime, date, timedelta
+from datetime import datetime, date, timedelta, timezone
 from functools import wraps
 from urllib.parse import urlencode
 
@@ -928,7 +928,13 @@ def admin_dashboard():
     def _cnt(sql, params=()):
         r = db.fetchone(sql, params)
         return (r["n"] if isinstance(r, dict) else r[0]) if r else 0
-    now = datetime.now()
+    # Pakistan time (server runs on UTC) — greeting + date must follow PKT.
+    try:
+        from zoneinfo import ZoneInfo
+        now = datetime.now(ZoneInfo("Asia/Karachi"))
+    except Exception:
+        # Pakistan is UTC+5 all year (no daylight saving).
+        now = datetime.now(timezone.utc) + timedelta(hours=5)
     pipeline = [
         ("Synopsis Received", _cnt(
             "SELECT COUNT(*) AS n FROM students WHERE synopsis='Received'")),
