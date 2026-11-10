@@ -8,41 +8,13 @@
   </div>
 </div>
 
-<div class="list-insights">
-  <a class="insight-tile{% if not f.get('status') and not f.get('overdue') and not f.get('needs_coe') and not f.get('q') %} active{% endif %}" href="{{ url_for('admin_students') }}">
-    <span class="insight-ico blue"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></span>
-    <span class="insight-num">{{ insights.total }}</span>
-    <span class="insight-label">Total Students</span>
-  </a>
-  <a class="insight-tile{% if f.get('status') == 'Viva Pending' %} active{% endif %}" href="{{ url_for('admin_students', status='Viva Pending') }}">
-    <span class="insight-ico amber"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></span>
-    <span class="insight-num">{{ insights.viva_pending }}</span>
-    <span class="insight-label">Viva Pending</span>
-  </a>
-  <a class="insight-tile{% if f.get('status') == 'Sent to COE' %} active{% endif %}" href="{{ url_for('admin_students', status='Sent to COE') }}">
-    <span class="insight-ico violet"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg></span>
-    <span class="insight-num">{{ insights.sent_to_coe }}</span>
-    <span class="insight-label">Sent to COE</span>
-  </a>
-  <a class="insight-tile smart{% if f.get('overdue') == '1' %} active{% endif %}" href="{{ url_for('admin_students', overdue='1') }}">
-    <span class="insight-ico pink"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l2.4 7.6L22 12l-7.6 2.4L12 22l-2.4-7.6L2 12l7.6-2.4L12 2z"/></svg></span>
-    <span class="insight-num">{{ insights.overdue }}</span>
-    <span class="insight-label">Synopsis Overdue</span>
-    <span class="insight-tag">Smart</span>
-  </a>
-  <a class="insight-tile smart{% if f.get('needs_coe') == '1' %} active{% endif %}" href="{{ url_for('admin_students', needs_coe='1') }}">
-    <span class="insight-ico teal"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg></span>
-    <span class="insight-num">{{ insights.needs_coe }}</span>
-    <span class="insight-label">Needs COE</span>
-    <span class="insight-tag">Smart</span>
-  </a>
-</div>
-
 <div class="chip-row">
   <a class="chip{% if not f.get('status') %} active{% endif %}" href="{{ url_for('admin_students') }}">All Students</a>
   {% for chip in ['Viva Pending', 'Sent to COE', 'Pass Out', 'Freeze'] %}
   <a class="chip{% if f.get('status') == chip %} active{% endif %}" href="{{ url_for('admin_students', status=chip) }}">{{ chip }}</a>
   {% endfor %}
+  <a class="chip smart{% if f.get('overdue') == '1' %} active{% endif %}" href="{{ url_for('admin_students', overdue='1') }}">Synopsis Overdue</a>
+  <a class="chip smart{% if f.get('needs_coe') == '1' %} active{% endif %}" href="{{ url_for('admin_students', needs_coe='1') }}">Needs COE</a>
 </div>
 
 <div class="card section">
@@ -55,7 +27,6 @@
     {% if f.get('degree') %}<a class="active-pill" href="{{ clear_url('degree') }}">Degree: {{ f.get('degree') }} &times;</a>{% endif %}
     {% if f.get('gender') %}<a class="active-pill" href="{{ clear_url('gender') }}">Gender: {{ f.get('gender') }} &times;</a>{% endif %}
     {% if f.get('folder_file') %}<a class="active-pill" href="{{ clear_url('folder_file') }}">Folder: {{ f.get('folder_file') }} &times;</a>{% endif %}
-    {% if f.get('department') %}<a class="active-pill" href="{{ clear_url('department') }}">Dept: {{ f.get('department') }} &times;</a>{% endif %}
     {% if f.get('overdue') == '1' %}<a class="active-pill smart-pill" href="{{ clear_url('overdue') }}">Synopsis Overdue &times;</a>{% endif %}
     {% if f.get('needs_coe') == '1' %}<a class="active-pill smart-pill" href="{{ clear_url('needs_coe') }}">Needs COE &times;</a>{% endif %}
     <span style="flex:1"></span>
@@ -103,14 +74,6 @@
         <select class="no-icon" id="folder_file" name="folder_file">
           <option value="">All</option>
           {% for v in folders %}<option value="{{ v }}" {% if f.get('folder_file')==v %}selected{% endif %}>{{ v }}</option>{% endfor %}
-        </select>
-      </div>
-      <div>
-        <label class="f-label" for="department">Department</label>
-        <select class="no-icon" id="department" name="department">
-          <option value="">All</option>
-          <option value="__unassigned" {% if f.get('department')=='__unassigned' %}selected{% endif %}>— Unassigned —</option>
-          {% for v in departments %}<option value="{{ v }}" {% if f.get('department')==v %}selected{% endif %}>{{ v }}</option>{% endfor %}
         </select>
       </div>
     </div>

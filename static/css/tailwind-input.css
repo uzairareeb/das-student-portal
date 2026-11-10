@@ -191,6 +191,8 @@
   .chip-row { @apply mb-4 flex flex-wrap gap-2; }
   .chip { @apply inline-flex items-center rounded-full border border-line bg-white px-4 py-2 text-[13.5px] font-semibold text-slate-600 no-underline transition-colors hover:border-primary hover:text-primary; }
   .chip.active { @apply border-primary bg-primary text-white; }
+  .chip.smart { @apply border-violet-300 text-violet-700 hover:border-accent hover:text-violet-700; }
+  .chip.smart.active { @apply border-accent bg-accent text-white; }
   .filters { @apply grid grid-cols-1 items-end gap-3 md:grid-cols-2 xl:grid-cols-6; }
   .filters .btn { @apply px-[18px] py-3; }
   .filter-actions { @apply flex gap-2.5; }
@@ -367,21 +369,6 @@
   .insight-row { @apply flex items-start gap-2.5 text-sm font-medium leading-relaxed text-ink; }
   .insight-dot { @apply mt-[7px] inline-block h-2 w-2 shrink-0 rounded-full; background: linear-gradient(135deg, #1769e8, #db2777); }
   /* ---------- student list: insights, filters, table, pager ---------- */
-  .list-insights { @apply mb-6 grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-5; }
-  .insight-tile { @apply relative grid grid-cols-[auto_1fr] items-center gap-x-3 rounded-xl border border-line bg-white px-4 py-4 text-ink no-underline shadow-sm transition-all hover:-translate-y-px hover:border-primary/50; }
-  .insight-tile.active { @apply border-primary; box-shadow: 0 0 0 1px rgba(23,105,232,.35), 0 10px 24px rgba(23,105,232,.12); }
-  .insight-tile.smart { @apply border-violet-200; }
-  .insight-tile.smart.active { @apply border-accent; box-shadow: 0 0 0 1px rgba(124,58,237,.35), 0 10px 24px rgba(124,58,237,.12); }
-  .insight-ico { @apply row-span-2 inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-white; }
-  .insight-ico svg { @apply h-5 w-5; }
-  .insight-ico.blue { background: linear-gradient(135deg, #1769e8, #38bdf8); }
-  .insight-ico.amber { background: linear-gradient(135deg, #d97706, #f59e0b); }
-  .insight-ico.violet { background: linear-gradient(135deg, #7c3aed, #a78bfa); }
-  .insight-ico.pink { background: linear-gradient(135deg, #db2777, #f472b6); }
-  .insight-ico.teal { background: linear-gradient(135deg, #0e7490, #22d3ee); }
-  .insight-num { @apply text-[22px] font-extrabold leading-none tracking-tight; }
-  .insight-label { @apply text-xs font-semibold text-muted; }
-  .insight-tag { @apply absolute top-2 right-2 rounded-full bg-violet-100 px-2 py-0.5 text-[10px] font-extrabold tracking-wide text-violet-700 uppercase; }
   .active-pill { @apply inline-flex items-center gap-1 rounded-full border border-primary/30 bg-soft px-3 py-1 text-xs font-bold text-primary no-underline hover:border-primary; }
   .active-pill.smart-pill { @apply border-accent/40 bg-violet-50 text-violet-700 hover:border-accent; }
   .search-wrap { @apply relative; }

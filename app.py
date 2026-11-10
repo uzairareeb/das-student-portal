@@ -1116,13 +1116,6 @@ def admin_students():
         a.pop("page", None)
         return url_for("admin_students") + "?" + urlencode(a)
 
-    insights = {
-        "total": total,
-        "viva_pending": count_students({"status": "Viva Pending"}),
-        "sent_to_coe": count_students({"status": "Sent to COE"}),
-        "overdue": count_students({"overdue": "1"}),
-        "needs_coe": count_students({"needs_coe": "1"}),
-    }
     shown_from = (page - 1) * per_page + 1 if filtered_total else 0
     shown_to = min(page * per_page, filtered_total)
     sort = (request.args.get("sort") or "").strip()
@@ -1134,7 +1127,7 @@ def admin_students():
         filtered_total=filtered_total, page=page, pages=pages,
         page_url=page_url, per_page=per_page,
         sort_url=sort_url, clear_url=clear_url, per_page_url=per_page_url,
-        insights=insights, shown_from=shown_from, shown_to=shown_to,
+        shown_from=shown_from, shown_to=shown_to,
         sort=sort, direction=direction,
         sessions=distinct_values("session"), degrees=distinct_values("degree"),
         genders=GENDER_OPTS, folders=FOLDER_OPTS, status_list=STATUS_LIST,
