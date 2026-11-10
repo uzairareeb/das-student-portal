@@ -392,8 +392,9 @@
   .pager-perpage { @apply flex items-center gap-2 text-[13.5px] font-semibold text-muted; }
   .per-page-sel { @apply h-9 w-auto rounded-lg border-[1.5px] border-line bg-white px-2.5 py-1 text-[13.5px] font-semibold text-ink; }
   /* ---------- list table: tick/cross + legend + status chips ---------- */
-  .tick-cell { @apply text-center; }
-  .tick { @apply inline-flex h-7 w-7 items-center justify-center rounded-full text-[15px] font-extrabold leading-none text-white shadow-sm; }
+  .wide-table td.tick-cell { text-align: center; }
+  .wide-table th.tick-head { text-align: center; }
+  .tick { @apply inline-flex h-5 w-5 items-center justify-center rounded-full text-[11px] font-extrabold leading-none text-white shadow-sm; }
   .tick.ok { background: linear-gradient(135deg, #22c55e, #16a34a); }
   .tick.no { background: linear-gradient(135deg, #f87171, #dc2626); }
   .tick-legend { @apply ml-1 inline-flex items-center gap-3 text-xs font-semibold text-muted; }

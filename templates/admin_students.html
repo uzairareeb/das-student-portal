@@ -119,8 +119,8 @@
           <tr>
             <th class="cb"><input type="checkbox" id="selAll" title="Select all on this page"></th>
             <th><a class="th-sort" href="{{ sort_url('name') }}">Name {% if sort == 'name' %}<span class="arr">{{ '▼' if direction == 'desc' else '▲' }}</span>{% endif %}</a></th><th><a class="th-sort" href="{{ sort_url('reg_no') }}">Reg.No {% if sort == 'reg_no' %}<span class="arr">{{ '▼' if direction == 'desc' else '▲' }}</span>{% endif %}</a></th><th>Degree</th>
-            <th>Folder/File</th><th>Synopsis</th><th>Synopsis Received</th>
-            <th>Semi-Final</th><th>Final Thesis</th><th>Thesis Received Dates</th>
+            <th class="tick-head">Folder/File</th><th class="tick-head">Synopsis</th><th>Synopsis Received</th>
+            <th class="tick-head">Semi-Final</th><th class="tick-head">Final Thesis</th><th>Thesis Received Dates</th>
             <th>Thesis Forward (COE)</th>
             <th><a class="th-sort" href="{{ sort_url('status') }}">Status {% if sort == 'status' %}<span class="arr">{{ '▼' if direction == 'desc' else '▲' }}</span>{% endif %}</a></th><th></th>
           </tr>

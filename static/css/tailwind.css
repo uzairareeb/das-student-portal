@@ -2935,17 +2935,20 @@
     font-weight: var(--font-weight-semibold);
     color: var(--color-ink);
   }
-  .tick-cell {
+  .wide-table td.tick-cell {
+    text-align: center;
+  }
+  .wide-table th.tick-head {
     text-align: center;
   }
   .tick {
     display: inline-flex;
-    height: calc(var(--spacing) * 7);
-    width: calc(var(--spacing) * 7);
+    height: calc(var(--spacing) * 5);
+    width: calc(var(--spacing) * 5);
     align-items: center;
     justify-content: center;
     border-radius: calc(infinity * 1px);
-    font-size: 15px;
+    font-size: 11px;
     --tw-leading: 1;
     line-height: 1;
     --tw-font-weight: var(--font-weight-extrabold);
