@@ -943,6 +943,8 @@ def admin_dashboard():
         prog[name.split(" ")[0] if name else "Other"] = \
             prog.get(name.split(" ")[0] if name else "Other", 0) + n
     top_programs = sorted(prog.items(), key=lambda kv: -kv[1])
+    uploads_pending_total = _cnt(
+        "SELECT COUNT(*) AS n FROM dept_uploads WHERE status='pending'")
     greeting = ("Good Morning" if now.hour < 12 else
                 "Good Afternoon" if now.hour < 17 else "Good Evening")
     return render_template(
@@ -956,7 +958,8 @@ def admin_dashboard():
         trend_months=months, trend_counts=trend_counts,
         trend_current=by_month.get(cur_month, 0),
         trend_previous=by_month.get(prev_month, 0),
-        viva_month=viva_month, today_str=now.strftime("%A, %d %B %Y"),
+        viva_month=viva_month, uploads_pending_total=uploads_pending_total,
+        today_str=now.strftime("%A, %d %B %Y"),
         greeting=greeting, top_programs=top_programs)
 
 

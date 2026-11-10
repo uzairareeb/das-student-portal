@@ -3,10 +3,36 @@
 {% block content %}
 <!-- Banner -->
 <div class="dash-banner">
-  <div>
-    <p class="banner-greet">{{ greeting }}, Administrator</p>
+  <span class="banner-blob b1" aria-hidden="true"></span>
+  <span class="banner-blob b2" aria-hidden="true"></span>
+  <span class="banner-blob b3" aria-hidden="true"></span>
+  <div class="banner-main">
+    <p class="banner-greet"><span class="greet-ico">{% if greeting == 'Good Morning' %}<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></svg>{% elif greeting == 'Good Afternoon' %}<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></svg>{% else %}<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>{% endif %}</span>{{ greeting }}, Administrator</p>
     <h2>Admin Dashboard</h2>
     <p class="banner-sub">Overview of student records &middot; {{ total }} students in the system &middot; {{ today_str }}</p>
+    <div class="banner-actions">
+      <a class="btn primary sm" href="{{ url_for('admin_student_new') }}">+ Add Student</a>
+      <a class="btn ghost sm banner-btn" href="{{ url_for('admin_students') }}">View Students</a>
+      <a class="btn ghost sm banner-btn" href="{{ url_for('admin_uploads') }}">Review Uploads{% if uploads_pending_total %} ({{ uploads_pending_total }}){% endif %}</a>
+    </div>
+  </div>
+  <div class="banner-stats">
+    <a class="banner-chip" href="{{ url_for('admin_students') }}">
+      <span class="bc-ico blue"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></span>
+      <span class="bc-num">{{ total }}</span><span class="bc-label">Total Students</span>
+    </a>
+    <a class="banner-chip" href="#attention">
+      <span class="bc-ico amber"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg></span>
+      <span class="bc-num">{{ pending.total }}</span><span class="bc-label">Needs Attention</span>
+    </a>
+    <a class="banner-chip" href="{{ url_for('admin_uploads') }}">
+      <span class="bc-ico violet"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg></span>
+      <span class="bc-num">{{ uploads_pending_total }}</span><span class="bc-label">Uploads Awaiting Review</span>
+    </a>
+    <a class="banner-chip" href="{{ url_for('admin_viva') }}">
+      <span class="bc-ico green"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg></span>
+      <span class="bc-num">{{ viva_month.pass }}</span><span class="bc-label">Viva Passed This Month</span>
+    </a>
   </div>
 </div>
 
@@ -58,7 +84,7 @@
 </div>
 
 <!-- 3. Attention Needed -->
-<section class="card dash-card pending-card">
+<section class="card dash-card pending-card" id="attention">
   <div class="dash-card-head">
     <h3><span class="dash-ico amber"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg></span> Attention Needed</h3>
     {% if pending.total %}<span class="pill warn">{{ pending.total }} pending</span>{% endif %}
