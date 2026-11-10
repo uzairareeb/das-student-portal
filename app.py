@@ -716,6 +716,22 @@ def _student_where(args):
     elif dept:
         where.append("department=?")
         params.append(dept)
+    if (args.get("overdue") or "") == "1":
+        # Synopsis 6+ months old, Semi-Final still pending (pending group 3)
+        cutoff = (datetime.now() - timedelta(days=182)).strftime("%Y-%m-%d")
+        where.append(
+            "synopsis='Received' AND semi_final_thesis!='Received' "
+            "AND synopsis_at IS NOT NULL AND synopsis_at < ? "
+            "AND status NOT IN ('Pass Out','Left','Admission Cancelled',"
+            "'Freeze')")
+        params.append(cutoff)
+    if (args.get("needs_coe") or "") == "1":
+        # Final Thesis received but never forwarded to COE (pending group 1)
+        where.append(
+            "final_thesis='Received' "
+            "AND (thesis_forward_coe IS NULL OR thesis_forward_coe='') "
+            "AND status NOT IN ('Pass Out','Left','Admission Cancelled',"
+            "'Freeze')")
     return where, params
 
 
@@ -728,13 +744,19 @@ def count_students(args):
     return (row["n"] if isinstance(row, dict) else row[0]) if row else 0
 
 
+SORTABLE_COLUMNS = {"name": "name", "reg_no": "reg_no", "status": "status"}
+
+
 def query_students(args, limit=None, offset=None):
     """Apply the dashboard filters; returns list of dicts."""
     where, params = _student_where(args)
     sql = "SELECT * FROM students"
     if where:
         sql += " WHERE " + " AND ".join(where)
-    sql += " ORDER BY name"
+    sort_col = SORTABLE_COLUMNS.get((args.get("sort") or "").strip())
+    direction = ("DESC" if (args.get("dir") or "").strip().lower() == "desc"
+                 else "ASC")
+    sql += " ORDER BY " + (sort_col or "name") + " " + direction
     if limit is not None:
         sql += " LIMIT ? OFFSET ?"
         params += [limit, offset or 0]
@@ -1038,11 +1060,17 @@ def admin_students():
         page = max(int(request.args.get("page", 1) or 1), 1)
     except (TypeError, ValueError):
         page = 1
+    try:
+        per_page = int(request.args.get("per_page", PER_PAGE) or PER_PAGE)
+    except (TypeError, ValueError):
+        per_page = PER_PAGE
+    if per_page not in (10, 25, 50, 100):
+        per_page = PER_PAGE
     filtered_total = count_students(request.args)
-    pages = max((filtered_total + PER_PAGE - 1) // PER_PAGE, 1)
+    pages = max((filtered_total + per_page - 1) // per_page, 1)
     page = min(page, pages)
-    students = query_students(request.args, limit=PER_PAGE,
-                              offset=(page - 1) * PER_PAGE)
+    students = query_students(request.args, limit=per_page,
+                              offset=(page - 1) * per_page)
     for s in students:
         s["coe_display"] = fmt_coe(s.get("thesis_forward_coe"))
         s["syn_at_disp"] = fmt_stamp(s.get("synopsis_at"))
@@ -1062,11 +1090,47 @@ def admin_students():
         a["page"] = p
         return url_for("admin_students") + "?" + urlencode(a)
 
+    def sort_url(col):
+        a = dict(base_args)
+        a.pop("page", None)
+        if a.get("sort") == col:
+            a["dir"] = "desc" if a.get("dir") != "desc" else "asc"
+        else:
+            a["sort"] = col
+            a["dir"] = "asc"
+        return url_for("admin_students") + "?" + urlencode(a)
+
+    def clear_url(key):
+        a = {k: v for k, v in base_args.items() if k != key}
+        a.pop("page", None)
+        return url_for("admin_students") + ("?" + urlencode(a) if a else "")
+
+    def per_page_url(n):
+        a = dict(base_args)
+        a["per_page"] = n
+        a.pop("page", None)
+        return url_for("admin_students") + "?" + urlencode(a)
+
+    insights = {
+        "total": total,
+        "viva_pending": count_students({"status": "Viva Pending"}),
+        "sent_to_coe": count_students({"status": "Sent to COE"}),
+        "overdue": count_students({"overdue": "1"}),
+        "needs_coe": count_students({"needs_coe": "1"}),
+    }
+    shown_from = (page - 1) * per_page + 1 if filtered_total else 0
+    shown_to = min(page * per_page, filtered_total)
+    sort = (request.args.get("sort") or "").strip()
+    direction = (request.args.get("dir") or "").strip().lower()
+
     return render_template(
         "admin_students.html", uni=UNI_NAME, title=PORTAL_TITLE,
         students=students, shown=len(students), total=total,
         filtered_total=filtered_total, page=page, pages=pages,
-        page_url=page_url, per_page=PER_PAGE,
+        page_url=page_url, per_page=per_page,
+        sort_url=sort_url, clear_url=clear_url, per_page_url=per_page_url,
+        insights=insights, shown_from=shown_from, shown_to=shown_to,
+        sort=sort, direction=direction,
         sessions=distinct_values("session"), degrees=distinct_values("degree"),
         genders=GENDER_OPTS, folders=FOLDER_OPTS, status_list=STATUS_LIST,
         received=RECEIVED_OPTS, departments=dept_names(),

@@ -8,6 +8,36 @@
   </div>
 </div>
 
+<div class="list-insights">
+  <a class="insight-tile{% if not f.get('status') and not f.get('overdue') and not f.get('needs_coe') and not f.get('q') %} active{% endif %}" href="{{ url_for('admin_students') }}">
+    <span class="insight-ico blue"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></span>
+    <span class="insight-num">{{ insights.total }}</span>
+    <span class="insight-label">Total Students</span>
+  </a>
+  <a class="insight-tile{% if f.get('status') == 'Viva Pending' %} active{% endif %}" href="{{ url_for('admin_students', status='Viva Pending') }}">
+    <span class="insight-ico amber"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></span>
+    <span class="insight-num">{{ insights.viva_pending }}</span>
+    <span class="insight-label">Viva Pending</span>
+  </a>
+  <a class="insight-tile{% if f.get('status') == 'Sent to COE' %} active{% endif %}" href="{{ url_for('admin_students', status='Sent to COE') }}">
+    <span class="insight-ico violet"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg></span>
+    <span class="insight-num">{{ insights.sent_to_coe }}</span>
+    <span class="insight-label">Sent to COE</span>
+  </a>
+  <a class="insight-tile smart{% if f.get('overdue') == '1' %} active{% endif %}" href="{{ url_for('admin_students', overdue='1') }}">
+    <span class="insight-ico pink"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l2.4 7.6L22 12l-7.6 2.4L12 22l-2.4-7.6L2 12l7.6-2.4L12 2z"/></svg></span>
+    <span class="insight-num">{{ insights.overdue }}</span>
+    <span class="insight-label">Synopsis Overdue</span>
+    <span class="insight-tag">Smart</span>
+  </a>
+  <a class="insight-tile smart{% if f.get('needs_coe') == '1' %} active{% endif %}" href="{{ url_for('admin_students', needs_coe='1') }}">
+    <span class="insight-ico teal"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg></span>
+    <span class="insight-num">{{ insights.needs_coe }}</span>
+    <span class="insight-label">Needs COE</span>
+    <span class="insight-tag">Smart</span>
+  </a>
+</div>
+
 <div class="chip-row">
   <a class="chip{% if not f.get('status') %} active{% endif %}" href="{{ url_for('admin_students') }}">All Students</a>
   {% for chip in ['Viva Pending', 'Sent to COE', 'Pass Out', 'Freeze'] %}
@@ -16,11 +46,29 @@
 </div>
 
 <div class="card section">
+  <div class="section-head">
+    <span class="section-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="21" x2="4" y2="14"/><line x1="4" y1="10" x2="4" y2="3"/><line x1="12" y1="21" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="3"/><line x1="20" y1="21" x2="20" y2="16"/><line x1="20" y1="12" x2="20" y2="3"/><line x1="1" y1="14" x2="7" y2="14"/><line x1="9" y1="8" x2="15" y2="8"/><line x1="17" y1="16" x2="23" y2="16"/></svg></span>
+    <h3>Filters</h3>
+    {% if f.get('q') %}<a class="active-pill" href="{{ clear_url('q') }}">Search: &ldquo;{{ f.get('q') }}&rdquo; &times;</a>{% endif %}
+    {% if f.get('status') %}<a class="active-pill" href="{{ clear_url('status') }}">Status: {{ f.get('status') }} &times;</a>{% endif %}
+    {% if f.get('session') %}<a class="active-pill" href="{{ clear_url('session') }}">Session: {{ f.get('session') }} &times;</a>{% endif %}
+    {% if f.get('degree') %}<a class="active-pill" href="{{ clear_url('degree') }}">Degree: {{ f.get('degree') }} &times;</a>{% endif %}
+    {% if f.get('gender') %}<a class="active-pill" href="{{ clear_url('gender') }}">Gender: {{ f.get('gender') }} &times;</a>{% endif %}
+    {% if f.get('folder_file') %}<a class="active-pill" href="{{ clear_url('folder_file') }}">Folder: {{ f.get('folder_file') }} &times;</a>{% endif %}
+    {% if f.get('department') %}<a class="active-pill" href="{{ clear_url('department') }}">Dept: {{ f.get('department') }} &times;</a>{% endif %}
+    {% if f.get('overdue') == '1' %}<a class="active-pill smart-pill" href="{{ clear_url('overdue') }}">Synopsis Overdue &times;</a>{% endif %}
+    {% if f.get('needs_coe') == '1' %}<a class="active-pill smart-pill" href="{{ clear_url('needs_coe') }}">Needs COE &times;</a>{% endif %}
+    <span style="flex:1"></span>
+    <a class="btn ghost sm" href="{{ url_for('admin_students') }}">Reset</a>
+  </div>
   <form method="get" action="{{ url_for('admin_students') }}">
     <div class="filters">
-      <div>
+      <div class="search-wrap">
         <label class="f-label" for="q">Search (Name / Reg.No / CNIC)</label>
-        <input class="no-icon" type="text" id="q" name="q" value="{{ f.get('q','') }}" placeholder="Type to search...">
+        <div class="search-box">
+          <input class="no-icon" type="text" id="q" name="q" value="{{ f.get('q','') }}" placeholder="Type to search...">
+          <button type="button" class="search-clear" id="qClear" aria-label="Clear search" {% if not f.get('q') %}hidden{% endif %}>&times;</button>
+        </div>
       </div>
       <div>
         <label class="f-label" for="session">Session</label>
@@ -68,7 +116,6 @@
     </div>
     <div class="row" style="margin-top:14px">
       <button type="submit" class="btn primary sm">Apply Filters</button>
-      <a class="btn ghost sm" href="{{ url_for('admin_dashboard') }}">Clear</a>
     </div>
   </form>
 </div>
@@ -107,18 +154,18 @@
         <thead>
           <tr>
             <th class="cb"><input type="checkbox" id="selAll" title="Select all on this page"></th>
-            <th>Name</th><th>Reg.No</th><th>Degree</th>
+            <th><a class="th-sort" href="{{ sort_url('name') }}">Name {% if sort == 'name' %}<span class="arr">{{ '▼' if direction == 'desc' else '▲' }}</span>{% endif %}</a></th><th><a class="th-sort" href="{{ sort_url('reg_no') }}">Reg.No {% if sort == 'reg_no' %}<span class="arr">{{ '▼' if direction == 'desc' else '▲' }}</span>{% endif %}</a></th><th>Degree</th>
             <th>Folder/File</th><th>Synopsis</th><th>Synopsis Received</th>
             <th>Semi-Final</th><th>Final Thesis</th><th>Thesis Received Dates</th>
             <th>Thesis Forward (COE)</th>
-            <th>Status</th><th></th>
+            <th><a class="th-sort" href="{{ sort_url('status') }}">Status {% if sort == 'status' %}<span class="arr">{{ '▼' if direction == 'desc' else '▲' }}</span>{% endif %}</a></th><th></th>
           </tr>
         </thead>
         <tbody id="studentsBody">
           {% for s in students %}
           <tr data-dept="{{ s.department or '' }}">
             <td class="cb"><input type="checkbox" class="selBox" name="sel" value="{{ s.id }}"></td>
-            <td>{{ s.name }}</td>
+            <td><span class="row-avatar">{{ s.name[0] if s.name else '?' }}</span><span class="row-name">{{ s.name }}</span></td>
             <td>{{ s.reg_no }}</td>
             <td class="degree-cell">{{ s.degree or '—' }}</td>
             <td>
@@ -161,24 +208,32 @@
     </form>
     <span class="hint">Removes every student record and all uploaded documents.</span>
   </div>
-  {% if pages > 1 %}
-  <div class="pagination" id="pagination">
-    {% if page > 1 %}
-    <a class="btn ghost sm" href="{{ page_url(page-1) }}">&larr; Prev</a>
-    {% endif %}
-    {% for p in range(1, pages+1) %}
-      {% if p == 1 or p == pages or (p >= page-2 and p <= page+2) %}
-        {% if p == page %}<span class="page-cur">{{ p }}</span>
-        {% else %}<a class="page-num" href="{{ page_url(p) }}">{{ p }}</a>{% endif %}
-      {% elif p == 2 or p == pages-1 %}
-        <span class="page-gap">…</span>
+  <div class="pager-bar">
+    <span class="pager-info" id="rangeText">Showing {{ shown_from }}&ndash;{{ shown_to }} of {{ filtered_total }} students</span>
+    {% if pages > 1 %}
+    <div class="pagination" id="pagination">
+      {% if page > 1 %}
+      <a class="btn ghost sm" href="{{ page_url(page-1) }}">&larr; Prev</a>
       {% endif %}
-    {% endfor %}
-    {% if page < pages %}
-    <a class="btn ghost sm" href="{{ page_url(page+1) }}">Next &rarr;</a>
+      {% for p in range(1, pages+1) %}
+        {% if p == 1 or p == pages or (p >= page-2 and p <= page+2) %}
+          {% if p == page %}<span class="page-cur">{{ p }}</span>
+          {% else %}<a class="page-num" href="{{ page_url(p) }}">{{ p }}</a>{% endif %}
+        {% elif p == 2 or p == pages-1 %}
+          <span class="page-gap">…</span>
+        {% endif %}
+      {% endfor %}
+      {% if page < pages %}
+      <a class="btn ghost sm" href="{{ page_url(page+1) }}">Next &rarr;</a>
+      {% endif %}
+    </div>
     {% endif %}
+    <label class="pager-perpage">Per page
+      <select class="per-page-sel" onchange="location=this.value">
+        {% for n in [10, 25, 50, 100] %}<option value="{{ per_page_url(n) }}" {% if per_page == n %}selected{% endif %}>{{ n }}</option>{% endfor %}
+      </select>
+    </label>
   </div>
-  {% endif %}
   {% else %}
   <div class="empty">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>
@@ -395,6 +450,8 @@
     var pagination = document.getElementById('pagination');
     var countLine = document.getElementById('countLine');
     var liveHint = document.getElementById('liveHint');
+    var rangeText = document.getElementById('rangeText');
+    var origRange = rangeText ? rangeText.textContent : '';
     var origRows = tbody ? tbody.innerHTML : '';
     var origCount = countLine ? countLine.innerHTML : '';
     var searchMode = false;
@@ -413,7 +470,7 @@
     function rowHTML(s) {
       return '<tr data-dept="' + esc(s.department) + '">'
         + '<td class="cb"><input type="checkbox" class="selBox" name="sel" value="' + s.id + '"></td>'
-        + '<td>' + esc(s.name) + '</td>'
+        + '<td><span class="row-avatar">' + esc(s.name.charAt(0) || '?') + '</span><span class="row-name">' + esc(s.name) + '</span></td>'
         + '<td>' + esc(s.reg_no) + '</td>'
         + '<td class="degree-cell">' + esc(s.degree || '\u2014') + '</td>'
         + '<td>' + ynPill(s.folder_file, 'Completed', 'Not Completed') + '</td>'
@@ -434,6 +491,7 @@
       tbody.innerHTML = origRows;
       if (pagination) pagination.style.display = '';
       if (countLine) countLine.innerHTML = origCount;
+      if (rangeText) rangeText.textContent = origRange;
       if (liveHint) liveHint.hidden = true;
     }
     function liveSearch(v) {
@@ -442,6 +500,8 @@
       if (filterForm) {
         new FormData(filterForm).forEach(function (val, key) { if (val) params.set(key, val); });
       }
+      var urlParams = new URLSearchParams(window.location.search);
+      ['sort', 'dir'].forEach(function (k) { if (urlParams.get(k)) params.set(k, urlParams.get(k)); });
       params.set('q', v);
       fetch('/admin/students/search.json?' + params.toString())
         .then(function (r) { return r.json(); })
@@ -453,6 +513,7 @@
             : '<tr><td colspan="13" style="text-align:center;padding:26px;color:var(--muted)">No students match &quot;' + esc(v) + '&quot;.</td></tr>';
           if (pagination) pagination.style.display = 'none';
           if (countLine) countLine.textContent = d.total + ' live result(s) for "' + v + '"';
+          if (rangeText) rangeText.textContent = d.total + ' result(s) for "' + v + '"';
           if (liveHint) {
             liveHint.hidden = false;
             liveHint.textContent = 'Live search on \u2014 clear the search box for the full list.';
@@ -461,9 +522,18 @@
         })
         .catch(function () {});
     }
+    var qClear = document.getElementById('qClear');
+    if (qClear) {
+      qClear.addEventListener('click', function () {
+        qInput.value = '';
+        qInput.dispatchEvent(new Event('input'));
+        qInput.focus();
+      });
+    }
     if (qInput && tbody) {
       qInput.addEventListener('input', function () {
         clearTimeout(debounce);
+        if (qClear) qClear.hidden = qInput.value.trim().length === 0;
         var v = qInput.value.trim();
         if (v.length === 0) { restoreList(); return; }
         if (v.length < 3) return;
