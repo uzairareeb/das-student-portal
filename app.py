@@ -20,8 +20,8 @@ from datetime import datetime, date, timedelta
 from functools import wraps
 from urllib.parse import urlencode
 
-from flask import (Flask, Response, flash, g, jsonify, redirect,
-                   render_template, request, send_file, session, url_for)
+from flask import (Flask, Response, flash, g, redirect, render_template,
+                   request, send_file, session, url_for)
 from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.utils import secure_filename
 from viva_pdf import build_viva_pdf
@@ -741,54 +741,6 @@ def query_students(args, limit=None, offset=None):
     return [dict(r) for r in get_db().fetchall(sql, params)]
 
 
-MILESTONE_STAGES = ["Admission", "Synopsis", "Semi-Final",
-                    "Final Thesis", "COE", "Viva", "Pass Out"]
-
-
-def milestone_stage(s, viva_pass=False):
-    """Visual pipeline state for one student.
-
-    Returns {'stages': [{'name', 'state'}...], 'current': name|None,
-    'ended': bool}. state is 'done' | 'current' | 'todo'. Uses only stored
-    fields (+ a viva Pass when the caller knows it)."""
-    coe = (s.get("thesis_forward_coe") or "").strip()
-    coe_done = bool(coe) and coe.lower() not in (
-        "not forwarded", "not-forwarded", "-", "\u2014")
-    status = (s.get("status") or "")
-    # A status implies the stages before it: e.g. Pass Out means every stage
-    # is done even when the COE date was never written (auto-completion
-    # writes theses but no COE date), and Sent to COE means COE is done.
-    if status == "Pass Out":
-        status_stage = 7
-    elif status == "Viva Done":
-        status_stage = 6
-    elif status in ("Viva Pending", "Defense Pending", "Sent to COE"):
-        status_stage = 5
-    else:
-        status_stage = None
-    field_done = [True,
-                  (s.get("synopsis") or "") == "Received",
-                  (s.get("semi_final_thesis") or "") == "Received",
-                  (s.get("final_thesis") or "") == "Received",
-                  coe_done,
-                  bool(viva_pass),
-                  False]
-    done = [f or (status_stage is not None and i < status_stage)
-            for i, f in enumerate(field_done)]
-    ended = status in ("Left", "Admission Cancelled")
-    try:
-        cur = done.index(False)
-    except ValueError:
-        cur = len(done)
-    stages = [{"name": name,
-               "state": ("done" if i < cur else
-                         "current" if i == cur else "todo")}
-              for i, name in enumerate(MILESTONE_STAGES)]
-    return {"stages": stages,
-            "current": MILESTONE_STAGES[cur] if cur < len(done) else None,
-            "ended": ended}
-
-
 PER_PAGE = 20
 
 
@@ -1011,45 +963,6 @@ def admin_dashboard():
         greeting=greeting, top_programs=top_programs)
 
 
-@app.route("/admin/dashboard/data")
-@admin_required
-def admin_dashboard_data():
-    """Live numbers for the dashboard auto-refresh (JSON, read-only)."""
-    db = get_db()
-    total = count_students({})
-    stat_rows = db.fetchall(
-        "SELECT status, COUNT(*) AS n FROM students GROUP BY status")
-    stats = {}
-    for r in stat_rows:
-        r = dict(r)
-        stats[r.get("status") or "Continue"] = r["n"]
-    def _cnt(sql, params=()):
-        r = db.fetchone(sql, params)
-        return (r["n"] if isinstance(r, dict) else r[0]) if r else 0
-    from pending_actions import compute_pending
-    pending = compute_pending(db, datetime.now(), parse_coe, parse_dt,
-                              fmt_coe, fmt_stamp)
-    now = datetime.now()
-    ym_pat = now.strftime("%Y-%m") + "%"
-    viva_month = {
-        "pass": _cnt(
-            "SELECT COUNT(*) AS n FROM viva_records"
-            " WHERE result='Pass' AND viva_date LIKE ?", (ym_pat,)),
-        "fail": _cnt(
-            "SELECT COUNT(*) AS n FROM viva_records"
-            " WHERE result='Fail' AND viva_date LIKE ?", (ym_pat,)),
-        "pending": _cnt(
-            "SELECT COUNT(*) AS n FROM viva_records"
-            " WHERE result='Pending' AND viva_date LIKE ?", (ym_pat,)),
-    }
-    uploads_pending_total = _cnt(
-        "SELECT COUNT(*) AS n FROM dept_uploads WHERE status='pending'")
-    return jsonify(total=total, stats=stats, pending_total=pending["total"],
-                   uploads_pending_total=uploads_pending_total,
-                   viva_month=viva_month,
-                   updated_at=now.strftime("%Y-%m-%d %H:%M"))
-
-
 @app.route("/admin/students")
 @admin_required
 def admin_students():
@@ -1068,7 +981,6 @@ def admin_students():
         s["syn_at_disp"] = fmt_stamp(s.get("synopsis_at"))
         s["semi_at_disp"] = fmt_stamp(s.get("semi_final_thesis_at"))
         s["final_at_disp"] = fmt_stamp(s.get("final_thesis_at"))
-        s["ms"] = milestone_stage(s)
     total = count_students({})
     base_args = {k: v for k, v in request.args.items() if k != "page"}
     export_url = url_for("admin_export")
@@ -2176,8 +2088,6 @@ def dept_student_profile(sid):
         "SELECT examiner_name, examiner_affiliation, viva_date, result,"
         " remarks FROM viva_records WHERE student_id=? ORDER BY id DESC",
         (sid,))]
-    s["ms"] = milestone_stage(
-        s, viva_pass=any(v.get("result") == "Pass" for v in vivas))
     return render_template("dept_student_profile.html", uni=UNI_NAME,
                            title=PORTAL_TITLE, dept=dept, s=s, docs=docs,
                            vivas=vivas)
@@ -2851,8 +2761,6 @@ def admin_student_profile(sid):
     vivas = [dict(r) for r in get_db().fetchall(
         "SELECT * FROM viva_records WHERE student_id=? ORDER BY id DESC",
         (sid,))]
-    s["ms"] = milestone_stage(
-        s, viva_pass=any(v.get("result") == "Pass" for v in vivas))
     return render_template("student_profile.html", uni=UNI_NAME,
                            title=PORTAL_TITLE, s=s, docs=docs, vivas=vivas,
                            status_list=STATUS_LIST, genders=GENDER_OPTS,
@@ -3384,7 +3292,6 @@ def student_record():
         session.pop("student_id", None)
         return redirect(url_for("student_login"))
     s["coe_display"] = fmt_coe(s.get("thesis_forward_coe"))
-    s["ms"] = milestone_stage(s)
     return render_template("student_record.html", uni=UNI_NAME,
                            title=PORTAL_TITLE, s=s)
 
