@@ -2943,25 +2943,24 @@
   }
   .tick {
     display: inline-flex;
-    height: calc(var(--spacing) * 5);
-    width: calc(var(--spacing) * 5);
+    height: calc(var(--spacing) * 8);
+    width: calc(var(--spacing) * 8);
     align-items: center;
     justify-content: center;
     border-radius: calc(infinity * 1px);
-    font-size: 11px;
+    font-size: var(--text-base);
+    line-height: var(--tw-leading, var(--text-base--line-height));
     --tw-leading: 1;
     line-height: 1;
     --tw-font-weight: var(--font-weight-extrabold);
     font-weight: var(--font-weight-extrabold);
     color: var(--color-white);
-    --tw-shadow: 0 1px 3px 0 var(--tw-shadow-color, rgb(0 0 0 / 0.1)), 0 1px 2px -1px var(--tw-shadow-color, rgb(0 0 0 / 0.1));
-    box-shadow: var(--tw-inset-shadow), var(--tw-inset-ring-shadow), var(--tw-ring-offset-shadow), var(--tw-ring-shadow), var(--tw-shadow);
   }
   .tick.ok {
-    background: linear-gradient(135deg, #22c55e, #16a34a);
+    background: #10b981;
   }
   .tick.no {
-    background: linear-gradient(135deg, #f87171, #dc2626);
+    background: #ef4444;
   }
   .tick-legend {
     margin-left: var(--spacing);
