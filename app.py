@@ -727,9 +727,14 @@ def _student_where(args):
         params.append(cutoff)
     if (args.get("needs_coe") or "") == "1":
         # Final Thesis received but never forwarded to COE (pending group 1)
+        # NOTE: thesis_forward_coe is DATE on Postgres, and '' is not a
+        # valid date there — DATE = '' crashes PG, so on PG only IS NULL
+        # is used (a DATE column can never hold ''). SQLite stores it as
+        # TEXT, where '' is possible, so both checks stay there.
+        coe_empty = ("thesis_forward_coe IS NULL" if USE_PG
+                     else "(thesis_forward_coe IS NULL OR thesis_forward_coe='')")
         where.append(
-            "final_thesis='Received' "
-            "AND (thesis_forward_coe IS NULL OR thesis_forward_coe='') "
+            "final_thesis='Received' AND " + coe_empty + " "
             "AND status NOT IN ('Pass Out','Left','Admission Cancelled',"
             "'Freeze')")
     return where, params
