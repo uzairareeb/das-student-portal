@@ -632,6 +632,10 @@
     --tw-shadow: 0 1px 3px 0 var(--tw-shadow-color, rgb(0 0 0 / 0.1)), 0 1px 2px -1px var(--tw-shadow-color, rgb(0 0 0 / 0.1));
     box-shadow: var(--tw-inset-shadow), var(--tw-inset-ring-shadow), var(--tw-ring-offset-shadow), var(--tw-ring-shadow), var(--tw-shadow);
   }
+  .ring {
+    --tw-ring-shadow: var(--tw-ring-inset, ) 0 0 0 calc(1px + var(--tw-ring-offset-width)) var(--tw-ring-color, currentcolor);
+    box-shadow: var(--tw-inset-shadow), var(--tw-inset-ring-shadow), var(--tw-ring-offset-shadow), var(--tw-ring-shadow), var(--tw-shadow);
+  }
   .ring-2 {
     --tw-ring-shadow: var(--tw-ring-inset, ) 0 0 0 calc(2px + var(--tw-ring-offset-width)) var(--tw-ring-color, currentcolor);
     box-shadow: var(--tw-inset-shadow), var(--tw-inset-ring-shadow), var(--tw-ring-offset-shadow), var(--tw-ring-shadow), var(--tw-shadow);
@@ -2487,12 +2491,12 @@
     border-style: var(--tw-border-style);
     border-width: 1px;
     border-color: var(--color-line);
-    background-color: var(--color-white);
     padding-inline: calc(var(--spacing) * 8);
     padding-block: calc(var(--spacing) * 8);
     color: var(--color-ink);
     --tw-shadow: 0 1px 3px 0 var(--tw-shadow-color, rgb(0 0 0 / 0.1)), 0 1px 2px -1px var(--tw-shadow-color, rgb(0 0 0 / 0.1));
     box-shadow: var(--tw-inset-shadow), var(--tw-inset-ring-shadow), var(--tw-ring-offset-shadow), var(--tw-ring-shadow), var(--tw-shadow);
+    background: linear-gradient(115deg, #eaf2ff 0%, #f0edff 48%, #fdf2f8 100%);
   }
   .sp-hero::after {
     position: absolute;
@@ -2501,8 +2505,8 @@
     height: 260px;
     width: 260px;
     border-radius: calc(infinity * 1px);
-    background-color: var(--color-soft);
     content: "";
+    background: rgba(124, 58, 237, .13);
   }
   .sp-hero::before {
     position: absolute;
@@ -2511,8 +2515,15 @@
     height: 200px;
     width: 200px;
     border-radius: calc(infinity * 1px);
-    background-color: var(--color-lavender);
     content: "";
+    background: rgba(219, 39, 119, .11);
+  }
+  .hero-accent {
+    position: absolute;
+    inset-inline: 0px;
+    bottom: 0px;
+    height: var(--spacing);
+    background: linear-gradient(90deg, #1769e8, #7c3aed, #db2777);
   }
   .sp-hero-top {
     position: relative;
@@ -2524,26 +2535,25 @@
   }
   .sp-avatar {
     display: inline-flex;
-    height: 76px;
-    width: 76px;
+    height: 84px;
+    width: 84px;
     flex-shrink: 0;
     align-items: center;
     justify-content: center;
     border-radius: calc(infinity * 1px);
-    border-style: var(--tw-border-style);
-    border-width: 2px;
-    border-color: var(--color-soft);
-    background-color: var(--color-soft);
-    font-size: 28px;
+    font-size: 30px;
     --tw-font-weight: var(--font-weight-extrabold);
     font-weight: var(--font-weight-extrabold);
     --tw-tracking: var(--tracking-wide);
     letter-spacing: var(--tracking-wide);
-    color: var(--color-primary);
+    color: var(--color-white);
+    border: 3px solid #fff;
+    background: linear-gradient(135deg, #1769e8, #7c3aed);
+    box-shadow: 0 10px 24px rgba(23, 105, 232, .35);
   }
   .sp-hero h2 {
     margin: 0px;
-    font-size: 26px;
+    font-size: 28px;
     --tw-font-weight: var(--font-weight-extrabold);
     font-weight: var(--font-weight-extrabold);
     --tw-tracking: var(--tracking-tight);
@@ -2558,6 +2568,151 @@
   }
   .sp-hero .pill {
     margin-top: calc(var(--spacing) * 2.5);
+  }
+  .sp-identity {
+    min-width: 240px;
+    flex: 1;
+  }
+  .sp-chips {
+    margin-top: calc(var(--spacing) * 2);
+    display: flex;
+    flex-wrap: wrap;
+    gap: calc(var(--spacing) * 1.5);
+  }
+  .sp-chip {
+    display: inline-flex;
+    align-items: center;
+    border-radius: calc(infinity * 1px);
+    border-style: var(--tw-border-style);
+    border-width: 1px;
+    border-color: color-mix(in srgb, #fff 70%, transparent);
+    @supports (color: color-mix(in lab, red, red)) {
+      border-color: color-mix(in oklab, var(--color-white) 70%, transparent);
+    }
+    background-color: color-mix(in srgb, #fff 75%, transparent);
+    @supports (color: color-mix(in lab, red, red)) {
+      background-color: color-mix(in oklab, var(--color-white) 75%, transparent);
+    }
+    padding-inline: calc(var(--spacing) * 3);
+    padding-block: var(--spacing);
+    font-size: var(--text-xs);
+    line-height: var(--tw-leading, var(--text-xs--line-height));
+    --tw-font-weight: var(--font-weight-bold);
+    font-weight: var(--font-weight-bold);
+    color: var(--color-navy);
+    --tw-shadow: 0 1px 3px 0 var(--tw-shadow-color, rgb(0 0 0 / 0.1)), 0 1px 2px -1px var(--tw-shadow-color, rgb(0 0 0 / 0.1));
+    box-shadow: var(--tw-inset-shadow), var(--tw-inset-ring-shadow), var(--tw-ring-offset-shadow), var(--tw-ring-shadow), var(--tw-shadow);
+  }
+  .sp-ring {
+    position: relative;
+    z-index: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: calc(var(--spacing) * 1.5);
+  }
+  .ring-wrap {
+    position: relative;
+    height: 96px;
+    width: 96px;
+  }
+  .ring-svg {
+    height: 100%;
+    width: 100%;
+  }
+  .ring-bg {
+    fill: none;
+    stroke: rgba(23, 54, 93, .12);
+    stroke-width: 9;
+  }
+  .ring-fg {
+    fill: none;
+    stroke-width: 9;
+    stroke-linecap: round;
+    transform: rotate(-90deg);
+    transform-origin: center;
+  }
+  .ring-pct {
+    position: absolute;
+    inset: 0px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 19px;
+    --tw-font-weight: var(--font-weight-extrabold);
+    font-weight: var(--font-weight-extrabold);
+    color: var(--color-navy);
+  }
+  .ring-label {
+    max-width: 160px;
+    text-align: center;
+    font-size: 11.5px;
+    --tw-leading: var(--leading-tight);
+    line-height: var(--leading-tight);
+    --tw-font-weight: var(--font-weight-bold);
+    font-weight: var(--font-weight-bold);
+    color: var(--color-muted);
+  }
+  .profile-page .sp-stat:nth-child(1) {
+    border-top-style: var(--tw-border-style);
+    border-top-width: 3px;
+    border-top-color: var(--color-primary);
+  }
+  .profile-page .sp-stat:nth-child(2) {
+    border-top-style: var(--tw-border-style);
+    border-top-width: 3px;
+    border-top-color: var(--color-emerald-600);
+  }
+  .profile-page .sp-stat:nth-child(3) {
+    border-top-style: var(--tw-border-style);
+    border-top-width: 3px;
+    border-top-color: var(--color-accent);
+  }
+  .profile-page .sp-stat:nth-child(4) {
+    border-top-style: var(--tw-border-style);
+    border-top-width: 3px;
+    border-top-color: var(--color-amber-600);
+  }
+  .profile-page .section-icon {
+    background: linear-gradient(135deg, #1769e8, #7c3aed);
+    color: #fff;
+  }
+  .profile-page .section-icon.spark {
+    background: linear-gradient(135deg, #7c3aed, #db2777);
+    color: #fff;
+  }
+  .insights {
+    border-color: #e9d5ff;
+    background: linear-gradient(115deg, #f5f3ff, #fdf2f8);
+  }
+  .insight-list {
+    margin: 0px;
+    display: flex;
+    flex-direction: column;
+    gap: calc(var(--spacing) * 2.5);
+    padding: 0px;
+    list-style: none;
+  }
+  .insight-row {
+    display: flex;
+    align-items: flex-start;
+    gap: calc(var(--spacing) * 2.5);
+    font-size: var(--text-sm);
+    line-height: var(--tw-leading, var(--text-sm--line-height));
+    --tw-leading: var(--leading-relaxed);
+    line-height: var(--leading-relaxed);
+    --tw-font-weight: var(--font-weight-medium);
+    font-weight: var(--font-weight-medium);
+    color: var(--color-ink);
+  }
+  .insight-dot {
+    margin-top: 7px;
+    display: inline-block;
+    height: calc(var(--spacing) * 2);
+    width: calc(var(--spacing) * 2);
+    flex-shrink: 0;
+    border-radius: calc(infinity * 1px);
+    background: linear-gradient(135deg, #1769e8, #db2777);
   }
   .sp-hero .pill.q {
     background-color: var(--color-emerald-50);

@@ -741,6 +741,73 @@ def query_students(args, limit=None, offset=None):
     return [dict(r) for r in get_db().fetchall(sql, params)]
 
 
+JOURNEY_STAGES = ["Admission", "Synopsis", "Semi-Final Thesis",
+                  "Final Thesis", "COE", "Viva", "Pass Out"]
+
+
+def journey_progress(s, viva_pass=False):
+    """Profile progress ring: (stages done out of 7, next step or None).
+
+    A status implies the stages before it (Pass Out = all done; Viva Done =
+    viva done; Viva Pending / Defense Pending / Sent to COE = COE done)."""
+    status = (s.get("status") or "")
+    if status == "Pass Out":
+        return 7, None
+    if status == "Viva Done":
+        return 6, "Pass Out"
+    if status in ("Viva Pending", "Defense Pending", "Sent to COE"):
+        return 5, "Viva"
+    n = 1
+    if (s.get("synopsis") or "") == "Received":
+        n = 2
+        if (s.get("semi_final_thesis") or "") == "Received":
+            n = 3
+            if (s.get("final_thesis") or "") == "Received":
+                n = 4
+                coe = (s.get("thesis_forward_coe") or "").strip()
+                if coe and coe.lower() not in (
+                        "not forwarded", "not-forwarded", "-", "\u2014"):
+                    n = 5
+                    if viva_pass:
+                        n = 6
+    if status in ("Left", "Admission Cancelled"):
+        return n, None
+    return n, JOURNEY_STAGES[n] if n < 7 else None
+
+
+def profile_insights(s, docs, vivas, next_step):
+    """Short auto-generated summary lines for the profile (real data only)."""
+    out = []
+    if next_step:
+        out.append(("next", "Next step: " + next_step + "."))
+    else:
+        out.append(("done", "Journey complete — all milestones done."))
+    try:
+        dt = parse_dt(s.get("synopsis_at"))
+        age = (datetime.now() - dt).days if dt else None
+    except Exception:
+        age = None
+    if age is not None and age >= 0 and \
+            (s.get("semi_final_thesis") or "") != "Received":
+        out.append(("time", "Synopsis received %d days ago — "
+                            "Semi-Final Thesis still pending." % age))
+    if vivas:
+        v = vivas[0]
+        out.append(("viva", "Latest viva: %s — %s."
+                            % (v.get("viva_date") or "date not set",
+                               v.get("result") or "Pending")))
+    else:
+        out.append(("viva", "No viva record yet."))
+    pend = sum(1 for d in docs if d.get("status") != "Verified")
+    if docs:
+        out.append(("docs", "%d documents on record — %d pending "
+                            "verification." % (len(docs), pend) if pend
+                    else "All %d documents verified." % len(docs)))
+    else:
+        out.append(("docs", "No documents uploaded yet."))
+    return out[:3]
+
+
 PER_PAGE = 20
 
 
@@ -2761,6 +2828,11 @@ def admin_student_profile(sid):
     vivas = [dict(r) for r in get_db().fetchall(
         "SELECT * FROM viva_records WHERE student_id=? ORDER BY id DESC",
         (sid,))]
+    done_n, next_step = journey_progress(
+        s, viva_pass=any(v.get("result") == "Pass" for v in vivas))
+    s["journey_pct"] = round(done_n / 7 * 100)
+    s["next_step"] = next_step
+    s["insights"] = profile_insights(s, docs, vivas, next_step)
     return render_template("student_profile.html", uni=UNI_NAME,
                            title=PORTAL_TITLE, s=s, docs=docs, vivas=vivas,
                            status_list=STATUS_LIST, genders=GENDER_OPTS,
