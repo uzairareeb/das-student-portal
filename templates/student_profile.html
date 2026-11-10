@@ -78,21 +78,21 @@
     <span class="section-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></span>
     <h3>Complete Record</h3>
   </div>
-  <div class="record-grid">
-    <div class="rec-field"><div class="rec-k">CNIC</div><div class="rec-v">{{ s.cnic or '—' }}</div></div>
-    <div class="rec-field"><div class="rec-k">Father Name</div><div class="rec-v">{{ s.father_name or '—' }}</div></div>
-    <div class="rec-field"><div class="rec-k">Registration No.</div><div class="rec-v">{{ s.reg_no }}</div></div>
-    <div class="rec-field"><div class="rec-k">Gender</div><div class="rec-v">{{ s.gender or '—' }}</div></div>
-    <div class="rec-field"><div class="rec-k">Department</div><div class="rec-v">{{ s.department or '—' }}</div></div>
-    <div class="rec-field"><div class="rec-k">Synopsis</div><div class="rec-v">{% if s.synopsis == 'Received' %}<span class="pill q">Received</span>{% else %}<span class="pill nq">Not Received</span>{% endif %}</div></div>
-    <div class="rec-field"><div class="rec-k">Synopsis Received On</div><div class="rec-v">{{ s.syn_at_disp }}</div></div>
-    <div class="rec-field"><div class="rec-k">Semi-Final Thesis</div><div class="rec-v">{% if s.semi_final_thesis == 'Received' %}<span class="pill q">Received</span>{% else %}<span class="pill nq">Not Received</span>{% endif %}</div></div>
-    <div class="rec-field"><div class="rec-k">Semi-Final Received On</div><div class="rec-v">{{ s.semi_at_disp }}</div></div>
-    <div class="rec-field"><div class="rec-k">Final Thesis</div><div class="rec-v">{% if s.final_thesis == 'Received' %}<span class="pill q">Received</span>{% else %}<span class="pill nq">Not Received</span>{% endif %}</div></div>
-    <div class="rec-field"><div class="rec-k">Final Received On</div><div class="rec-v">{{ s.final_at_disp }}</div></div>
-    <div class="rec-field"><div class="rec-k">Thesis Forward (COE)</div><div class="rec-v">{{ s.coe_display }}</div></div>
-    <div class="rec-field full"><div class="rec-k">Comments (Missing)</div><div class="rec-v">{{ s.comments_missing or '—' }}</div></div>
-  </div>
+  <dl class="record-list">
+    <div><dt>CNIC</dt><dd>{{ s.cnic or '—' }}</dd></div>
+    <div><dt>Father Name</dt><dd>{{ s.father_name or '—' }}</dd></div>
+    <div><dt>Registration No.</dt><dd>{{ s.reg_no }}</dd></div>
+    <div><dt>Gender</dt><dd>{{ s.gender or '—' }}</dd></div>
+    <div><dt>Department</dt><dd>{{ s.department or '—' }}</dd></div>
+    <div><dt>Synopsis</dt><dd>{% if s.synopsis == 'Received' %}<span class="pill q">Received</span>{% else %}<span class="pill nq">Not Received</span>{% endif %}</dd></div>
+    <div><dt>Synopsis Received On</dt><dd>{{ s.syn_at_disp }}</dd></div>
+    <div><dt>Semi-Final Thesis</dt><dd>{% if s.semi_final_thesis == 'Received' %}<span class="pill q">Received</span>{% else %}<span class="pill nq">Not Received</span>{% endif %}</dd></div>
+    <div><dt>Semi-Final Received On</dt><dd>{{ s.semi_at_disp }}</dd></div>
+    <div><dt>Final Thesis</dt><dd>{% if s.final_thesis == 'Received' %}<span class="pill q">Received</span>{% else %}<span class="pill nq">Not Received</span>{% endif %}</dd></div>
+    <div><dt>Final Received On</dt><dd>{{ s.final_at_disp }}</dd></div>
+    <div><dt>Thesis Forward (COE)</dt><dd>{{ s.coe_display }}</dd></div>
+    <div><dt>Comments (Missing)</dt><dd>{{ s.comments_missing or '—' }}</dd></div>
+  </dl>
 </div>
 
 <div class="card section">
