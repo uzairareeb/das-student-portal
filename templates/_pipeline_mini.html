@@ -1,4 +1,0 @@
-<div class="pipe-mini" title="{{ s.ms.current or 'Complete' }}{% if s.ms.ended %} — {{ s.status }}{% endif %}">
-  {% for st in s.ms.stages %}<span class="pm-dot {{ st.state }}"></span>{% endfor %}
-  <span class="pm-label">{{ s.ms.current or 'Complete' }}</span>
-</div>
