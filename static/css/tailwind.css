@@ -2674,11 +2674,11 @@
     border-top-color: var(--color-amber-600);
   }
   .profile-page .section-icon {
-    background: linear-gradient(135deg, #1769e8, #7c3aed);
+    background: linear-gradient(135deg, #1769e8, #38bdf8);
     color: #fff;
   }
   .profile-page .section-icon.spark {
-    background: linear-gradient(135deg, #7c3aed, #db2777);
+    background: linear-gradient(135deg, #1769e8, #38bdf8);
     color: #fff;
   }
   .insights {
@@ -2713,6 +2713,45 @@
     flex-shrink: 0;
     border-radius: calc(infinity * 1px);
     background: linear-gradient(135deg, #1769e8, #db2777);
+  }
+  .record-grid {
+    display: grid;
+    grid-template-columns: repeat(1, minmax(0, 1fr));
+    gap: calc(var(--spacing) * 3);
+    @media (width >= 48rem) {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+  }
+  .rec-field {
+    border-radius: 10px;
+    border-style: var(--tw-border-style);
+    border-width: 1px;
+    border-color: var(--color-line);
+    background-color: #fbfbfe;
+    padding-inline: calc(var(--spacing) * 4);
+    padding-block: calc(var(--spacing) * 3);
+  }
+  @media (width >= 48rem) {
+    .rec-field.full {
+      grid-column: span 2 / span 2;
+    }
+  }
+  .rec-k {
+    margin-bottom: var(--spacing);
+    font-size: 11px;
+    --tw-font-weight: var(--font-weight-bold);
+    font-weight: var(--font-weight-bold);
+    --tw-tracking: var(--tracking-wider);
+    letter-spacing: var(--tracking-wider);
+    color: var(--color-muted);
+    text-transform: uppercase;
+  }
+  .rec-v {
+    font-size: var(--text-sm);
+    line-height: var(--tw-leading, var(--text-sm--line-height));
+    --tw-font-weight: var(--font-weight-semibold);
+    font-weight: var(--font-weight-semibold);
+    color: var(--color-ink);
   }
   .sp-hero .pill.q {
     background-color: var(--color-emerald-50);

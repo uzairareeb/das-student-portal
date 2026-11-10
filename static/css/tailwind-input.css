@@ -361,12 +361,17 @@
   .profile-page .sp-stat:nth-child(2) { @apply border-t-[3px] border-t-emerald-600; }
   .profile-page .sp-stat:nth-child(3) { @apply border-t-[3px] border-t-accent; }
   .profile-page .sp-stat:nth-child(4) { @apply border-t-[3px] border-t-amber-600; }
-  .profile-page .section-icon { background: linear-gradient(135deg, #1769e8, #7c3aed); color: #fff; }
-  .profile-page .section-icon.spark { background: linear-gradient(135deg, #7c3aed, #db2777); color: #fff; }
+  .profile-page .section-icon { background: linear-gradient(135deg, #1769e8, #38bdf8); color: #fff; }
+  .profile-page .section-icon.spark { background: linear-gradient(135deg, #1769e8, #38bdf8); color: #fff; }
   .insights { border-color: #e9d5ff; background: linear-gradient(115deg, #f5f3ff, #fdf2f8); }
   .insight-list { @apply m-0 flex flex-col gap-2.5 p-0; list-style: none; }
   .insight-row { @apply flex items-start gap-2.5 text-sm font-medium leading-relaxed text-ink; }
   .insight-dot { @apply mt-[7px] inline-block h-2 w-2 shrink-0 rounded-full; background: linear-gradient(135deg, #1769e8, #db2777); }
+  .record-grid { @apply grid grid-cols-1 gap-3 md:grid-cols-2; }
+  .rec-field { @apply rounded-[10px] border border-line bg-[#fbfbfe] px-4 py-3; }
+  .rec-field.full { @apply md:col-span-2; }
+  .rec-k { @apply mb-1 text-[11px] font-bold tracking-wider text-muted uppercase; }
+  .rec-v { @apply text-sm font-semibold text-ink; }
   .sp-hero .pill.q { @apply bg-emerald-50 text-emerald-700; }
   .sp-hero .pill.warn { @apply bg-amber-50 text-amber-700; }
   .sp-hero .pill.nq { @apply bg-red-50 text-red-700; }
