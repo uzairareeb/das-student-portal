@@ -368,6 +368,9 @@
   .insight-list { @apply m-0 flex flex-col gap-2.5 p-0; list-style: none; }
   .insight-row { @apply flex items-start gap-2.5 text-sm font-medium leading-relaxed text-ink; }
   .insight-dot { @apply mt-[7px] inline-block h-2 w-2 shrink-0 rounded-full; background: linear-gradient(135deg, #1769e8, #db2777); }
+  .hl-note { @apply mb-4 rounded-lg border border-primary/25 bg-soft px-3 py-2 text-[13px] font-semibold text-primary; }
+  .form-grid .hl { @apply rounded-[10px] border border-primary/30 bg-soft px-3 py-2.5; }
+  .form-grid .hl .f-label { @apply text-primary; }
   /* ---------- student list: insights, filters, table, pager ---------- */
   .active-pill { @apply inline-flex items-center gap-1 rounded-full border border-primary/30 bg-soft px-3 py-1 text-xs font-bold text-primary no-underline hover:border-primary; }
   .active-pill.smart-pill { @apply border-accent/40 bg-violet-50 text-violet-700 hover:border-accent; }
@@ -388,6 +391,22 @@
   .pager-info { @apply text-[13.5px] font-semibold text-muted; }
   .pager-perpage { @apply flex items-center gap-2 text-[13.5px] font-semibold text-muted; }
   .per-page-sel { @apply h-9 w-auto rounded-lg border-[1.5px] border-line bg-white px-2.5 py-1 text-[13.5px] font-semibold text-ink; }
+  /* ---------- list table: tick/cross + legend + status chips ---------- */
+  .tick-cell { @apply text-center; }
+  .tick { @apply inline-flex h-7 w-7 items-center justify-center rounded-full text-[15px] font-extrabold leading-none text-white shadow-sm; }
+  .tick.ok { background: linear-gradient(135deg, #22c55e, #16a34a); }
+  .tick.no { background: linear-gradient(135deg, #f87171, #dc2626); }
+  .tick-legend { @apply ml-1 inline-flex items-center gap-3 text-xs font-semibold text-muted; }
+  .tick-legend .item { @apply inline-flex items-center gap-1.5; }
+  .tick-legend .tick { @apply h-5 w-5 text-[11px]; }
+  .status-chip { @apply inline-flex items-center gap-1.5 rounded-full border px-3 py-[5px] text-xs font-bold whitespace-nowrap; }
+  .status-chip .dot { @apply h-2 w-2 shrink-0 rounded-full; }
+  .status-chip.sc-ok { @apply border-emerald-200 bg-emerald-50 text-emerald-700; }
+  .status-chip.sc-ok .dot { @apply bg-emerald-500; }
+  .status-chip.sc-warn { @apply border-amber-200 bg-amber-50 text-amber-700; }
+  .status-chip.sc-warn .dot { @apply bg-amber-500; }
+  .status-chip.sc-bad { @apply border-red-200 bg-red-50 text-red-700; }
+  .status-chip.sc-bad .dot { @apply bg-red-500; }
   .record-grid { @apply grid grid-cols-1 gap-3 md:grid-cols-2; }
   .rec-field { @apply rounded-[10px] border border-line bg-[#fbfbfe] px-4 py-3; }
   .rec-field.full { @apply md:col-span-2; }
@@ -403,16 +422,16 @@
   }
 
   /* ---------- modals ---------- */
-  .modal-backdrop { @apply fixed inset-0 z-[2000] flex items-center justify-center bg-navy/55 p-5 backdrop-blur-[3px]; }
+  .modal-backdrop { @apply fixed inset-0 z-[2000] flex items-center justify-center bg-navy/55 p-5 backdrop-blur-[3px]; animation: fadeIn .2s ease-out; }
   .modal-backdrop[hidden] { @apply hidden; }
-  .modal { @apply w-full max-w-[420px] rounded-[14px] bg-white px-9 pt-9 pb-7 text-center shadow-2xl; animation: modalIn .25s ease-out; }
+  .modal { @apply w-full max-w-[420px] rounded-[14px] bg-white px-9 pt-9 pb-7 text-center shadow-2xl; animation: modalIn .3s cubic-bezier(.22,1,.36,1); }
   .modal h3 { @apply mt-4 mb-2 text-[22px] font-extrabold text-ink; }
   .modal p { @apply mb-5 text-sm leading-relaxed text-muted; }
   .modal-actions { @apply flex justify-end gap-3; }
   .modal-icon { @apply mx-auto inline-flex h-16 w-16 items-center justify-center rounded-full; }
   .modal-icon.warn { @apply bg-amber-50 text-amber-600; }
   .modal-icon svg { @apply h-8 w-8; }
-  .modal.modal-lg { @apply max-w-[780px] px-[30px] py-6 text-left max-h-[92vh] overflow-y-auto; }
+  .modal.modal-lg { @apply max-w-[1080px] rounded-[18px] px-9 py-7 text-left max-h-[94vh] overflow-y-auto; }
   .modal-backdrop.closing { animation: fadeOut .19s ease-in forwards; }
   .modal-backdrop.closing .modal { animation: modalOut .19s ease-in forwards; }
   .edit-head { @apply mb-4 flex items-start gap-2.5; }
@@ -497,7 +516,8 @@
   .health-bar { @apply mb-2.5 h-2.5 overflow-hidden rounded-full bg-line; }
   .health-bar span { @apply block h-full rounded-full bg-gradient-to-r from-primary to-accent; }
 }
-@keyframes modalIn { from { transform: scale(.92) translateY(10px); opacity: 0; } to { transform: scale(1) translateY(0); opacity: 1; } }
+@keyframes modalIn { from { transform: scale(.94) translateY(16px); opacity: 0; } to { transform: scale(1) translateY(0); opacity: 1; } }
+@keyframes fadeIn { from { opacity: 0; } }
 @keyframes modalOut { to { transform: scale(.95) translateY(10px); opacity: 0; } }
 @keyframes fadeOut { to { opacity: 0; } }
 @keyframes tickCircle { to { stroke-dashoffset: 0; } }

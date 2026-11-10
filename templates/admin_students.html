@@ -87,6 +87,7 @@
   <div class="section-head">
     <span class="section-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg></span>
     <h3>Student List</h3>
+    <span class="tick-legend"><span class="item"><span class="tick ok">&#10003;</span> Submitted</span><span class="item"><span class="tick no">&#10007;</span> Not Submitted</span></span>
     <span class="hint">{{ per_page }} per page</span>
     <span class="hint" id="liveHint" hidden style="color:var(--primary);font-weight:600"></span>
     <span style="flex:1"></span>
@@ -131,22 +132,22 @@
             <td><span class="row-avatar">{{ s.name[0] if s.name else '?' }}</span><span class="row-name">{{ s.name }}</span></td>
             <td>{{ s.reg_no }}</td>
             <td class="degree-cell">{{ s.degree or '—' }}</td>
-            <td>
-              {% if s.folder_file == 'Completed' %}<span class="pill q">Completed</span>
-              {% else %}<span class="pill nq">Not Completed</span>{% endif %}
+            <td class="tick-cell">
+              {% if s.folder_file == 'Completed' %}<span class="tick ok" title="Submitted">&#10003;</span>
+              {% else %}<span class="tick no" title="Not submitted">&#10007;</span>{% endif %}
             </td>
-            <td>
-              {% if s.synopsis == 'Received' %}<span class="pill q">Received</span>
-              {% else %}<span class="pill nq">Not Received</span>{% endif %}
+            <td class="tick-cell">
+              {% if s.synopsis == 'Received' %}<span class="tick ok" title="Submitted">&#10003;</span>
+              {% else %}<span class="tick no" title="Not submitted">&#10007;</span>{% endif %}
             </td>
             <td class="dates-cell">{{ s.syn_at_disp }}</td>
-            <td>
-              {% if s.semi_final_thesis == 'Received' %}<span class="pill q">Received</span>
-              {% else %}<span class="pill nq">Not Received</span>{% endif %}
+            <td class="tick-cell">
+              {% if s.semi_final_thesis == 'Received' %}<span class="tick ok" title="Submitted">&#10003;</span>
+              {% else %}<span class="tick no" title="Not submitted">&#10007;</span>{% endif %}
             </td>
-            <td>
-              {% if s.final_thesis == 'Received' %}<span class="pill q">Received</span>
-              {% else %}<span class="pill nq">Not Received</span>{% endif %}
+            <td class="tick-cell">
+              {% if s.final_thesis == 'Received' %}<span class="tick ok" title="Submitted">&#10003;</span>
+              {% else %}<span class="tick no" title="Not submitted">&#10007;</span>{% endif %}
             </td>
             <td class="dates-cell">
               <div><span>Semi:</span> {{ s.semi_at_disp }}</div>
@@ -154,9 +155,9 @@
             </td>
             <td>{{ s.coe_display }}</td>
             <td>
-              {% if s.status in ['Continue', 'Viva Done', 'Pass Out', 'Sent to COE'] %}<span class="pill q">{{ s.status }}</span>
-              {% elif s.status in ['Viva Pending', 'Defense Pending'] %}<span class="pill warn">{{ s.status }}</span>
-              {% else %}<span class="pill nq">{{ s.status }}</span>{% endif %}
+              {% if s.status in ['Continue', 'Viva Done', 'Pass Out', 'Sent to COE'] %}<span class="status-chip sc-ok"><span class="dot"></span>{{ s.status }}</span>
+              {% elif s.status in ['Viva Pending', 'Defense Pending'] %}<span class="status-chip sc-warn"><span class="dot"></span>{{ s.status }}</span>
+              {% else %}<span class="status-chip sc-bad"><span class="dot"></span>{{ s.status }}</span>{% endif %}
             </td>
             <td><button type="button" class="btn ghost sm profile-btn" data-sid="{{ s.id }}">Profile</button></td>
           </tr>
@@ -216,7 +217,8 @@
     </div>
     <form method="post" id="editForm" action="">
       <input type="hidden" name="next" id="editNext" value="">
-      <div class="form-grid">
+      <p class="hl-note">Highlighted fields are the key ones to update &mdash; Folder/File, Synopsis, Synopsis Received, Semi-Final, Final Thesis.</p>
+      <div class="form-grid form-wide">
         <div>
           <label class="f-label" for="e_name">Name *</label>
           <input class="no-icon" type="text" id="e_name" name="name" required>
@@ -261,23 +263,23 @@
             {% for v in status_list %}<option value="{{ v }}">{{ v }}</option>{% endfor %}
           </select>
         </div>
-        <div>
+        <div class="hl">
           <label class="f-label" for="e_folder_file">Folder/File (With GS-Forms)</label>
           <select class="no-icon" id="e_folder_file" name="folder_file">
             {% for v in folders %}<option value="{{ v }}">{{ v }}</option>{% endfor %}
           </select>
         </div>
-        <div>
+        <div class="hl">
           <label class="f-label" for="e_synopsis">Synopsis</label>
           <select class="no-icon" id="e_synopsis" name="synopsis">
             {% for v in received %}<option value="{{ v }}">{{ v }}</option>{% endfor %}
           </select>
         </div>
-        <div>
+        <div class="hl">
           <label class="f-label" for="e_synopsis_at">Synopsis Received On</label>
           <input class="no-icon" type="datetime-local" id="e_synopsis_at" name="synopsis_at">
         </div>
-        <div>
+        <div class="hl">
           <label class="f-label" for="e_semi_final_thesis">Semi-Final Thesis</label>
           <select class="no-icon" id="e_semi_final_thesis" name="semi_final_thesis">
             {% for v in received %}<option value="{{ v }}">{{ v }}</option>{% endfor %}
@@ -287,7 +289,7 @@
           <label class="f-label" for="e_semi_final_thesis_at">Semi-Final Received On</label>
           <input class="no-icon" type="datetime-local" id="e_semi_final_thesis_at" name="semi_final_thesis_at">
         </div>
-        <div>
+        <div class="hl">
           <label class="f-label" for="e_final_thesis">Final Thesis</label>
           <select class="no-icon" id="e_final_thesis" name="final_thesis">
             {% for v in received %}<option value="{{ v }}">{{ v }}</option>{% endfor %}
@@ -425,10 +427,13 @@
         return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[m];
       });
     }
-    function ynPill(v, yesText, noText) {
-      return v === yesText
-        ? '<span class="pill q">' + yesText + '</span>'
-        : '<span class="pill nq">' + noText + '</span>';
+    function tickHTML(ok) {
+      return ok ? '<span class="tick ok" title="Submitted">&#10003;</span>'
+                : '<span class="tick no" title="Not submitted">&#10007;</span>';
+    }
+    function statusChip(st, pill) {
+      var cls = pill === 'q' ? 'sc-ok' : (pill === 'warn' ? 'sc-warn' : 'sc-bad');
+      return '<span class="status-chip ' + cls + '"><span class="dot"></span>' + esc(st) + '</span>';
     }
     function rowHTML(s) {
       return '<tr data-dept="' + esc(s.department) + '">'
@@ -436,15 +441,15 @@
         + '<td><span class="row-avatar">' + esc(s.name.charAt(0) || '?') + '</span><span class="row-name">' + esc(s.name) + '</span></td>'
         + '<td>' + esc(s.reg_no) + '</td>'
         + '<td class="degree-cell">' + esc(s.degree || '\u2014') + '</td>'
-        + '<td>' + ynPill(s.folder_file, 'Completed', 'Not Completed') + '</td>'
-        + '<td>' + ynPill(s.synopsis, 'Received', 'Not Received') + '</td>'
+        + '<td class="tick-cell">' + tickHTML(s.folder_file === 'Completed') + '</td>'
+        + '<td class="tick-cell">' + tickHTML(s.synopsis === 'Received') + '</td>'
         + '<td class="dates-cell">' + esc(s.syn_at) + '</td>'
-        + '<td>' + ynPill(s.semi_final_thesis, 'Received', 'Not Received') + '</td>'
-        + '<td>' + ynPill(s.final_thesis, 'Received', 'Not Received') + '</td>'
+        + '<td class="tick-cell">' + tickHTML(s.semi_final_thesis === 'Received') + '</td>'
+        + '<td class="tick-cell">' + tickHTML(s.final_thesis === 'Received') + '</td>'
         + '<td class="dates-cell"><div><span>Semi:</span> ' + esc(s.semi_at) +
           '</div><div><span>Final:</span> ' + esc(s.final_at) + '</div></td>'
         + '<td>' + esc(s.coe_display) + '</td>'
-        + '<td><span class="pill ' + s.pill + '">' + esc(s.status) + '</span></td>'
+        + '<td>' + statusChip(s.status, s.pill) + '</td>'
         + '<td><button type="button" class="btn ghost sm profile-btn" data-sid="' + s.id + '">Profile</button></td>'
         + '</tr>';
     }
