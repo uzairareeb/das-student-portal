@@ -1,0 +1,17 @@
+<div class="card section pipeline">
+  <div class="section-head">
+    <span class="section-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></span>
+    <h3>Academic Journey</h3>
+    {% if s.ms.ended %}<span class="pill nq">{{ s.status }}</span>
+    {% elif s.ms.current %}<span class="hint">Currently: <strong>{{ s.ms.current }}</strong></span>
+    {% else %}<span class="pill q">Complete</span>{% endif %}
+  </div>
+  <ol class="pipeline-steps">
+    {% for st in s.ms.stages %}
+    <li class="pstep {{ st.state }}">
+      <span class="pdot">{% if st.state == 'done' %}&#10003;{% elif st.state == 'current' %}&bull;{% endif %}</span>
+      <span class="pname">{{ st.name }}</span>
+    </li>
+    {% endfor %}
+  </ol>
+</div>

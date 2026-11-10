@@ -8,6 +8,20 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/tailwind.css') }}">
+  <script>
+  (function () {
+    // Dark mode: saved preference, applied before first paint. Only inside
+    // the portals (/admin/*, /dept/*, /student/*) — login + home stay light.
+    var portal = /^\/(admin|dept|student)\//.test(location.pathname);
+    var stored = null;
+    try { stored = localStorage.getItem('das-theme'); } catch (e) {}
+    if (portal && stored === 'dark') document.documentElement.classList.add('dark');
+    window.toggleTheme = function () {
+      var dark = document.documentElement.classList.toggle('dark');
+      try { localStorage.setItem('das-theme', dark ? 'dark' : 'light'); } catch (e) {}
+    };
+  })();
+  </script>
   {% block extra_css %}{% endblock %}
 </head>
 <body class="{% block body_class %}{% endblock %}">

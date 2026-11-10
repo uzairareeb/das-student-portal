@@ -111,7 +111,7 @@
             <th>Folder/File</th><th>Synopsis</th><th>Synopsis Received</th>
             <th>Semi-Final</th><th>Final Thesis</th><th>Thesis Received Dates</th>
             <th>Thesis Forward (COE)</th>
-            <th>Status</th><th></th>
+            <th>Status</th><th>Progress</th><th></th>
           </tr>
         </thead>
         <tbody id="studentsBody">
@@ -148,6 +148,7 @@
               {% elif s.status in ['Viva Pending', 'Defense Pending'] %}<span class="pill warn">{{ s.status }}</span>
               {% else %}<span class="pill nq">{{ s.status }}</span>{% endif %}
             </td>
+            <td>{% include "_pipeline_mini.html" %}</td>
             <td><button type="button" class="btn ghost sm profile-btn" data-sid="{{ s.id }}">Profile</button></td>
           </tr>
           {% endfor %}

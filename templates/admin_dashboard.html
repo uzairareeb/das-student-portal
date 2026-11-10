@@ -16,22 +16,24 @@
       <a class="btn ghost sm banner-btn" href="{{ url_for('admin_uploads') }}">Review Uploads{% if uploads_pending_total %} ({{ uploads_pending_total }}){% endif %}</a>
     </div>
   </div>
+    <p class="banner-live"><span class="live-dot"></span> Live &middot; <span id="dash-updated">Updated just now</span></p>
+  </div>
   <div class="banner-stats">
     <a class="banner-chip" href="{{ url_for('admin_students') }}">
       <span class="bc-ico blue"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></span>
-      <span class="bc-num">{{ total }}</span><span class="bc-label">Total Students</span>
+      <span class="bc-num" id="bc-total">{{ total }}</span><span class="bc-label">Total Students</span>
     </a>
     <a class="banner-chip" href="#attention">
       <span class="bc-ico amber"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg></span>
-      <span class="bc-num">{{ pending.total }}</span><span class="bc-label">Needs Attention</span>
+      <span class="bc-num" id="bc-pending">{{ pending.total }}</span><span class="bc-label">Needs Attention</span>
     </a>
     <a class="banner-chip" href="{{ url_for('admin_uploads') }}">
       <span class="bc-ico violet"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg></span>
-      <span class="bc-num">{{ uploads_pending_total }}</span><span class="bc-label">Uploads Awaiting Review</span>
+      <span class="bc-num" id="bc-uploads">{{ uploads_pending_total }}</span><span class="bc-label">Uploads Awaiting Review</span>
     </a>
     <a class="banner-chip" href="{{ url_for('admin_viva') }}">
       <span class="bc-ico green"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg></span>
-      <span class="bc-num">{{ viva_month.pass }}</span><span class="bc-label">Viva Passed This Month</span>
+      <span class="bc-num" id="bc-viva">{{ viva_month.pass }}</span><span class="bc-label">Viva Passed This Month</span>
     </a>
   </div>
 </div>
@@ -46,7 +48,7 @@
     </div>
     <div class="tile-grid">
       <a class="tile t-blue" href="{{ url_for('admin_students') }}">
-        <span class="tile-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></span><div><div class="n">{{ total }}</div><div class="t">Total Students</div><div class="tile-bar"><span style="width: 100%; background: #1769e8"></span></div><div class="tile-pct">All students</div></div>
+        <span class="tile-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></span><div><div class="n" data-stat="__total__">{{ total }}</div><div class="t">Total Students</div><div class="tile-bar"><span style="width: 100%; background: #1769e8"></span></div><div class="tile-pct">All students</div></div>
       </a>
       {% for st in status_list %}
       {% if st == 'Continue' %}{% set tc = 't-green' %}
@@ -62,7 +64,7 @@
       {% set pct = ((stats.get(st, 0) / total * 100)|round(1)) if total else 0 %}
       {% set bar_c = {'t-blue': '#1769e8', 't-green': '#047857', 't-green2': '#059669', 't-amber': '#d97706', 't-purple': '#6654a3', 't-purple2': '#7c3aed', 't-red': '#b91c1c', 't-red2': '#e11d48', 't-blue2': '#2563eb', 't-blue3': '#0284c7', 't-slate': '#475569'} %}
       <a class="tile {{ tc }}" href="{{ url_for('admin_students', status=st) }}">
-        <span class="tile-ico">{% if st == 'Continue' %}<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="6 3 20 12 6 21 6 3"/></svg>{% elif st == 'Freeze' %}<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="14" y="4" width="4" height="16" rx="1"/><rect x="6" y="4" width="4" height="16" rx="1"/></svg>{% elif st == 'Left' %}<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>{% elif st == 'Admission Cancelled' %}<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>{% elif st == 'Viva Done' %}<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>{% elif st == 'Viva Pending' %}<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>{% elif st == 'Defense Pending' %}<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>{% elif st == 'Sent to COE' %}<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>{% elif st == 'Pass Out' %}<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 10L12 5 2 10l10 5 10-5z"/><path d="M6 12v5c0 1.7 2.7 3 6 3s6-1.3 6-3v-5"/><line x1="22" y1="10" x2="22" y2="16"/></svg>{% endif %}</span><div><div class="n">{{ stats.get(st, 0) }}</div><div class="t">{{ st }}</div><div class="tile-bar"><span style="width: {{ pct }}%; background: {{ bar_c[tc] }}"></span></div><div class="tile-pct">{{ pct }}% of total</div></div>
+        <span class="tile-ico">{% if st == 'Continue' %}<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="6 3 20 12 6 21 6 3"/></svg>{% elif st == 'Freeze' %}<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="14" y="4" width="4" height="16" rx="1"/><rect x="6" y="4" width="4" height="16" rx="1"/></svg>{% elif st == 'Left' %}<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>{% elif st == 'Admission Cancelled' %}<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>{% elif st == 'Viva Done' %}<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>{% elif st == 'Viva Pending' %}<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>{% elif st == 'Defense Pending' %}<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>{% elif st == 'Sent to COE' %}<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>{% elif st == 'Pass Out' %}<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 10L12 5 2 10l10 5 10-5z"/><path d="M6 12v5c0 1.7 2.7 3 6 3s6-1.3 6-3v-5"/><line x1="22" y1="10" x2="22" y2="16"/></svg>{% endif %}</span><div><div class="n" data-stat="{{ st }}">{{ stats.get(st, 0) }}</div><div class="t">{{ st }}</div><div class="tile-bar"><span data-bar="{{ st }}" style="width: {{ pct }}%; background: {{ bar_c[tc] }}"></span></div><div class="tile-pct" data-pct="{{ st }}">{{ pct }}% of total</div></div>
       </a>
       {% endfor %}
     </div>
@@ -86,7 +88,7 @@
 <!-- 3. Attention Needed -->
 <section class="card dash-card pending-card" id="attention">
   <div class="dash-card-head">
-    <h3><span class="dash-ico amber"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg></span> Attention Needed</h3>
+    <h3><span class="dash-ico amber"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg></span> Attention Needed <span class="hint" id="attn-count">({{ pending.total }})</span></h3>
     {% if pending.total %}<span class="pill warn">{{ pending.total }} pending</span>{% endif %}
   </div>
   {% if pending.groups %}
@@ -134,9 +136,9 @@
       <a href="{{ url_for('admin_viva') }}">View All</a>
     </div>
     <div class="viva-strip">
-      <div class="viva-box ok"><span class="viva-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg></span><div><div class="n">{{ viva_month.pass }}</div><div class="t">Passed</div></div></div>
-      <div class="viva-box bad"><span class="viva-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg></span><div><div class="n">{{ viva_month.fail }}</div><div class="t">Failed</div></div></div>
-      <div class="viva-box warn"><span class="viva-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></span><div><div class="n">{{ viva_month.pending }}</div><div class="t">Pending</div></div></div>
+      <div class="viva-box ok"><span class="viva-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg></span><div><div class="n" data-viva="pass">{{ viva_month.pass }}</div><div class="t">Passed</div></div></div>
+      <div class="viva-box bad"><span class="viva-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg></span><div><div class="n" data-viva="fail">{{ viva_month.fail }}</div><div class="t">Failed</div></div></div>
+      <div class="viva-box warn"><span class="viva-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></span><div><div class="n" data-viva="pending">{{ viva_month.pending }}</div><div class="t">Pending</div></div></div>
     </div>
     <p class="hint">Based on viva dates in the current month. Full history is available in the Viva Records page.</p>
   </section>
@@ -254,11 +256,12 @@
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 <script>
 (function () {
+  var isDark = document.documentElement.classList.contains('dark');
   var palette = ['#2457a7', '#15803d', '#d97706', '#7c3aed', '#b91c1c', '#0e7490', '#db2777', '#475569', '#f59e0b'];
   function doughnut(id, labels, data) {
     new Chart(document.getElementById(id), {
       type: 'doughnut',
-      data: { labels: labels, datasets: [{ data: data, backgroundColor: palette, borderWidth: 2, borderColor: '#fff' }] },
+      data: { labels: labels, datasets: [{ data: data, backgroundColor: palette, borderWidth: 2, borderColor: isDark ? '#111d33' : '#fff' }] },
       options: { responsive: true, maintainAspectRatio: false, cutout: '68%', plugins: { legend: { display: false } } }
     });
   }
@@ -271,8 +274,58 @@
       datasets: [{ data: {{ sessions|map(attribute=1)|list|tojson }}, backgroundColor: palette, borderRadius: 8, barThickness: 42 }]
     },
     options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } },
-      scales: { y: { beginAtZero: true, ticks: { precision: 0 }, grid: { color: '#eef2f7' } }, x: { grid: { display: false } } } }
+      scales: { y: { beginAtZero: true, ticks: { precision: 0, color: isDark ? '#94a3b8' : undefined }, grid: { color: isDark ? '#22304a' : '#eef2f7' } }, x: { ticks: { color: isDark ? '#94a3b8' : undefined }, grid: { display: false } } } }
   });
+
+  /* ---- live dashboard refresh: numbers update without a page reload ---- */
+  (function () {
+    var updatedEl = document.getElementById('dash-updated');
+    var last = Date.now();
+    function ago() {
+      if (!updatedEl) return;
+      var s = Math.floor((Date.now() - last) / 1000);
+      updatedEl.textContent = s < 10 ? 'Updated just now'
+        : s < 60 ? 'Updated ' + s + 's ago'
+        : 'Updated ' + Math.floor(s / 60) + ' min ago';
+    }
+    function apply(d) {
+      function setNum(id, v) { var el = document.getElementById(id); if (el) el.textContent = v; }
+      setNum('bc-total', d.total);
+      setNum('bc-pending', d.pending_total);
+      setNum('bc-uploads', d.uploads_pending_total);
+      setNum('bc-viva', d.viva_month.pass);
+      var ac = document.getElementById('attn-count');
+      if (ac) ac.textContent = '(' + d.pending_total + ')';
+      document.querySelectorAll('[data-viva]').forEach(function (el) {
+        var k = el.getAttribute('data-viva');
+        if (d.viva_month[k] !== undefined) el.textContent = d.viva_month[k];
+      });
+      document.querySelectorAll('[data-stat]').forEach(function (el) {
+        var k = el.getAttribute('data-stat');
+        var v = k === '__total__' ? d.total : (d.stats[k] || 0);
+        el.textContent = v;
+        var bar = document.querySelector('[data-bar="' + k + '"]');
+        var pct = document.querySelector('[data-pct="' + k + '"]');
+        var p = d.total ? Math.round(v / d.total * 10) / 10 : 0;
+        if (bar) bar.style.width = p + '%';
+        if (pct) pct.textContent = p + '% of total';
+      });
+      last = Date.now();
+      ago();
+    }
+    function refresh() {
+      fetch('/admin/dashboard/data', { credentials: 'same-origin' })
+        .then(function (r) { return r.json(); })
+        .then(apply)
+        .catch(function () {});
+    }
+    setInterval(ago, 15000);
+    setInterval(refresh, 60000);
+    document.addEventListener('visibilitychange', function () {
+      if (!document.hidden) refresh();
+    });
+    ago();
+  })();
 })();
 </script>
 {% endblock %}
