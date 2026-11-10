@@ -2990,7 +2990,9 @@ import json as _json
 def _row_jsonable(row):
     out = {}
     for k, v in dict(row).items():
-        if isinstance(v, (bytes, bytearray)):
+        if isinstance(v, (bytes, bytearray, memoryview)):
+            # psycopg2 returns BYTEA columns as memoryview (sqlite3
+            # returns bytes) — both must become base64 for json.dumps.
             out[k] = {"__b64__": _b64.b64encode(bytes(v)).decode("ascii")}
         elif isinstance(v, (datetime, date)):
             # Postgres returns DATE columns as date objects, which
