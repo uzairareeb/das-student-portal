@@ -2992,6 +2992,10 @@ def _row_jsonable(row):
     for k, v in dict(row).items():
         if isinstance(v, (bytes, bytearray)):
             out[k] = {"__b64__": _b64.b64encode(bytes(v)).decode("ascii")}
+        elif isinstance(v, (datetime, date)):
+            # Postgres returns DATE columns as date objects, which
+            # json.dumps cannot serialise (SQLite returns plain text).
+            out[k] = v.isoformat()
         else:
             out[k] = v
     return out
