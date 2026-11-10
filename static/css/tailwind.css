@@ -2935,54 +2935,6 @@
     font-weight: var(--font-weight-semibold);
     color: var(--color-ink);
   }
-  .wide-table td.tick-cell {
-    text-align: center;
-  }
-  .wide-table th.tick-head {
-    text-align: center;
-  }
-  .tick {
-    display: inline-flex;
-    height: calc(var(--spacing) * 8);
-    width: calc(var(--spacing) * 8);
-    align-items: center;
-    justify-content: center;
-    border-radius: calc(infinity * 1px);
-    font-size: var(--text-base);
-    line-height: var(--tw-leading, var(--text-base--line-height));
-    --tw-leading: 1;
-    line-height: 1;
-    --tw-font-weight: var(--font-weight-extrabold);
-    font-weight: var(--font-weight-extrabold);
-    color: var(--color-white);
-  }
-  .tick.ok {
-    background: #10b981;
-  }
-  .tick.no {
-    background: #ef4444;
-  }
-  .tick-legend {
-    margin-left: var(--spacing);
-    display: inline-flex;
-    align-items: center;
-    gap: calc(var(--spacing) * 3);
-    font-size: var(--text-xs);
-    line-height: var(--tw-leading, var(--text-xs--line-height));
-    --tw-font-weight: var(--font-weight-semibold);
-    font-weight: var(--font-weight-semibold);
-    color: var(--color-muted);
-  }
-  .tick-legend .item {
-    display: inline-flex;
-    align-items: center;
-    gap: calc(var(--spacing) * 1.5);
-  }
-  .tick-legend .tick {
-    height: calc(var(--spacing) * 5);
-    width: calc(var(--spacing) * 5);
-    font-size: 11px;
-  }
   .status-chip {
     display: inline-flex;
     align-items: center;

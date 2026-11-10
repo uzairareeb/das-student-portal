@@ -87,7 +87,6 @@
   <div class="section-head">
     <span class="section-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg></span>
     <h3>Student List</h3>
-    <span class="tick-legend"><span class="item"><span class="tick ok">&#10003;</span> Submitted</span><span class="item"><span class="tick no">&#10007;</span> Not Submitted</span></span>
     <span class="hint">{{ per_page }} per page</span>
     <span class="hint" id="liveHint" hidden style="color:var(--primary);font-weight:600"></span>
     <span style="flex:1"></span>
@@ -119,8 +118,8 @@
           <tr>
             <th class="cb"><input type="checkbox" id="selAll" title="Select all on this page"></th>
             <th><a class="th-sort" href="{{ sort_url('name') }}">Name {% if sort == 'name' %}<span class="arr">{{ '▼' if direction == 'desc' else '▲' }}</span>{% endif %}</a></th><th><a class="th-sort" href="{{ sort_url('reg_no') }}">Reg.No {% if sort == 'reg_no' %}<span class="arr">{{ '▼' if direction == 'desc' else '▲' }}</span>{% endif %}</a></th><th>Degree</th>
-            <th class="tick-head">Folder/File</th><th class="tick-head">Synopsis</th><th>Synopsis Received</th>
-            <th class="tick-head">Semi-Final</th><th class="tick-head">Final Thesis</th><th>Thesis Received Dates</th>
+            <th>Folder/File</th><th>Synopsis</th><th>Synopsis Received</th>
+            <th>Semi-Final</th><th>Final Thesis</th><th>Thesis Received Dates</th>
             <th>Thesis Forward (COE)</th>
             <th><a class="th-sort" href="{{ sort_url('status') }}">Status {% if sort == 'status' %}<span class="arr">{{ '▼' if direction == 'desc' else '▲' }}</span>{% endif %}</a></th><th></th>
           </tr>
@@ -132,22 +131,22 @@
             <td><span class="row-avatar">{{ s.name[0] if s.name else '?' }}</span><span class="row-name">{{ s.name }}</span></td>
             <td>{{ s.reg_no }}</td>
             <td class="degree-cell">{{ s.degree or '—' }}</td>
-            <td class="tick-cell">
-              {% if s.folder_file == 'Completed' %}<span class="tick ok" title="Submitted">&#10003;</span>
-              {% else %}<span class="tick no" title="Not submitted">&#10007;</span>{% endif %}
+            <td>
+              {% if s.folder_file == 'Completed' %}<span class="pill q">Completed</span>
+              {% else %}<span class="pill nq">Not Completed</span>{% endif %}
             </td>
-            <td class="tick-cell">
-              {% if s.synopsis == 'Received' %}<span class="tick ok" title="Submitted">&#10003;</span>
-              {% else %}<span class="tick no" title="Not submitted">&#10007;</span>{% endif %}
+            <td>
+              {% if s.synopsis == 'Received' %}<span class="pill q">Received</span>
+              {% else %}<span class="pill nq">Not Received</span>{% endif %}
             </td>
             <td class="dates-cell">{{ s.syn_at_disp }}</td>
-            <td class="tick-cell">
-              {% if s.semi_final_thesis == 'Received' %}<span class="tick ok" title="Submitted">&#10003;</span>
-              {% else %}<span class="tick no" title="Not submitted">&#10007;</span>{% endif %}
+            <td>
+              {% if s.semi_final_thesis == 'Received' %}<span class="pill q">Received</span>
+              {% else %}<span class="pill nq">Not Received</span>{% endif %}
             </td>
-            <td class="tick-cell">
-              {% if s.final_thesis == 'Received' %}<span class="tick ok" title="Submitted">&#10003;</span>
-              {% else %}<span class="tick no" title="Not submitted">&#10007;</span>{% endif %}
+            <td>
+              {% if s.final_thesis == 'Received' %}<span class="pill q">Received</span>
+              {% else %}<span class="pill nq">Not Received</span>{% endif %}
             </td>
             <td class="dates-cell">
               <div><span>Semi:</span> {{ s.semi_at_disp }}</div>
@@ -427,9 +426,10 @@
         return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[m];
       });
     }
-    function tickHTML(ok) {
-      return ok ? '<span class="tick ok" title="Submitted">&#10003;</span>'
-                : '<span class="tick no" title="Not submitted">&#10007;</span>';
+    function ynPill(v, yesText, noText) {
+      return v === yesText
+        ? '<span class="pill q">' + yesText + '</span>'
+        : '<span class="pill nq">' + noText + '</span>';
     }
     function statusChip(st, pill) {
       var cls = pill === 'q' ? 'sc-ok' : (pill === 'warn' ? 'sc-warn' : 'sc-bad');
@@ -441,11 +441,11 @@
         + '<td><span class="row-avatar">' + esc(s.name.charAt(0) || '?') + '</span><span class="row-name">' + esc(s.name) + '</span></td>'
         + '<td>' + esc(s.reg_no) + '</td>'
         + '<td class="degree-cell">' + esc(s.degree || '\u2014') + '</td>'
-        + '<td class="tick-cell">' + tickHTML(s.folder_file === 'Completed') + '</td>'
-        + '<td class="tick-cell">' + tickHTML(s.synopsis === 'Received') + '</td>'
+        + '<td>' + ynPill(s.folder_file, 'Completed', 'Not Completed') + '</td>'
+        + '<td>' + ynPill(s.synopsis, 'Received', 'Not Received') + '</td>'
         + '<td class="dates-cell">' + esc(s.syn_at) + '</td>'
-        + '<td class="tick-cell">' + tickHTML(s.semi_final_thesis === 'Received') + '</td>'
-        + '<td class="tick-cell">' + tickHTML(s.final_thesis === 'Received') + '</td>'
+        + '<td>' + ynPill(s.semi_final_thesis, 'Received', 'Not Received') + '</td>'
+        + '<td>' + ynPill(s.final_thesis, 'Received', 'Not Received') + '</td>'
         + '<td class="dates-cell"><div><span>Semi:</span> ' + esc(s.semi_at) +
           '</div><div><span>Final:</span> ' + esc(s.final_at) + '</div></td>'
         + '<td>' + esc(s.coe_display) + '</td>'
