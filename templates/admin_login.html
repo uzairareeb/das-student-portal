@@ -9,38 +9,46 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/tailwind.css') }}">
 </head>
-<body class="ref-page">
-  <div class="ref-card">
-    <!-- Welcome panel -->
-    <section class="ref-left">
-      <span class="ref-circle ref-circle-a"></span>
-      <span class="ref-circle ref-circle-b"></span>
-      <div class="ref-left-inner">
-        <h1>WELCOME</h1>
-        <p class="ref-headline">{{ uni }}</p>
-        <p class="ref-para">Cholistan University of Veterinary and Animal Sciences, Bahawalpur &mdash; manage MPhil &amp; PhD student records, viva schedules and reports in one place.</p>
+<body class="ref2-page">
+  <div class="ref2-card">
+    <!-- Form side -->
+    <section class="ref2-left">
+      <div class="ref2-form">
+        <h2>Login</h2>
+        <p class="ref2-sub">Restricted area &mdash; sign in to manage student records.</p>
+        <form method="post" id="loginForm">
+          {% if error %}<p class="form-error">{{ error }}</p>{% endif %}
+          <div class="ref2-pw">
+            <input class="ref2-input" type="password" name="password" id="adminPw" placeholder="Password" required autofocus>
+            <button type="button" class="ref2-show" id="pwToggle">SHOW</button>
+          </div>
+          <div class="ref2-row">
+            <label class="ref2-remember"><input type="checkbox" name="remember" value="1"> Remember Me</label>
+            <a class="ref2-home" href="{{ url_for('index') }}">Back to Home</a>
+          </div>
+          <button type="submit" class="ref2-submit" id="loginBtn">LOGIN</button>
+        </form>
+        <p class="ref2-note">Authorized personnel only. All sign-ins are logged.</p>
       </div>
     </section>
 
-    <!-- Sign-in panel -->
-    <section class="ref-right">
-      <div class="ref-form">
-        <h2>Sign in</h2>
-        <p class="ref-sub">Restricted area &mdash; sign in to manage student records.</p>
-        <form method="post" id="loginForm">
-          {% if error %}<p class="form-error">{{ error }}</p>{% endif %}
-          <div class="ref-input">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
-            <input type="password" name="password" id="adminPw" placeholder="Password" required autofocus>
-            <button type="button" class="ref-show" id="pwToggle">SHOW</button>
-          </div>
-          <div class="ref-row">
-            <label class="ref-remember"><input type="checkbox" name="remember" value="1"> Remember me</label>
-            <a class="ref-home" href="{{ url_for('index') }}">Back to Home</a>
-          </div>
-          <button type="submit" class="ref-submit" id="loginBtn">Sign in</button>
-        </form>
-        <p class="ref-note">Authorized personnel only. All sign-ins are logged.</p>
+    <!-- Welcome panel -->
+    <section class="ref2-right">
+      <svg class="ref2-poly" viewBox="0 0 600 520" preserveAspectRatio="none" aria-hidden="true">
+        <polygon points="600,0 600,170 430,70" fill="#A78BFA" opacity="0.55"/>
+        <polygon points="430,70 600,170 520,310" fill="#7C3AED" opacity="0.7"/>
+        <polygon points="520,310 600,170 600,520" fill="#6D28D9" opacity="0.6"/>
+        <polygon points="300,0 430,70 600,0" fill="#C4B5FD" opacity="0.5"/>
+        <polygon points="430,70 520,310 380,240" fill="#8B5CF6" opacity="0.55"/>
+        <polygon points="380,240 520,310 460,520" fill="#5B21B6" opacity="0.55"/>
+        <polygon points="520,310 600,520 460,520" fill="#3B82F6" opacity="0.5"/>
+        <polygon points="300,0 380,240 180,120" fill="#A78BFA" opacity="0.4"/>
+        <polygon points="180,120 380,240 300,520" fill="#7C3AED" opacity="0.45"/>
+        <polygon points="0,0 300,0 180,120" fill="#DDD6FE" opacity="0.35"/>
+      </svg>
+      <div class="ref2-welcome">
+        <h1>Welcome<br>Back.</h1>
+        <p>Cholistan University of Veterinary and Animal Sciences, Bahawalpur &mdash; {{ uni }}. {{ title }}.</p>
       </div>
     </section>
   </div>
