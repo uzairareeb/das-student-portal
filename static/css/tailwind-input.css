@@ -417,7 +417,7 @@
   }
   .ref2-poly { @apply pointer-events-none absolute inset-0 h-full w-full; }
   .ref2-welcome { @apply absolute inset-0 flex flex-col items-center justify-center px-6 text-center text-white lg:inset-auto lg:top-1/2 lg:right-12 lg:w-[340px] lg:-translate-y-1/2 lg:px-0; }
-  .ref2-logo { @apply mb-4 flex h-14 w-14 items-center justify-center overflow-hidden rounded-full bg-white p-1 shadow-lg ring-4 ring-white/25 lg:mb-5 lg:h-20 lg:w-20; }
+  .ref2-logo { @apply mb-4 flex h-16 w-16 items-center justify-center overflow-hidden rounded-full bg-white p-1 shadow-lg ring-4 ring-white/25 lg:mb-5 lg:h-32 lg:w-32; }
   .ref2-logo img { @apply h-full w-full rounded-full object-cover; }
   .ref2-welcome h1 { @apply text-[30px] leading-tight font-extrabold lg:text-[40px]; }
   .ref2-welcome p { @apply mt-3 hidden text-[12.5px] leading-relaxed text-blue-100 sm:block lg:text-[13.5px]; }
