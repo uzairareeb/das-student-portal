@@ -398,22 +398,23 @@
   .login-brand { @apply relative overflow-hidden bg-navy px-8 py-10 text-white lg:w-[46%] lg:px-12 lg:py-14; }
   .login-brand::before { content: ""; @apply pointer-events-none absolute -top-24 -left-24 h-80 w-80 rounded-full opacity-40; background: radial-gradient(circle, #1769E8 0%, transparent 70%); }
   .login-brand::after { content: ""; @apply pointer-events-none absolute -right-20 -bottom-28 h-96 w-96 rounded-full opacity-30; background: radial-gradient(circle, #ec4899 0%, transparent 70%); }
-  .login-brand-inner { @apply relative mx-auto flex h-full max-w-[460px] flex-col; }
-  .login-logo { @apply mb-6 flex h-20 w-20 items-center justify-center overflow-hidden rounded-full bg-white p-1.5 shadow-lg ring-4 ring-white/20; }
+  .login-brand-inner { @apply relative mx-auto flex h-full max-w-[460px] flex-col items-center text-center; }
+  .login-logo { @apply mx-auto mb-6 flex h-20 w-20 items-center justify-center overflow-hidden rounded-full bg-white p-1.5 shadow-lg ring-4 ring-white/20; }
   .login-logo img { @apply h-full w-full rounded-full object-cover; }
   .login-uni { @apply text-[13px] font-semibold tracking-wide text-blue-200 uppercase; }
   .login-brand-title { @apply mt-3 text-[30px] leading-tight font-extrabold; }
   .login-brand-sub { @apply mt-1 text-[15px] text-blue-100; }
-  .login-points { @apply mt-10 space-y-5; }
-  .login-points li { @apply flex items-start gap-3; }
-  .login-points .dot { @apply mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full; }
+  .login-brand-divider { @apply mx-auto mt-5 h-1 w-14 rounded-full; background: linear-gradient(90deg, #38bdf8, #a78bfa, #f472b6); }
+  .login-points { @apply mt-9 w-full space-y-6; }
+  .login-points li { @apply flex flex-col items-center gap-1 text-center; }
+  .login-points .dot { @apply mb-1 h-2.5 w-2.5 rounded-full; }
   .dot-blue { background: #38bdf8; }
   .dot-violet { background: #a78bfa; }
   .dot-pink { background: #f472b6; }
   .login-points strong { @apply block text-[15px] font-semibold; }
   .login-points span span { @apply block text-[13px] text-blue-200; }
-  .login-brand-foot { @apply mt-auto pt-10 text-xs text-blue-300; }
-  .login-form-wrap { @apply flex flex-1 items-center justify-center px-6 py-12; }
+  .login-brand-foot { @apply mt-auto w-full pt-10 text-center text-xs text-blue-300; }
+  .login-form-wrap { @apply flex flex-1 items-center justify-center px-6 py-12; background: linear-gradient(135deg, #EFF5FF 0%, #F7F9FC 45%, #F6F1FF 100%); }
   .login-form { @apply w-full max-w-[420px]; animation: loginUp .5s ease both; }
   .login-eyebrow { @apply mb-2 text-xs font-bold tracking-[0.18em] text-primary uppercase; }
   .login-form h2 { @apply text-[28px] font-extrabold; }

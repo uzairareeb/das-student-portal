@@ -3000,8 +3000,11 @@
     height: 100%;
     max-width: 460px;
     flex-direction: column;
+    align-items: center;
+    text-align: center;
   }
   .login-logo {
+    margin-inline: auto;
     margin-bottom: calc(var(--spacing) * 6);
     display: flex;
     height: calc(var(--spacing) * 20);
@@ -3048,24 +3051,34 @@
     font-size: 15px;
     color: var(--color-blue-100);
   }
+  .login-brand-divider {
+    margin-inline: auto;
+    margin-top: calc(var(--spacing) * 5);
+    height: var(--spacing);
+    width: calc(var(--spacing) * 14);
+    border-radius: calc(infinity * 1px);
+    background: linear-gradient(90deg, #38bdf8, #a78bfa, #f472b6);
+  }
   .login-points {
-    margin-top: calc(var(--spacing) * 10);
+    margin-top: calc(var(--spacing) * 9);
+    width: 100%;
     :where(& > :not(:last-child)) {
       --tw-space-y-reverse: 0;
-      margin-block-start: calc(calc(var(--spacing) * 5) * var(--tw-space-y-reverse));
-      margin-block-end: calc(calc(var(--spacing) * 5) * calc(1 - var(--tw-space-y-reverse)));
+      margin-block-start: calc(calc(var(--spacing) * 6) * var(--tw-space-y-reverse));
+      margin-block-end: calc(calc(var(--spacing) * 6) * calc(1 - var(--tw-space-y-reverse)));
     }
   }
   .login-points li {
     display: flex;
-    align-items: flex-start;
-    gap: calc(var(--spacing) * 3);
+    flex-direction: column;
+    align-items: center;
+    gap: var(--spacing);
+    text-align: center;
   }
   .login-points .dot {
-    margin-top: calc(var(--spacing) * 1.5);
+    margin-bottom: var(--spacing);
     height: calc(var(--spacing) * 2.5);
     width: calc(var(--spacing) * 2.5);
-    flex-shrink: 0;
     border-radius: calc(infinity * 1px);
   }
   .dot-blue {
@@ -3090,7 +3103,9 @@
   }
   .login-brand-foot {
     margin-top: auto;
+    width: 100%;
     padding-top: calc(var(--spacing) * 10);
+    text-align: center;
     font-size: var(--text-xs);
     line-height: var(--tw-leading, var(--text-xs--line-height));
     color: var(--color-blue-300);
@@ -3102,6 +3117,7 @@
     justify-content: center;
     padding-inline: calc(var(--spacing) * 6);
     padding-block: calc(var(--spacing) * 12);
+    background: linear-gradient(135deg, #EFF5FF 0%, #F7F9FC 45%, #F6F1FF 100%);
   }
   .login-form {
     width: 100%;
