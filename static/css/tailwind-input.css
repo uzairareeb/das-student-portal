@@ -391,6 +391,47 @@
   .pager-info { @apply text-[13.5px] font-semibold text-muted; }
   .pager-perpage { @apply flex items-center gap-2 text-[13.5px] font-semibold text-muted; }
   .per-page-sel { @apply h-9 w-auto rounded-lg border-[1.5px] border-line bg-white px-2.5 py-1 text-[13.5px] font-semibold text-ink; }
+
+  /* ---------- admin login: split-screen ---------- */
+  .login-page { @apply bg-[#F7F9FC] font-sans text-ink; }
+  .login-split { @apply flex min-h-screen flex-col lg:flex-row; animation: loginIn .45s ease both; }
+  .login-brand { @apply relative overflow-hidden bg-navy px-8 py-10 text-white lg:w-[46%] lg:px-12 lg:py-14; }
+  .login-brand::before { content: ""; @apply pointer-events-none absolute -top-24 -left-24 h-80 w-80 rounded-full opacity-40; background: radial-gradient(circle, #1769E8 0%, transparent 70%); }
+  .login-brand::after { content: ""; @apply pointer-events-none absolute -right-20 -bottom-28 h-96 w-96 rounded-full opacity-30; background: radial-gradient(circle, #ec4899 0%, transparent 70%); }
+  .login-brand-inner { @apply relative mx-auto flex h-full max-w-[460px] flex-col; }
+  .login-logo { @apply mb-6 flex h-20 w-20 items-center justify-center overflow-hidden rounded-full bg-white p-1.5 shadow-lg ring-4 ring-white/20; }
+  .login-logo img { @apply h-full w-full rounded-full object-cover; }
+  .login-uni { @apply text-[13px] font-semibold tracking-wide text-blue-200 uppercase; }
+  .login-brand-title { @apply mt-3 text-[30px] leading-tight font-extrabold; }
+  .login-brand-sub { @apply mt-1 text-[15px] text-blue-100; }
+  .login-points { @apply mt-10 space-y-5; }
+  .login-points li { @apply flex items-start gap-3; }
+  .login-points .dot { @apply mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full; }
+  .dot-blue { background: #38bdf8; }
+  .dot-violet { background: #a78bfa; }
+  .dot-pink { background: #f472b6; }
+  .login-points strong { @apply block text-[15px] font-semibold; }
+  .login-points span span { @apply block text-[13px] text-blue-200; }
+  .login-brand-foot { @apply mt-auto pt-10 text-xs text-blue-300; }
+  .login-form-wrap { @apply flex flex-1 items-center justify-center px-6 py-12; }
+  .login-form { @apply w-full max-w-[420px]; animation: loginUp .5s ease both; }
+  .login-eyebrow { @apply mb-2 text-xs font-bold tracking-[0.18em] text-primary uppercase; }
+  .login-form h2 { @apply text-[28px] font-extrabold; }
+  .login-lede { @apply mt-1 mb-7 text-[15px] text-muted; }
+  .login-label { @apply mb-1.5 block text-sm font-semibold; }
+  .login-pw { @apply relative mb-5; }
+  .login-pw input { @apply w-full rounded-[10px] border-[1.5px] border-line bg-white py-3 pr-16 pl-4 text-[15px] outline-none transition; }
+  .login-pw input:focus { @apply border-primary ring-4 ring-blue-100; }
+  .login-toggle { @apply absolute top-1/2 right-2 -translate-y-1/2 cursor-pointer rounded-md px-2.5 py-1 text-[13px] font-semibold text-primary hover:bg-blue-50; }
+  .login-submit { @apply py-3.5 text-[16px]; }
+  .login-submit:disabled { @apply cursor-wait opacity-70; }
+  .login-divider { @apply my-6 flex items-center gap-3 text-xs font-semibold text-muted; }
+  .login-divider::before, .login-divider::after { content: ""; @apply h-px flex-1 bg-line; }
+  .login-home { @apply block text-center text-sm font-semibold text-primary hover:text-navy; }
+  .login-note { @apply mt-6 text-center text-xs text-muted; }
+  @keyframes loginIn { from { opacity: 0; } to { opacity: 1; } }
+  @keyframes loginUp { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
   /* ---------- list table: tick/cross + legend + status chips ---------- */
   .status-chip { @apply inline-flex items-center gap-1.5 rounded-full border px-3 py-[5px] text-xs font-bold whitespace-nowrap; }
   .status-chip .dot { @apply h-2 w-2 shrink-0 rounded-full; }
