@@ -394,29 +394,29 @@
 
   /* ---------- admin login: white page, diagonal purple geometric panel ---------- */
   .ref2-page { @apply flex min-h-screen items-center justify-center bg-white p-4 font-sans text-ink sm:p-6; }
-  .ref2-card { @apply relative flex w-full max-w-[900px] flex-col overflow-hidden rounded-[20px] bg-white shadow-[0_24px_60px_-12px_rgba(30,27,75,0.25)] lg:min-h-[520px] lg:flex-row; animation: loginIn .45s ease both; }
-  .ref2-left { @apply relative z-10 flex flex-1 items-center px-7 py-10 sm:px-10 lg:py-12; }
-  .ref2-form { @apply w-full max-w-[360px]; animation: loginUp .5s ease both; }
-  .ref2-form h2 { @apply text-[28px] font-extrabold text-[#1F2937]; }
+  .ref2-card { @apply relative flex w-full max-w-[1020px] flex-col overflow-hidden rounded-[20px] bg-white shadow-[0_24px_60px_-12px_rgba(23,54,93,0.28)] lg:min-h-[580px] lg:flex-row; animation: loginIn .45s ease both; }
+  .ref2-left { @apply relative z-10 flex flex-1 items-center px-8 py-12 sm:px-12 lg:py-14; }
+  .ref2-form { @apply w-full max-w-[400px]; animation: loginUp .5s ease both; }
+  .ref2-form h2 { @apply text-[30px] font-extrabold text-[#1F2937]; }
   .ref2-sub { @apply mt-1 mb-7 text-[13px] text-muted; }
-  .ref2-input { @apply w-full rounded-[10px] border border-[#E5E7EB] bg-white py-3.5 pr-16 pl-4 text-[15px] outline-none transition placeholder:text-slate-400 focus:border-[#8B5CF6] focus:ring-4 focus:ring-violet-100; }
+  .ref2-input { @apply w-full rounded-[10px] border border-[#E5E7EB] bg-white py-4 pr-16 pl-4 text-[15px] outline-none transition placeholder:text-slate-400 focus:border-primary focus:ring-4 focus:ring-blue-100; }
   .ref2-pw { @apply relative mb-4; }
   .ref2-input { @apply mb-0; }
-  .ref2-show { @apply absolute top-1/2 right-3 -translate-y-1/2 cursor-pointer text-xs font-bold tracking-wide text-[#7C3AED] hover:text-[#5B21B6]; }
+  .ref2-show { @apply absolute top-1/2 right-3 -translate-y-1/2 cursor-pointer text-xs font-bold tracking-wide text-primary hover:text-navy; }
   .ref2-row { @apply mt-1 mb-6 flex items-center justify-between text-[13px]; }
   .ref2-remember { @apply flex cursor-pointer items-center gap-2 font-medium text-slate-600; }
-  .ref2-remember input { @apply h-4 w-4 accent-[#7C3AED]; }
-  .ref2-home { @apply font-semibold text-[#7C3AED] hover:text-[#5B21B6]; }
-  .ref2-submit { @apply w-full cursor-pointer rounded-[10px] py-3.5 text-[15px] font-bold tracking-wide text-white transition hover:opacity-90 disabled:cursor-wait disabled:opacity-70; background: linear-gradient(90deg, #8B5CF6 0%, #7C3AED 100%); }
+  .ref2-remember input { @apply h-4 w-4 accent-[#1769E8]; }
+  .ref2-home { @apply font-semibold text-primary hover:text-navy; }
+  .ref2-submit { @apply w-full cursor-pointer rounded-[10px] py-4 text-[15px] font-bold tracking-wide text-white transition hover:opacity-90 disabled:cursor-wait disabled:opacity-70; background: linear-gradient(90deg, #1769E8 0%, #0B5ED7 100%); }
   .ref2-note { @apply mt-5 text-center text-xs text-muted; }
-  .ref2-right { @apply relative order-first h-[240px] overflow-hidden lg:order-none lg:absolute lg:inset-0 lg:h-auto; background: linear-gradient(140deg, #7C3AED 0%, #8B5CF6 45%, #4F46E5 75%, #3B82F6 100%); clip-path: polygon(0 0, 100% 0, 100% 100%, 0 84%); }
+  .ref2-right { @apply relative order-first h-[240px] overflow-hidden lg:order-none lg:absolute lg:inset-0 lg:h-auto; background: linear-gradient(140deg, #17365D 0%, #1769E8 45%, #2563EB 75%, #38BDF8 100%); clip-path: polygon(0 0, 100% 0, 100% 100%, 0 84%); }
   @media (min-width: 1024px) {
     .ref2-right { clip-path: polygon(44% 0, 100% 0, 100% 100%, 64% 100%); }
   }
   .ref2-poly { @apply pointer-events-none absolute inset-0 h-full w-full; }
-  .ref2-welcome { @apply absolute top-8 right-7 max-w-[250px] text-white lg:top-14 lg:right-9 lg:max-w-[290px]; }
-  .ref2-welcome h1 { @apply text-[30px] leading-tight font-extrabold lg:text-[36px]; }
-  .ref2-welcome p { @apply mt-3 text-[12.5px] leading-relaxed text-violet-100 lg:text-[13px]; }
+  .ref2-welcome { @apply absolute top-8 right-7 max-w-[250px] text-white lg:top-16 lg:right-10 lg:max-w-[320px]; }
+  .ref2-welcome h1 { @apply text-[30px] leading-tight font-extrabold lg:text-[40px]; }
+  .ref2-welcome p { @apply mt-3 text-[12.5px] leading-relaxed text-blue-100 lg:text-[13.5px]; }
   /* ---------- list table: tick/cross + legend + status chips ---------- */
   .status-chip { @apply inline-flex items-center gap-1.5 rounded-full border px-3 py-[5px] text-xs font-bold whitespace-nowrap; }
   .status-chip .dot { @apply h-2 w-2 shrink-0 rounded-full; }
