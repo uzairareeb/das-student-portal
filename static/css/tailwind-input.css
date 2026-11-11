@@ -394,15 +394,17 @@
 
   /* ---------- admin login: white page, diagonal purple geometric panel ---------- */
   .ref2-page { @apply flex min-h-screen items-center justify-center bg-white p-4 font-sans text-ink sm:p-6; }
-  .ref2-card { @apply relative flex w-full max-w-[1020px] flex-col overflow-hidden rounded-[20px] bg-white shadow-[0_24px_60px_-12px_rgba(23,54,93,0.28)] lg:min-h-[580px] lg:flex-row; animation: loginIn .45s ease both; }
+  .ref2-card { @apply relative flex w-full max-w-[1120px] flex-col overflow-hidden rounded-[20px] bg-white shadow-[0_24px_60px_-12px_rgba(23,54,93,0.28)] lg:min-h-[620px] lg:flex-row; animation: loginIn .45s ease both; }
   .ref2-left { @apply relative z-10 flex flex-1 items-center px-8 py-12 sm:px-12 lg:py-14; }
-  .ref2-form { @apply w-full max-w-[400px]; animation: loginUp .5s ease both; }
+  .ref2-form { @apply w-full max-w-[420px]; animation: loginUp .5s ease both; }
   .ref2-form h2 { @apply text-[30px] font-extrabold text-[#1F2937]; }
   .ref2-sub { @apply mt-1 mb-7 text-[13px] text-muted; }
-  .ref2-input { @apply w-full rounded-[10px] border border-[#E5E7EB] bg-white py-4 pr-16 pl-4 text-[15px] outline-none transition placeholder:text-slate-400 focus:border-primary focus:ring-4 focus:ring-blue-100; }
+  .ref2-input { @apply w-full rounded-[10px] border border-[#E5E7EB] bg-white py-4 pr-12 pl-11 text-[15px] outline-none transition placeholder:text-slate-400 focus:border-primary focus:ring-4 focus:ring-blue-100; }
   .ref2-pw { @apply relative mb-4; }
   .ref2-input { @apply mb-0; }
-  .ref2-show { @apply absolute top-1/2 right-3 -translate-y-1/2 cursor-pointer text-xs font-bold tracking-wide text-primary hover:text-navy; }
+  .ref2-lock { @apply pointer-events-none absolute top-1/2 left-3.5 h-5 w-5 -translate-y-1/2 text-slate-400; }
+  .ref2-show { @apply absolute top-1/2 right-2 -translate-y-1/2 cursor-pointer rounded-md p-1.5 text-slate-500 hover:bg-slate-100 hover:text-primary; }
+  .ref2-show svg { @apply h-5 w-5; }
   .ref2-row { @apply mt-1 mb-6 flex items-center justify-between text-[13px]; }
   .ref2-remember { @apply flex cursor-pointer items-center gap-2 font-medium text-slate-600; }
   .ref2-remember input { @apply h-4 w-4 accent-[#1769E8]; }
@@ -414,9 +416,11 @@
     .ref2-right { clip-path: polygon(44% 0, 100% 0, 100% 100%, 64% 100%); }
   }
   .ref2-poly { @apply pointer-events-none absolute inset-0 h-full w-full; }
-  .ref2-welcome { @apply absolute top-8 right-7 max-w-[250px] text-white lg:top-16 lg:right-10 lg:max-w-[320px]; }
+  .ref2-welcome { @apply absolute inset-0 flex flex-col items-center justify-center px-6 text-center text-white lg:inset-auto lg:top-1/2 lg:right-12 lg:w-[340px] lg:-translate-y-1/2 lg:px-0; }
+  .ref2-logo { @apply mb-4 flex h-14 w-14 items-center justify-center overflow-hidden rounded-full bg-white p-1 shadow-lg ring-4 ring-white/25 lg:mb-5 lg:h-20 lg:w-20; }
+  .ref2-logo img { @apply h-full w-full rounded-full object-cover; }
   .ref2-welcome h1 { @apply text-[30px] leading-tight font-extrabold lg:text-[40px]; }
-  .ref2-welcome p { @apply mt-3 text-[12.5px] leading-relaxed text-blue-100 lg:text-[13.5px]; }
+  .ref2-welcome p { @apply mt-3 hidden text-[12.5px] leading-relaxed text-blue-100 sm:block lg:text-[13.5px]; }
   /* ---------- list table: tick/cross + legend + status chips ---------- */
   .status-chip { @apply inline-flex items-center gap-1.5 rounded-full border px-3 py-[5px] text-xs font-bold whitespace-nowrap; }
   .status-chip .dot { @apply h-2 w-2 shrink-0 rounded-full; }
