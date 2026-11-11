@@ -9,45 +9,38 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/tailwind.css') }}">
 </head>
-<body class="login-page">
-  <div class="login-split">
-    <!-- Brand panel -->
-    <section class="login-brand">
-      <div class="login-brand-inner">
-        <div class="login-logo">
-          <img src="{{ url_for('static', filename='img/cuvas-logo.png') }}" alt="CUVAS logo">
-        </div>
-        <p class="login-uni">Cholistan University of Veterinary<br>and Animal Sciences, Bahawalpur</p>
-        <h1 class="login-brand-title">{{ uni }}</h1>
-        <p class="login-brand-sub">{{ title }}</p>
-        <div class="login-brand-divider"></div>
-        <ul class="login-points">
-          <li><span class="dot dot-blue"></span><div><strong>Student Records</strong><span>Complete MPhil &amp; PhD records in one place</span></div></li>
-          <li><span class="dot dot-violet"></span><div><strong>Viva Management</strong><span>Schedules, results &amp; result cards</span></div></li>
-          <li><span class="dot dot-pink"></span><div><strong>Reports &amp; Exports</strong><span>Excel &amp; PDF exports, ready to share</span></div></li>
-        </ul>
-        <p class="login-brand-foot">&copy; 2026 Advanced Studies Office</p>
+<body class="ref-page">
+  <div class="ref-card">
+    <!-- Welcome panel -->
+    <section class="ref-left">
+      <span class="ref-circle ref-circle-a"></span>
+      <span class="ref-circle ref-circle-b"></span>
+      <div class="ref-left-inner">
+        <h1>WELCOME</h1>
+        <p class="ref-headline">{{ uni }}</p>
+        <p class="ref-para">Cholistan University of Veterinary and Animal Sciences, Bahawalpur &mdash; manage MPhil &amp; PhD student records, viva schedules and reports in one place.</p>
       </div>
     </section>
 
-    <!-- Form panel -->
-    <section class="login-form-wrap">
-      <div class="login-form">
-        <p class="login-eyebrow">Admin Portal</p>
-        <h2>Welcome back</h2>
-        <p class="login-lede">Restricted area &mdash; sign in to manage student records.</p>
+    <!-- Sign-in panel -->
+    <section class="ref-right">
+      <div class="ref-form">
+        <h2>Sign in</h2>
+        <p class="ref-sub">Restricted area &mdash; sign in to manage student records.</p>
         <form method="post" id="loginForm">
           {% if error %}<p class="form-error">{{ error }}</p>{% endif %}
-          <label class="login-label" for="adminPw">Admin Password</label>
-          <div class="login-pw">
-            <input type="password" name="password" id="adminPw" placeholder="Enter your admin password" required autofocus>
-            <button type="button" class="login-toggle" id="pwToggle">Show</button>
+          <div class="ref-input">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+            <input type="password" name="password" id="adminPw" placeholder="Password" required autofocus>
+            <button type="button" class="ref-show" id="pwToggle">SHOW</button>
           </div>
-          <button type="submit" class="btn primary block login-submit" id="loginBtn">Sign In</button>
+          <div class="ref-row">
+            <label class="ref-remember"><input type="checkbox" name="remember" value="1"> Remember me</label>
+            <a class="ref-home" href="{{ url_for('index') }}">Back to Home</a>
+          </div>
+          <button type="submit" class="ref-submit" id="loginBtn">Sign in</button>
         </form>
-        <div class="login-divider"><span>or</span></div>
-        <a class="login-home" href="{{ url_for('index') }}">&larr; Back to Home</a>
-        <p class="login-note">Authorized personnel only. All sign-ins are logged.</p>
+        <p class="ref-note">Authorized personnel only. All sign-ins are logged.</p>
       </div>
     </section>
   </div>
@@ -58,7 +51,7 @@
     tg.addEventListener('click', function () {
       var show = pw.type === 'password';
       pw.type = show ? 'text' : 'password';
-      tg.textContent = show ? 'Hide' : 'Show';
+      tg.textContent = show ? 'HIDE' : 'SHOW';
       pw.focus();
     });
     document.getElementById('loginForm').addEventListener('submit', function () {

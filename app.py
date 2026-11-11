@@ -36,6 +36,7 @@ app = Flask(__name__,
             static_folder=os.path.join(BASE_DIR, "static"))
 app.secret_key = os.environ.get("PORTAL_SECRET", "das-student-portal-dev-key")
 app.config["MAX_CONTENT_LENGTH"] = 26 * 1024 * 1024  # 26 MB (PDF uploads up to ~25 MB)
+app.permanent_session_lifetime = timedelta(days=30)  # "Remember me" on admin login
 
 UNI_NAME = "Advanced Studies Office"
 PORTAL_TITLE = "Student Data Management System"
@@ -875,6 +876,7 @@ def admin_login():
     if request.method == "POST":
         if check_admin_password(request.form.get("password")):
             session["admin"] = True
+            session.permanent = bool(request.form.get("remember"))
             log_activity("admin", "login", "admin portal sign-in")
             return redirect(url_for("admin_dashboard"))
         error = "Wrong password."

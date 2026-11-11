@@ -392,47 +392,34 @@
   .pager-perpage { @apply flex items-center gap-2 text-[13.5px] font-semibold text-muted; }
   .per-page-sel { @apply h-9 w-auto rounded-lg border-[1.5px] border-line bg-white px-2.5 py-1 text-[13.5px] font-semibold text-ink; }
 
-  /* ---------- admin login: split-screen ---------- */
-  .login-page { @apply bg-[#F7F9FC] font-sans text-ink; }
-  .login-split { @apply flex min-h-screen flex-col lg:flex-row; animation: loginIn .45s ease both; }
-  .login-brand { @apply relative overflow-hidden bg-navy px-8 py-10 text-white lg:w-[46%] lg:px-12 lg:py-14; }
-  .login-brand::before { content: ""; @apply pointer-events-none absolute -top-24 -left-24 h-80 w-80 rounded-full opacity-40; background: radial-gradient(circle, #1769E8 0%, transparent 70%); }
-  .login-brand::after { content: ""; @apply pointer-events-none absolute -right-20 -bottom-28 h-96 w-96 rounded-full opacity-30; background: radial-gradient(circle, #ec4899 0%, transparent 70%); }
-  .login-brand-inner { @apply relative mx-auto flex h-full max-w-[460px] flex-col items-center text-center; }
-  .login-logo { @apply mx-auto mb-6 flex h-20 w-20 items-center justify-center overflow-hidden rounded-full bg-white p-1.5 shadow-lg ring-4 ring-white/20; }
-  .login-logo img { @apply h-full w-full rounded-full object-cover; }
-  .login-uni { @apply text-[13px] font-semibold tracking-wide text-blue-200 uppercase; }
-  .login-brand-title { @apply mt-3 text-[30px] leading-tight font-extrabold; }
-  .login-brand-sub { @apply mt-1 text-[15px] text-blue-100; }
-  .login-brand-divider { @apply mx-auto mt-5 h-1 w-14 rounded-full; background: linear-gradient(90deg, #38bdf8, #a78bfa, #f472b6); }
-  .login-points { @apply mt-9 w-full space-y-6; }
-  .login-points li { @apply flex flex-col items-center gap-1 text-center; }
-  .login-points .dot { @apply mb-1 h-2.5 w-2.5 rounded-full; }
-  .dot-blue { background: #38bdf8; }
-  .dot-violet { background: #a78bfa; }
-  .dot-pink { background: #f472b6; }
-  .login-points strong { @apply block text-[15px] font-semibold; }
-  .login-points span span { @apply block text-[13px] text-blue-200; }
-  .login-brand-foot { @apply mt-auto w-full pt-10 text-center text-xs text-blue-300; }
-  .login-form-wrap { @apply flex flex-1 items-center justify-center px-6 py-12; background: linear-gradient(135deg, #EFF5FF 0%, #F7F9FC 45%, #F6F1FF 100%); }
-  .login-form { @apply w-full max-w-[420px]; animation: loginUp .5s ease both; }
-  .login-eyebrow { @apply mb-2 text-xs font-bold tracking-[0.18em] text-primary uppercase; }
-  .login-form h2 { @apply text-[28px] font-extrabold; }
-  .login-lede { @apply mt-1 mb-7 text-[15px] text-muted; }
-  .login-label { @apply mb-1.5 block text-sm font-semibold; }
-  .login-pw { @apply relative mb-5; }
-  .login-pw input { @apply w-full rounded-[10px] border-[1.5px] border-line bg-white py-3 pr-16 pl-4 text-[15px] outline-none transition; }
-  .login-pw input:focus { @apply border-primary ring-4 ring-blue-100; }
-  .login-toggle { @apply absolute top-1/2 right-2 -translate-y-1/2 cursor-pointer rounded-md px-2.5 py-1 text-[13px] font-semibold text-primary hover:bg-blue-50; }
-  .login-submit { @apply py-3.5 text-[16px]; }
-  .login-submit:disabled { @apply cursor-wait opacity-70; }
-  .login-divider { @apply my-6 flex items-center gap-3 text-xs font-semibold text-muted; }
-  .login-divider::before, .login-divider::after { content: ""; @apply h-px flex-1 bg-line; }
-  .login-home { @apply block text-center text-sm font-semibold text-primary hover:text-navy; }
-  .login-note { @apply mt-6 text-center text-xs text-muted; }
-  @keyframes loginIn { from { opacity: 0; } to { opacity: 1; } }
-  @keyframes loginUp { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
-
+  /* ---------- admin login: reference style (blue page, curved welcome panel) ---------- */
+  .ref-page { @apply flex min-h-screen items-center justify-center bg-[#0B63D8] p-4 font-sans text-ink sm:p-6; background: linear-gradient(135deg, #0B63D8 0%, #0A4DB0 100%); }
+  .ref-card { @apply flex w-full max-w-[880px] flex-col overflow-hidden rounded-[24px] bg-white shadow-2xl lg:flex-row; animation: loginIn .45s ease both; }
+  .ref-left { @apply relative overflow-hidden px-8 py-12 text-white lg:w-[44%] lg:px-10 lg:py-14; background: linear-gradient(160deg, #0E6BE0 0%, #0B5ED7 55%, #0A4DB0 100%); border-bottom-right-radius: 50% 12%; border-bottom-left-radius: 0; }
+  @media (min-width: 1024px) {
+    .ref-left { border-top-right-radius: 50% 22%; border-bottom-right-radius: 50% 22%; border-bottom-left-radius: 0; }
+  }
+  .ref-circle { @apply pointer-events-none absolute rounded-full; }
+  .ref-circle-a { @apply -bottom-24 -left-20 h-[260px] w-[260px]; background: #0849A8; }
+  .ref-circle-b { @apply -bottom-16 left-[130px] h-[190px] w-[190px]; background: #0D62D6; }
+  .ref-left-inner { @apply relative; }
+  .ref-left h1 { @apply text-[38px] leading-none font-extrabold tracking-wide; }
+  .ref-headline { @apply mt-3 text-[15px] font-bold tracking-[0.12em] uppercase; }
+  .ref-para { @apply mt-4 max-w-[300px] text-[13px] leading-relaxed text-blue-100; }
+  .ref-right { @apply flex flex-1 items-center justify-center px-7 py-10 sm:px-10 lg:py-12; }
+  .ref-form { @apply w-full max-w-[360px]; animation: loginUp .5s ease both; }
+  .ref-form h2 { @apply text-[28px] font-extrabold text-[#12233D]; }
+  .ref-sub { @apply mt-1 mb-6 text-[13px] text-muted; }
+  .ref-input { @apply relative mb-4 flex items-center rounded-[10px] border border-transparent bg-[#F1F3F5] transition focus-within:border-primary focus-within:bg-white focus-within:ring-4 focus-within:ring-blue-100; }
+  .ref-input svg { @apply ml-3.5 h-5 w-5 shrink-0 text-slate-500; }
+  .ref-input input { @apply w-full bg-transparent py-3.5 pr-16 pl-3 text-[15px] outline-none placeholder:text-slate-400; }
+  .ref-show { @apply absolute top-1/2 right-3 -translate-y-1/2 cursor-pointer text-xs font-bold tracking-wide text-primary hover:text-navy; }
+  .ref-row { @apply mb-5 flex items-center justify-between text-[13px]; }
+  .ref-remember { @apply flex cursor-pointer items-center gap-2 font-medium text-slate-600; }
+  .ref-remember input { @apply h-4 w-4 accent-[#1769E8]; }
+  .ref-home { @apply font-semibold text-primary hover:text-navy; }
+  .ref-submit { @apply w-full cursor-pointer rounded-[10px] bg-primary py-3.5 text-[16px] font-bold text-white transition hover:bg-navy disabled:cursor-wait disabled:opacity-70; }
+  .ref-note { @apply mt-5 text-center text-xs text-muted; }
   /* ---------- list table: tick/cross + legend + status chips ---------- */
   .status-chip { @apply inline-flex items-center gap-1.5 rounded-full border px-3 py-[5px] text-xs font-bold whitespace-nowrap; }
   .status-chip .dot { @apply h-2 w-2 shrink-0 rounded-full; }

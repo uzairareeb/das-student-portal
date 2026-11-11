@@ -44,6 +44,7 @@
     --color-slate-100: oklch(96.8% 0.007 247.896);
     --color-slate-300: oklch(86.9% 0.022 252.894);
     --color-slate-400: oklch(70.4% 0.04 256.788);
+    --color-slate-500: oklch(55.4% 0.046 257.417);
     --color-slate-600: oklch(44.6% 0.043 257.281);
     --color-slate-700: oklch(37.2% 0.044 257.287);
     --color-neutral-800: oklch(26.9% 0 none);
@@ -2938,299 +2939,229 @@
     font-weight: var(--font-weight-semibold);
     color: var(--color-ink);
   }
-  .login-page {
-    background-color: #F7F9FC;
-    font-family: var(--font-sans);
-    color: var(--color-ink);
-  }
-  .login-split {
+  .ref-page {
     display: flex;
     min-height: 100vh;
+    align-items: center;
+    justify-content: center;
+    background-color: #0B63D8;
+    padding: calc(var(--spacing) * 4);
+    font-family: var(--font-sans);
+    color: var(--color-ink);
+    @media (width >= 40rem) {
+      padding: calc(var(--spacing) * 6);
+    }
+    background: linear-gradient(135deg, #0B63D8 0%, #0A4DB0 100%);
+  }
+  .ref-card {
+    display: flex;
+    width: 100%;
+    max-width: 880px;
     flex-direction: column;
+    overflow: hidden;
+    border-radius: 24px;
+    background-color: var(--color-white);
+    --tw-shadow: 0 25px 50px -12px var(--tw-shadow-color, rgb(0 0 0 / 0.25));
+    box-shadow: var(--tw-inset-shadow), var(--tw-inset-ring-shadow), var(--tw-ring-offset-shadow), var(--tw-ring-shadow), var(--tw-shadow);
     @media (width >= 64rem) {
       flex-direction: row;
     }
     animation: loginIn .45s ease both;
   }
-  .login-brand {
+  .ref-left {
     position: relative;
     overflow: hidden;
-    background-color: var(--color-navy);
     padding-inline: calc(var(--spacing) * 8);
-    padding-block: calc(var(--spacing) * 10);
+    padding-block: calc(var(--spacing) * 12);
     color: var(--color-white);
     @media (width >= 64rem) {
-      width: 46%;
+      width: 44%;
     }
     @media (width >= 64rem) {
-      padding-inline: calc(var(--spacing) * 12);
+      padding-inline: calc(var(--spacing) * 10);
     }
     @media (width >= 64rem) {
       padding-block: calc(var(--spacing) * 14);
     }
+    background: linear-gradient(160deg, #0E6BE0 0%, #0B5ED7 55%, #0A4DB0 100%);
+    border-bottom-right-radius: 50% 12%;
+    border-bottom-left-radius: 0;
   }
-  .login-brand::before {
-    content: "";
-    pointer-events: none;
-    position: absolute;
-    top: calc(var(--spacing) * -24);
-    left: calc(var(--spacing) * -24);
-    height: calc(var(--spacing) * 80);
-    width: calc(var(--spacing) * 80);
-    border-radius: calc(infinity * 1px);
-    opacity: 40%;
-    background: radial-gradient(circle, #1769E8 0%, transparent 70%);
-  }
-  .login-brand::after {
-    content: "";
-    pointer-events: none;
-    position: absolute;
-    right: calc(var(--spacing) * -20);
-    bottom: calc(var(--spacing) * -28);
-    height: calc(var(--spacing) * 96);
-    width: calc(var(--spacing) * 96);
-    border-radius: calc(infinity * 1px);
-    opacity: 30%;
-    background: radial-gradient(circle, #ec4899 0%, transparent 70%);
-  }
-  .login-brand-inner {
-    position: relative;
-    margin-inline: auto;
-    display: flex;
-    height: 100%;
-    max-width: 460px;
-    flex-direction: column;
-    align-items: center;
-    text-align: center;
-  }
-  .login-logo {
-    margin-inline: auto;
-    margin-bottom: calc(var(--spacing) * 6);
-    display: flex;
-    height: calc(var(--spacing) * 20);
-    width: calc(var(--spacing) * 20);
-    align-items: center;
-    justify-content: center;
-    overflow: hidden;
-    border-radius: calc(infinity * 1px);
-    background-color: var(--color-white);
-    padding: calc(var(--spacing) * 1.5);
-    --tw-shadow: 0 10px 15px -3px var(--tw-shadow-color, rgb(0 0 0 / 0.1)), 0 4px 6px -4px var(--tw-shadow-color, rgb(0 0 0 / 0.1));
-    --tw-ring-shadow: var(--tw-ring-inset, ) 0 0 0 calc(4px + var(--tw-ring-offset-width)) var(--tw-ring-color, currentcolor);
-    box-shadow: var(--tw-inset-shadow), var(--tw-inset-ring-shadow), var(--tw-ring-offset-shadow), var(--tw-ring-shadow), var(--tw-shadow);
-    --tw-ring-color: color-mix(in srgb, #fff 20%, transparent);
-    @supports (color: color-mix(in lab, red, red)) {
-      --tw-ring-color: color-mix(in oklab, var(--color-white) 20%, transparent);
+  @media (min-width: 1024px) {
+    .ref-left {
+      border-top-right-radius: 50% 22%;
+      border-bottom-right-radius: 50% 22%;
+      border-bottom-left-radius: 0;
     }
   }
-  .login-logo img {
-    height: 100%;
-    width: 100%;
+  .ref-circle {
+    pointer-events: none;
+    position: absolute;
     border-radius: calc(infinity * 1px);
-    object-fit: cover;
   }
-  .login-uni {
-    font-size: 13px;
-    --tw-font-weight: var(--font-weight-semibold);
-    font-weight: var(--font-weight-semibold);
-    --tw-tracking: var(--tracking-wide);
-    letter-spacing: var(--tracking-wide);
-    color: var(--color-blue-200);
-    text-transform: uppercase;
+  .ref-circle-a {
+    bottom: calc(var(--spacing) * -24);
+    left: calc(var(--spacing) * -20);
+    height: 260px;
+    width: 260px;
+    background: #0849A8;
   }
-  .login-brand-title {
-    margin-top: calc(var(--spacing) * 3);
-    font-size: 30px;
-    --tw-leading: var(--leading-tight);
-    line-height: var(--leading-tight);
+  .ref-circle-b {
+    bottom: calc(var(--spacing) * -16);
+    left: 130px;
+    height: 190px;
+    width: 190px;
+    background: #0D62D6;
+  }
+  .ref-left-inner {
+    position: relative;
+  }
+  .ref-left h1 {
+    font-size: 38px;
+    --tw-leading: 1;
+    line-height: 1;
     --tw-font-weight: var(--font-weight-extrabold);
     font-weight: var(--font-weight-extrabold);
+    --tw-tracking: var(--tracking-wide);
+    letter-spacing: var(--tracking-wide);
   }
-  .login-brand-sub {
-    margin-top: var(--spacing);
+  .ref-headline {
+    margin-top: calc(var(--spacing) * 3);
     font-size: 15px;
+    --tw-font-weight: var(--font-weight-bold);
+    font-weight: var(--font-weight-bold);
+    --tw-tracking: 0.12em;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+  }
+  .ref-para {
+    margin-top: calc(var(--spacing) * 4);
+    max-width: 300px;
+    font-size: 13px;
+    --tw-leading: var(--leading-relaxed);
+    line-height: var(--leading-relaxed);
     color: var(--color-blue-100);
   }
-  .login-brand-divider {
-    margin-inline: auto;
-    margin-top: calc(var(--spacing) * 5);
-    height: var(--spacing);
-    width: calc(var(--spacing) * 14);
-    border-radius: calc(infinity * 1px);
-    background: linear-gradient(90deg, #38bdf8, #a78bfa, #f472b6);
-  }
-  .login-points {
-    margin-top: calc(var(--spacing) * 9);
-    width: 100%;
-    :where(& > :not(:last-child)) {
-      --tw-space-y-reverse: 0;
-      margin-block-start: calc(calc(var(--spacing) * 6) * var(--tw-space-y-reverse));
-      margin-block-end: calc(calc(var(--spacing) * 6) * calc(1 - var(--tw-space-y-reverse)));
-    }
-  }
-  .login-points li {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: var(--spacing);
-    text-align: center;
-  }
-  .login-points .dot {
-    margin-bottom: var(--spacing);
-    height: calc(var(--spacing) * 2.5);
-    width: calc(var(--spacing) * 2.5);
-    border-radius: calc(infinity * 1px);
-  }
-  .dot-blue {
-    background: #38bdf8;
-  }
-  .dot-violet {
-    background: #a78bfa;
-  }
-  .dot-pink {
-    background: #f472b6;
-  }
-  .login-points strong {
-    display: block;
-    font-size: 15px;
-    --tw-font-weight: var(--font-weight-semibold);
-    font-weight: var(--font-weight-semibold);
-  }
-  .login-points span span {
-    display: block;
-    font-size: 13px;
-    color: var(--color-blue-200);
-  }
-  .login-brand-foot {
-    margin-top: auto;
-    width: 100%;
-    padding-top: calc(var(--spacing) * 10);
-    text-align: center;
-    font-size: var(--text-xs);
-    line-height: var(--tw-leading, var(--text-xs--line-height));
-    color: var(--color-blue-300);
-  }
-  .login-form-wrap {
+  .ref-right {
     display: flex;
     flex: 1;
     align-items: center;
     justify-content: center;
-    padding-inline: calc(var(--spacing) * 6);
-    padding-block: calc(var(--spacing) * 12);
-    background: linear-gradient(135deg, #EFF5FF 0%, #F7F9FC 45%, #F6F1FF 100%);
+    padding-inline: calc(var(--spacing) * 7);
+    padding-block: calc(var(--spacing) * 10);
+    @media (width >= 40rem) {
+      padding-inline: calc(var(--spacing) * 10);
+    }
+    @media (width >= 64rem) {
+      padding-block: calc(var(--spacing) * 12);
+    }
   }
-  .login-form {
+  .ref-form {
     width: 100%;
-    max-width: 420px;
+    max-width: 360px;
     animation: loginUp .5s ease both;
   }
-  .login-eyebrow {
-    margin-bottom: calc(var(--spacing) * 2);
+  .ref-form h2 {
+    font-size: 28px;
+    --tw-font-weight: var(--font-weight-extrabold);
+    font-weight: var(--font-weight-extrabold);
+    color: #12233D;
+  }
+  .ref-sub {
+    margin-top: var(--spacing);
+    margin-bottom: calc(var(--spacing) * 6);
+    font-size: 13px;
+    color: var(--color-muted);
+  }
+  .ref-input {
+    position: relative;
+    margin-bottom: calc(var(--spacing) * 4);
+    display: flex;
+    align-items: center;
+    border-radius: 10px;
+    border-style: var(--tw-border-style);
+    border-width: 1px;
+    border-color: transparent;
+    background-color: #F1F3F5;
+    transition-property: color, background-color, border-color, outline-color, text-decoration-color, fill, stroke, --tw-gradient-from, --tw-gradient-via, --tw-gradient-to, opacity, box-shadow, transform, translate, scale, rotate, filter, -webkit-backdrop-filter, backdrop-filter, display, content-visibility, overlay, pointer-events;
+    transition-timing-function: var(--tw-ease, var(--default-transition-timing-function));
+    transition-duration: var(--tw-duration, var(--default-transition-duration));
+    &:focus-within {
+      border-color: var(--color-primary);
+    }
+    &:focus-within {
+      background-color: var(--color-white);
+    }
+    &:focus-within {
+      --tw-ring-shadow: var(--tw-ring-inset, ) 0 0 0 calc(4px + var(--tw-ring-offset-width)) var(--tw-ring-color, currentcolor);
+      box-shadow: var(--tw-inset-shadow), var(--tw-inset-ring-shadow), var(--tw-ring-offset-shadow), var(--tw-ring-shadow), var(--tw-shadow);
+    }
+    &:focus-within {
+      --tw-ring-color: var(--color-blue-100);
+    }
+  }
+  .ref-input svg {
+    margin-left: calc(var(--spacing) * 3.5);
+    height: calc(var(--spacing) * 5);
+    width: calc(var(--spacing) * 5);
+    flex-shrink: 0;
+    color: var(--color-slate-500);
+  }
+  .ref-input input {
+    width: 100%;
+    background-color: transparent;
+    padding-block: calc(var(--spacing) * 3.5);
+    padding-right: calc(var(--spacing) * 16);
+    padding-left: calc(var(--spacing) * 3);
+    font-size: 15px;
+    --tw-outline-style: none;
+    outline-style: none;
+    &::placeholder {
+      color: var(--color-slate-400);
+    }
+  }
+  .ref-show {
+    position: absolute;
+    top: calc(1 / 2 * 100%);
+    right: calc(var(--spacing) * 3);
+    --tw-translate-y: calc(calc(1 / 2 * 100%) * -1);
+    translate: var(--tw-translate-x) var(--tw-translate-y);
+    cursor: pointer;
     font-size: var(--text-xs);
     line-height: var(--tw-leading, var(--text-xs--line-height));
     --tw-font-weight: var(--font-weight-bold);
     font-weight: var(--font-weight-bold);
-    --tw-tracking: 0.18em;
-    letter-spacing: 0.18em;
-    color: var(--color-primary);
-    text-transform: uppercase;
-  }
-  .login-form h2 {
-    font-size: 28px;
-    --tw-font-weight: var(--font-weight-extrabold);
-    font-weight: var(--font-weight-extrabold);
-  }
-  .login-lede {
-    margin-top: var(--spacing);
-    margin-bottom: calc(var(--spacing) * 7);
-    font-size: 15px;
-    color: var(--color-muted);
-  }
-  .login-label {
-    margin-bottom: calc(var(--spacing) * 1.5);
-    display: block;
-    font-size: var(--text-sm);
-    line-height: var(--tw-leading, var(--text-sm--line-height));
-    --tw-font-weight: var(--font-weight-semibold);
-    font-weight: var(--font-weight-semibold);
-  }
-  .login-pw {
-    position: relative;
-    margin-bottom: calc(var(--spacing) * 5);
-  }
-  .login-pw input {
-    width: 100%;
-    border-radius: 10px;
-    border-style: var(--tw-border-style);
-    border-width: 1.5px;
-    border-color: var(--color-line);
-    background-color: var(--color-white);
-    padding-block: calc(var(--spacing) * 3);
-    padding-right: calc(var(--spacing) * 16);
-    padding-left: calc(var(--spacing) * 4);
-    font-size: 15px;
-    transition-property: color, background-color, border-color, outline-color, text-decoration-color, fill, stroke, --tw-gradient-from, --tw-gradient-via, --tw-gradient-to, opacity, box-shadow, transform, translate, scale, rotate, filter, -webkit-backdrop-filter, backdrop-filter, display, content-visibility, overlay, pointer-events;
-    transition-timing-function: var(--tw-ease, var(--default-transition-timing-function));
-    transition-duration: var(--tw-duration, var(--default-transition-duration));
-    --tw-outline-style: none;
-    outline-style: none;
-  }
-  .login-pw input:focus {
-    border-color: var(--color-primary);
-    --tw-ring-shadow: var(--tw-ring-inset, ) 0 0 0 calc(4px + var(--tw-ring-offset-width)) var(--tw-ring-color, currentcolor);
-    box-shadow: var(--tw-inset-shadow), var(--tw-inset-ring-shadow), var(--tw-ring-offset-shadow), var(--tw-ring-shadow), var(--tw-shadow);
-    --tw-ring-color: var(--color-blue-100);
-  }
-  .login-toggle {
-    position: absolute;
-    top: calc(1 / 2 * 100%);
-    right: calc(var(--spacing) * 2);
-    --tw-translate-y: calc(calc(1 / 2 * 100%) * -1);
-    translate: var(--tw-translate-x) var(--tw-translate-y);
-    cursor: pointer;
-    border-radius: var(--radius-md);
-    padding-inline: calc(var(--spacing) * 2.5);
-    padding-block: var(--spacing);
-    font-size: 13px;
-    --tw-font-weight: var(--font-weight-semibold);
-    font-weight: var(--font-weight-semibold);
+    --tw-tracking: var(--tracking-wide);
+    letter-spacing: var(--tracking-wide);
     color: var(--color-primary);
     &:hover {
       @media (hover: hover) {
-        background-color: var(--color-blue-50);
+        color: var(--color-navy);
       }
     }
   }
-  .login-submit {
-    padding-block: calc(var(--spacing) * 3.5);
-    font-size: 16px;
-  }
-  .login-submit:disabled {
-    cursor: wait;
-    opacity: 70%;
-  }
-  .login-divider {
-    margin-block: calc(var(--spacing) * 6);
+  .ref-row {
+    margin-bottom: calc(var(--spacing) * 5);
     display: flex;
     align-items: center;
-    gap: calc(var(--spacing) * 3);
-    font-size: var(--text-xs);
-    line-height: var(--tw-leading, var(--text-xs--line-height));
-    --tw-font-weight: var(--font-weight-semibold);
-    font-weight: var(--font-weight-semibold);
-    color: var(--color-muted);
+    justify-content: space-between;
+    font-size: 13px;
   }
-  .login-divider::before, .login-divider::after {
-    content: "";
-    height: 1px;
-    flex: 1;
-    background-color: var(--color-line);
+  .ref-remember {
+    display: flex;
+    cursor: pointer;
+    align-items: center;
+    gap: calc(var(--spacing) * 2);
+    --tw-font-weight: var(--font-weight-medium);
+    font-weight: var(--font-weight-medium);
+    color: var(--color-slate-600);
   }
-  .login-home {
-    display: block;
-    text-align: center;
-    font-size: var(--text-sm);
-    line-height: var(--tw-leading, var(--text-sm--line-height));
+  .ref-remember input {
+    height: calc(var(--spacing) * 4);
+    width: calc(var(--spacing) * 4);
+    accent-color: #1769E8;
+  }
+  .ref-home {
     --tw-font-weight: var(--font-weight-semibold);
     font-weight: var(--font-weight-semibold);
     color: var(--color-primary);
@@ -3240,30 +3171,37 @@
       }
     }
   }
-  .login-note {
-    margin-top: calc(var(--spacing) * 6);
+  .ref-submit {
+    width: 100%;
+    cursor: pointer;
+    border-radius: 10px;
+    background-color: var(--color-primary);
+    padding-block: calc(var(--spacing) * 3.5);
+    font-size: 16px;
+    --tw-font-weight: var(--font-weight-bold);
+    font-weight: var(--font-weight-bold);
+    color: var(--color-white);
+    transition-property: color, background-color, border-color, outline-color, text-decoration-color, fill, stroke, --tw-gradient-from, --tw-gradient-via, --tw-gradient-to, opacity, box-shadow, transform, translate, scale, rotate, filter, -webkit-backdrop-filter, backdrop-filter, display, content-visibility, overlay, pointer-events;
+    transition-timing-function: var(--tw-ease, var(--default-transition-timing-function));
+    transition-duration: var(--tw-duration, var(--default-transition-duration));
+    &:hover {
+      @media (hover: hover) {
+        background-color: var(--color-navy);
+      }
+    }
+    &:disabled {
+      cursor: wait;
+    }
+    &:disabled {
+      opacity: 70%;
+    }
+  }
+  .ref-note {
+    margin-top: calc(var(--spacing) * 5);
     text-align: center;
     font-size: var(--text-xs);
     line-height: var(--tw-leading, var(--text-xs--line-height));
     color: var(--color-muted);
-  }
-  @keyframes loginIn {
-    from {
-      opacity: 0;
-    }
-    to {
-      opacity: 1;
-    }
-  }
-  @keyframes loginUp {
-    from {
-      opacity: 0;
-      transform: translateY(10px);
-    }
-    to {
-      opacity: 1;
-      transform: translateY(0);
-    }
   }
   .status-chip {
     display: inline-flex;
@@ -5547,11 +5485,6 @@
   inherits: false;
   initial-value: 100%;
 }
-@property --tw-space-y-reverse {
-  syntax: "*";
-  inherits: false;
-  initial-value: 0;
-}
 @layer properties {
   @supports ((-webkit-hyphens: none) and (not (margin-trim: block))) or ((-moz-orient: inline) and (not (color:rgb(from red r g b)))) {
     *, ::before, ::after, ::backdrop {
@@ -5610,7 +5543,6 @@
       --tw-gradient-from-position: 0%;
       --tw-gradient-via-position: 50%;
       --tw-gradient-to-position: 100%;
-      --tw-space-y-reverse: 0;
     }
   }
 }
