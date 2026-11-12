@@ -215,29 +215,39 @@
   table.wide-table th { @apply text-[11px] whitespace-normal align-bottom; }
 
   /* ---------- academic schedule generator ---------- */
-  .gen-btn { @apply min-h-[50px] w-full text-base; }
+  .gen-btn { @apply h-12 w-full text-[15px]; }
   .sched-notice { @apply mb-4 rounded-[10px] border border-line bg-[#eaf2ff] px-4 py-3 text-sm text-slate-700; }
-  .sched-band { @apply mb-5 flex flex-wrap items-center justify-between gap-x-10 gap-y-3 rounded-xl border border-line bg-[#eaf2ff] px-5 py-4 shadow-sm; }
-  .sched-band .sb-sub { @apply text-xs font-bold tracking-wider text-slate-500 uppercase; }
-  .sched-band .sb-title { @apply text-lg leading-snug font-extrabold text-navy; }
-  .sched-band .sb-dates { @apply flex flex-wrap gap-x-10 gap-y-1.5; }
-  .sched-band .sb-d { @apply font-extrabold text-navy; }
-  .sched-band .sb-l { @apply ml-2 text-sm text-slate-600; }
-  .sched-table { @apply min-w-[920px]; }
+  .sched-info { @apply mb-5 rounded-xl border border-line bg-white p-5 shadow-sm; }
+  .si-head { @apply flex flex-wrap items-center gap-3.5; }
+  .si-icon { @apply flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-white; background: linear-gradient(135deg, #1769e8, #38bdf8); }
+  .si-icon svg { @apply h-[22px] w-[22px]; }
+  .si-head h3 { @apply text-[17px] font-extrabold text-navy; }
+  .si-head p { @apply mt-0.5 text-[13px] text-muted; }
+  .si-pill { @apply ml-auto rounded-full bg-primary px-4 py-1.5 text-[13px] font-bold text-white; }
+  .si-grid { @apply mt-4 grid grid-cols-1 gap-3 md:grid-cols-3; }
+  .info-tile { @apply rounded-[10px] border border-line bg-[#f7f9fc] px-4 py-3.5; }
+  .info-tile .it-label { @apply text-[11px] font-bold tracking-wider text-muted uppercase; }
+  .info-tile .it-value { @apply mt-1 text-[15px] font-extrabold text-navy; }
+  .sched-table { @apply min-w-[960px]; }
   .sched-table thead th { @apply text-[13px] normal-case tracking-normal text-white; background: linear-gradient(90deg, #1769e8, #38bdf8); }
-  .sched-table td { @apply px-3.5 py-3.5 align-top whitespace-normal; }
+  .sched-table td { @apply px-3.5 py-4 align-middle whitespace-normal; }
   .sched-table tbody tr:nth-child(even) { background: #f8fbff; }
-  .sched-table td.doc { @apply min-w-[170px] font-bold text-navy; }
-  .sched-table td.statute { @apply min-w-[230px] text-[13px] text-slate-500; }
-  .sched-mini { @apply mb-1 block text-[11px] font-bold tracking-wide text-muted uppercase; }
+  .sched-table tbody tr.shifted td:first-child { box-shadow: inset 3px 0 0 #1769e8; }
+  .sched-table td.num { @apply w-10 text-center font-bold text-muted; }
+  .sched-table td.doc { @apply min-w-[170px] text-[15px] font-bold text-navy; }
+  .sched-table td.statute { @apply min-w-[220px] text-[13px] text-slate-500; }
+  .sched-dates-text { @apply text-[14.5px] font-semibold whitespace-nowrap text-ink; }
+  .day-pill { @apply inline-block rounded-full bg-[#eaf2ff] px-2.5 py-1 text-xs font-bold whitespace-nowrap text-navy; }
   .sched-date { @apply w-[152px] rounded-lg border border-line bg-[#f7f9fc] px-2.5 py-2 text-sm text-ink focus:border-primary focus:bg-white focus:outline-none; }
-  .sched-day { @apply text-sm text-slate-600; }
+  .ext-tag { @apply mt-1.5 inline-block rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-bold text-emerald-700; }
   td.sched-adj { @apply bg-[#eaf2ff]; }
-  .adj-text, .adj-day { @apply font-bold text-primary; }
+  .adj-text, .adj-day { @apply text-[14.5px] font-bold whitespace-nowrap text-primary; }
   .adj-none { @apply font-normal text-slate-400; }
   .sched-actions { @apply mt-4 flex flex-wrap items-center gap-2.5; }
   .sched-note { @apply mt-4 flex items-start gap-2.5 rounded-[10px] bg-[#eaf2ff] px-4 py-3 text-[13px] leading-relaxed text-slate-700; }
   .sched-note svg { @apply mt-0.5 h-[18px] w-[18px] shrink-0 text-primary; }
+  .sched-toast { @apply fixed bottom-7 left-1/2 z-[200] -translate-x-1/2 rounded-xl bg-navy px-5 py-3.5 text-sm font-semibold whitespace-nowrap text-white shadow-xl; }
+  .sched-toast.err { @apply bg-red-600; }
   .saved-row { @apply flex flex-wrap items-center gap-3 border-b border-line py-3.5; }
   .saved-row:last-child { border-bottom: 0; }
   .saved-row .s-title { @apply text-[15px] font-bold text-navy; }

@@ -67,6 +67,7 @@
 <table>
   <thead>
     <tr>
+      <th>#</th>
       <th>Document</th>
       <th>Scheduled Last Date</th>
       <th>Day</th>
@@ -77,6 +78,7 @@
   <tbody>
     {% for r in rows %}
     <tr>
+      <td>{{ loop.index }}</td>
       <td class="doc">{{ r.document }}</td>
       <td>{{ r.scheduled_text }}</td>
       <td>{{ r.day_text }}</td>

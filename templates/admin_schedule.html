@@ -4,7 +4,7 @@
 <div class="page-head">
   <div>
     <h2>Academic Schedule Generator</h2>
-    <p>Generate the semester's statutory submission deadlines from the commencement and termination dates. Dates falling on Saturday or Sunday shift to Monday automatically — and every date stays editable.</p>
+    <p>Generate the semester's statutory submission deadlines from the commencement and termination dates. Dates falling on Saturday or Sunday shift to Monday automatically — and the Final Thesis date can be extended when needed.</p>
   </div>
 </div>
 
@@ -13,7 +13,7 @@
     <span class="section-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg></span>
     <h3>Semester Information</h3>
   </div>
-  <form method="post" action="{{ url_for('admin_schedule') }}">
+  <form method="post" action="{{ url_for('admin_schedule') }}" id="genForm">
     <div class="filters" style="grid-template-columns:repeat(auto-fit,minmax(210px,1fr))">
       <div>
         <label class="f-label" for="session">Academic Session</label>
@@ -27,7 +27,7 @@
         <label class="f-label" for="termination">Termination of Semester</label>
         <input class="no-icon" type="date" id="termination" name="termination" value="{{ form.termination }}" required>
       </div>
-      <div class="flex self-stretch">
+      <div>
         <button type="submit" class="btn primary gen-btn">Generate Schedule</button>
       </div>
     </div>
@@ -35,90 +35,7 @@
   {% if not rows %}<p class="hint">Enter the academic session and the semester dates, then press Generate Schedule. Deadlines are calculated from the statutes — nothing is hardcoded.</p>{% endif %}
 </div>
 
-{% if rows %}
-<form method="post" id="schedForm">
-  <input type="hidden" name="session" value="{{ sched.session }}">
-  <input type="hidden" name="commencement" value="{{ sched.commencement_iso }}">
-  <input type="hidden" name="termination" value="{{ sched.termination_iso }}">
-
-  {% if notice %}<div class="sched-notice">{{ notice }}</div>{% endif %}
-
-  <div class="sched-band">
-    <div>
-      <div class="sb-sub">Semester Schedule</div>
-      <div class="sb-title">{{ sched.session }}</div>
-    </div>
-    <div class="sb-dates">
-      <div><span class="sb-d">{{ sched.commencement_disp }}</span><span class="sb-l">Commencement of Semester</span></div>
-      <div><span class="sb-d">{{ sched.termination_disp }}</span><span class="sb-l">Termination of Semester</span></div>
-    </div>
-  </div>
-
-  <div class="card table-card section">
-    <div class="table-wrap">
-      <table class="sched-table" id="schedTable">
-        <thead>
-          <tr>
-            <th>Document</th>
-            <th>Submission Deadline According to Statutes</th>
-            <th>Scheduled Last Date</th>
-            <th>Day</th>
-            <th>Adjusted Date (Weekend Shift Applied)</th>
-            <th>Adjusted Day</th>
-          </tr>
-        </thead>
-        <tbody>
-          {% for r in rows %}
-          <tr>
-            <td class="doc">{{ r.document }}</td>
-            <td class="statute">{{ r.statute }}</td>
-            <td>
-              {% if r.is_range %}
-              <label class="sched-mini" for="sched_{{ loop.index0 }}_start">From</label>
-              <input type="date" class="sched-date" id="sched_{{ loop.index0 }}_start" name="sched_{{ loop.index0 }}_start" value="{{ r.scheduled_iso[0] }}" required>
-              <label class="sched-mini" for="sched_{{ loop.index0 }}_end" style="margin-top:6px">To</label>
-              <input type="date" class="sched-date" id="sched_{{ loop.index0 }}_end" name="sched_{{ loop.index0 }}_end" value="{{ r.scheduled_iso[1] }}" required>
-              {% else %}
-              <input type="date" class="sched-date" name="sched_{{ loop.index0 }}" value="{{ r.scheduled_iso[0] }}" required>
-              {% endif %}
-            </td>
-            <td><span class="sched-day">{{ r.day_text }}</span></td>
-            <td class="adj-cell{% if r.shifted %} sched-adj{% endif %}"><span class="adj-text{% if not r.shifted %} adj-none{% endif %}">{{ r.adjusted_text }}</span></td>
-            <td class="adj-cell{% if r.shifted %} sched-adj{% endif %}"><span class="adj-day{% if not r.shifted %} adj-none{% endif %}">{{ r.adjusted_day_text }}</span></td>
-          </tr>
-          {% endfor %}
-        </tbody>
-      </table>
-    </div>
-    <div class="sched-note">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
-      <span><strong>Note:</strong> You can change any scheduled date — the day and the weekend adjustment update automatically. Only the dates that actually shifted appear in the Adjusted columns. The statutory rule text stays visible here for the admin; it is not printed in the PDF.</span>
-    </div>
-    <div class="sched-actions">
-      <button type="submit" class="btn primary" formaction="{{ url_for('admin_schedule_save') }}">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
-        Save Schedule
-      </button>
-      <button type="submit" class="btn primary" formaction="{{ url_for('admin_schedule_pdf') }}">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
-        Export PDF
-      </button>
-      <button type="submit" class="btn ghost" formaction="{{ url_for('admin_schedule_excel') }}">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-        Export Excel
-      </button>
-      <button type="submit" class="btn ghost" formaction="{{ url_for('admin_schedule_print') }}" formtarget="_blank">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
-        Print Schedule
-      </button>
-      <a class="btn ghost" href="{{ url_for('admin_schedule') }}">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg>
-        Reset
-      </a>
-    </div>
-  </div>
-</form>
-{% endif %}
+<div id="schedResults">{% include "_schedule_results.html" %}</div>
 
 <div class="card section">
   <div class="section-head">
@@ -149,10 +66,22 @@
   {% endif %}
 </div>
 
+<div id="schedToast" class="sched-toast" hidden></div>
+
 <script>
 (function () {
   var DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
   var MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+  function showToast(msg, ok) {
+    var toast = document.getElementById('schedToast');
+    toast.textContent = (ok ? '✓ ' : '⚠ ') + msg;
+    toast.classList.toggle('err', !ok);
+    toast.hidden = false;
+    clearTimeout(toast._timer);
+    toast._timer = setTimeout(function () { toast.hidden = true; }, 4000);
+  }
+
   function parse(v) { if (!v) return null; var p = v.split('-'); return new Date(+p[0], +p[1] - 1, +p[2]); }
   function fmt(d) { return String(d.getDate()).padStart(2, '0') + ' ' + MON[d.getMonth()] + ' ' + d.getFullYear(); }
   function shift(d) { var n = new Date(d.getTime()); if (n.getDay() === 6) n.setDate(n.getDate() + 2); else if (n.getDay() === 0) n.setDate(n.getDate() + 1); return n; }
@@ -169,9 +98,11 @@
     if (adjT) { adjT.textContent = shT.length ? shT.join(' – ') : '—'; adjT.classList.toggle('adj-none', !shT.length); }
     if (adjD) { adjD.textContent = shD.length ? shD.join(' – ') : '—'; adjD.classList.toggle('adj-none', !shD.length); }
     tr.querySelectorAll('.adj-cell').forEach(function (td) { td.classList.toggle('sched-adj', !!shT.length); });
+    tr.classList.toggle('shifted', !!shT.length);
   }
-  var table = document.getElementById('schedTable');
-  if (table) {
+  function bindSchedTable() {
+    var table = document.getElementById('schedTable');
+    if (!table) return;
     table.querySelectorAll('tbody tr').forEach(function (tr) {
       tr.querySelectorAll('.sched-date').forEach(function (inp) {
         inp.addEventListener('change', function () { upd(tr); });
@@ -179,6 +110,42 @@
       });
     });
   }
+  bindSchedTable();
+
+  var genForm = document.getElementById('genForm');
+  genForm.addEventListener('submit', function (e) {
+    e.preventDefault();
+    var btn = genForm.querySelector('.gen-btn');
+    var old = btn.textContent;
+    btn.disabled = true;
+    btn.textContent = 'Generating…';
+    fetch(genForm.action, {
+      method: 'POST',
+      body: new FormData(genForm),
+      headers: { 'X-Requested-With': 'XMLHttpRequest' }
+    }).then(function (r) {
+      return r.text().then(function (txt) { return { ok: r.ok, txt: txt }; });
+    }).then(function (res) {
+      btn.disabled = false;
+      btn.textContent = old;
+      if (!res.ok) {
+        var msg = 'Something went wrong. Please try again.';
+        try { msg = JSON.parse(res.txt).error || msg; } catch (e2) {}
+        showToast(msg, false);
+        return;
+      }
+      document.getElementById('schedResults').innerHTML = res.txt;
+      bindSchedTable();
+      showToast('Schedule generated successfully.', true);
+      var target = document.querySelector('.sched-info');
+      if (target) target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }).catch(function () {
+      btn.disabled = false;
+      btn.textContent = old;
+      showToast('Network error — please try again.', false);
+    });
+  });
+
   document.querySelectorAll('form.del-form').forEach(function (f) {
     var btn = f.querySelector('.del-saved');
     var armed = false, timer = null;

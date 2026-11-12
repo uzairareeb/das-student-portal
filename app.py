@@ -2324,30 +2324,21 @@ def _schedule_file_tag(session):
     return re.sub(r"[^A-Za-z0-9]+", "_", session).strip("_") or "Session"
 
 
-def _rows_from_form(form):
-    """Rebuild schedule rows from the editable results form (the admin may
-    have changed any scheduled date). Returns (rows, error). Adjusted
-    dates are re-derived with the weekend rule."""
-    rows = []
-    for i, (document, statute, rule) in enumerate(SCHEDULE_RULES):
-        if rule[0] == "range":
-            raw = [(form.get(f"sched_{i}_start") or "").strip(),
-                   (form.get(f"sched_{i}_end") or "").strip()]
-        else:
-            raw = [(form.get(f"sched_{i}") or "").strip()]
-        dates = []
-        for v in raw:
-            if not v:
-                return (None, "All scheduled dates are required — please "
-                              "fill every date in the schedule table.")
-            try:
-                dates.append(datetime.strptime(v, "%Y-%m-%d").date())
-            except ValueError:
-                return None, "One of the scheduled dates is invalid."
-        if len(dates) == 2 and dates[1] < dates[0]:
-            return (None, f"The {document} end date must not be before "
-                          f"its start date.")
-        rows.append(make_row(document, statute, dates))
+def _rows_from_form(form, commencement, termination):
+    """Rows for save/export. Every date is computed from the statutes via
+    build_schedule; ONLY the Final Thesis date may be overridden by the
+    admin (it is the one extendable deadline). Returns (rows, error)."""
+    rows = build_schedule(commencement, termination)
+    raw = (form.get("sched_7") or "").strip()
+    if raw:
+        try:
+            d = datetime.strptime(raw, "%Y-%m-%d").date()
+        except ValueError:
+            return None, "The Final Thesis date is invalid."
+        idx = next(i for i, r in enumerate(SCHEDULE_RULES)
+                   if r[0] == "Final Thesis")
+        rows[idx] = make_row(rows[idx]["document"], rows[idx]["statute"],
+                             [d])
     return rows, None
 
 
@@ -2413,7 +2404,8 @@ def _schedule_payload():
             _parse_schedule_inputs(request.form)
         if error:
             return None, None, error
-        rows, error = _rows_from_form(request.form)
+        rows, error = _rows_from_form(request.form, commencement,
+                                      termination)
         if error:
             return None, None, error
         return (_schedule_ctx(session, commencement, termination),
@@ -2444,13 +2436,21 @@ def admin_schedule():
         form = {k: (request.form.get(k) or "").strip() for k in form}
         session, commencement, termination, raw_rows, error = \
             _parse_schedule_inputs(request.form)
+        ajax = (request.headers.get("X-Requested-With")
+                == "XMLHttpRequest")
         if error:
+            if ajax:
+                return {"error": error}, 400
             flash(error)
         else:
             sched = _schedule_ctx(session, commencement, termination)
             rows = [display_row(r) for r in raw_rows]
             log_activity("admin", "schedule_generate",
                          f"{session}: {commencement} to {termination}")
+            if ajax:
+                return render_template("_schedule_results.html",
+                                       rows=rows, sched=sched,
+                                       notice=None)
     elif request.args.get("saved"):
         rec = _get_saved_schedule(request.args.get("saved"))
         if rec:
@@ -2480,7 +2480,8 @@ def admin_schedule_save():
     if error:
         flash(error)
         return redirect(url_for("admin_schedule"))
-    rows, error = _rows_from_form(request.form)
+    rows, error = _rows_from_form(request.form, commencement,
+                                  termination)
     if error:
         flash(error)
         return redirect(url_for("admin_schedule"))
@@ -2709,12 +2710,13 @@ def admin_schedule_pdf():
                 f'<b><font color="#1769E8">{_esc(text)}</font></b>', cell)
         return Paragraph(f'<font color="#98A2B3">{_esc(text)}</font>', cell)
 
-    headers = ["Document", "Scheduled Last Date", "Day",
+    headers = ["#", "Document", "Scheduled Last Date", "Day",
                "Adjusted Date (Weekend Shift Applied)", "Adjusted Day"]
-    widths = [74 * mm, 52 * mm, 40 * mm, 58 * mm, 53 * mm]
+    widths = [10 * mm, 68 * mm, 50 * mm, 38 * mm, 58 * mm, 53 * mm]
     data = [[Paragraph(h, head_cell) for h in headers]]
-    for r in rows:
+    for i, r in enumerate(rows, start=1):
         data.append([
+            Paragraph(str(i), cell),
             Paragraph(_esc(r["document"]), cell_b),
             Paragraph(_esc(r["scheduled_text"]), cell),
             Paragraph(_esc(r["day_text"]), cell),

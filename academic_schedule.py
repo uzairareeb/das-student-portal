@@ -106,6 +106,7 @@ def display_row(row):
     shifted = [i for i in range(len(sched)) if adj[i] != sched[i]]
     return {
         "document": row["document"], "statute": row["statute"],
+        "editable": row["document"] == "Final Thesis",
         "is_range": len(sched) == 2,
         "scheduled_iso": [d.isoformat() for d in sched],
         "scheduled_text": " – ".join(fmt_date(d) for d in sched),
