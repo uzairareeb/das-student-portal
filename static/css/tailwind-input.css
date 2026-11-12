@@ -450,33 +450,31 @@
   .dip-tri { @apply pointer-events-none absolute top-0 right-0 h-[300px] w-[300px] bg-[#38bdf8] opacity-80; clip-path: polygon(100% 0, 0 0, 100% 100%); }
   .dip-circle-lg { @apply pointer-events-none absolute -bottom-[190px] -left-[130px] h-[430px] w-[430px] rounded-full bg-[#dbeafe]; }
   .dip-circle-sm { @apply pointer-events-none absolute -bottom-[70px] left-[110px] h-[190px] w-[190px] rounded-full bg-[#38bdf8] opacity-50; }
-  .dip-card { @apply relative z-10 flex w-full max-w-[980px] flex-col overflow-hidden rounded-[16px] bg-white shadow-[0_30px_70px_-18px_rgba(23,54,93,0.35)] lg:min-h-[560px] lg:flex-row; animation: loginIn .45s ease both; }
+  .dip-card { @apply relative z-10 flex w-full max-w-[1280px] flex-col overflow-hidden rounded-[18px] bg-white shadow-[0_30px_70px_-18px_rgba(23,54,93,0.35)] lg:min-h-[680px] lg:flex-row; animation: loginIn .45s ease both; }
   .dip-panel { @apply relative flex w-full flex-col overflow-hidden px-9 py-8 text-white lg:w-[42%] lg:py-10; background: linear-gradient(155deg, #17365d 0%, #1769e8 58%, #38bdf8 135%); }
   .dip-deco { @apply pointer-events-none absolute rounded-[6px] bg-white/10; transform: rotate(45deg); }
   .dip-deco-1 { @apply top-[16%] right-[14%] h-16 w-16; }
   .dip-deco-2 { @apply bottom-[20%] left-[8%] h-9 w-9 bg-white/15; }
   .dip-deco-3 { @apply -bottom-[90px] -left-[50px] h-[210px] w-[210px] rounded-full bg-white/10; transform: none; }
-  .dip-brand { @apply relative z-10 flex items-center gap-2.5; }
-  .dip-brand-logo { @apply flex h-9 w-9 items-center justify-center overflow-hidden rounded-full bg-white p-0.5 shadow ring-2 ring-white/40; }
-  .dip-brand-logo img { @apply h-full w-full rounded-full object-cover; }
-  .dip-brand-name { @apply text-[15px] font-bold tracking-[0.18em]; }
+  .dip-logo { @apply mx-auto mb-5 flex h-24 w-24 items-center justify-center overflow-hidden rounded-full bg-white p-1 shadow-lg ring-4 ring-white/25; }
+  .dip-logo img { @apply h-full w-full rounded-full object-cover; }
   .dip-panel-mid { @apply relative z-10 my-auto px-1 py-10 text-center; }
-  .dip-panel-mid h1 { @apply text-[32px] leading-tight font-extrabold lg:text-[34px]; }
+  .dip-panel-mid h1 { @apply text-[34px] leading-tight font-extrabold lg:text-[38px]; }
   .dip-panel-mid p { @apply mx-auto mt-4 max-w-[290px] text-[13.5px] leading-relaxed text-blue-100; }
   .dip-outline-btn { @apply mt-8 inline-block rounded-full border-2 border-white/90 px-9 py-2.5 text-[12.5px] font-bold tracking-[0.14em] text-white transition hover:bg-white hover:text-primary; }
   .dip-form-side { @apply flex flex-1 items-center justify-center px-8 py-10 sm:px-12; }
-  .dip-form { @apply w-full max-w-[330px] text-center; animation: loginUp .5s ease both; }
-  .dip-form h2 { @apply text-[30px] font-extrabold text-primary; }
+  .dip-form { @apply w-full max-w-[380px] text-center; animation: loginUp .5s ease both; }
+  .dip-form h2 { @apply text-[32px] font-extrabold text-primary; }
   .dip-sub { @apply mt-2.5 mb-6 text-[13px] text-muted; }
   .dip-pw { @apply relative mb-4 text-left; }
-  .dip-input { @apply w-full rounded-md border-0 bg-[#f2f7fd] py-3.5 pr-12 pl-11 text-[14.5px] outline-none transition placeholder:text-slate-400 focus:bg-[#eaf2ff] focus:ring-2 focus:ring-primary/60; }
+  .dip-input { @apply w-full rounded-md border-0 bg-[#f2f7fd] py-4 pr-12 pl-11 text-[15px] outline-none transition placeholder:text-slate-400 focus:bg-[#eaf2ff] focus:ring-2 focus:ring-primary/60; }
   .dip-lock { @apply pointer-events-none absolute top-1/2 left-3.5 h-5 w-5 -translate-y-1/2 text-slate-400; }
   .dip-show { @apply absolute top-1/2 right-2 -translate-y-1/2 cursor-pointer rounded-md p-1.5 text-slate-500 hover:bg-white hover:text-primary; }
   .dip-show svg { @apply h-5 w-5; }
   .dip-row { @apply mb-6 flex items-center justify-start text-[13px]; }
   .dip-remember { @apply flex cursor-pointer items-center gap-2 font-medium text-slate-600; }
   .dip-remember input { @apply h-4 w-4 accent-[#1769E8]; }
-  .dip-submit { @apply inline-block min-w-[190px] cursor-pointer rounded-full bg-primary px-10 py-3.5 text-[13.5px] font-bold tracking-[0.14em] text-white shadow-[0_10px_22px_-8px_rgba(23,105,232,0.65)] transition hover:bg-navy disabled:cursor-wait disabled:opacity-70; }
+  .dip-submit { @apply inline-block min-w-[210px] cursor-pointer rounded-full bg-primary px-10 py-4 text-[13.5px] font-bold tracking-[0.14em] text-white shadow-[0_10px_22px_-8px_rgba(23,105,232,0.65)] transition hover:bg-navy disabled:cursor-wait disabled:opacity-70; }
   .dip-note { @apply mt-7 text-xs text-muted; }
   .dip-office { @apply mt-1.5 text-xs font-semibold text-slate-500; }
   /* ---------- list table: tick/cross + legend + status chips ---------- */
