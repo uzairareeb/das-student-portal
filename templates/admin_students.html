@@ -17,6 +17,13 @@
   <a class="chip smart{% if f.get('needs_coe') == '1' %} active{% endif %}" href="{{ url_for('admin_students', needs_coe='1') }}">Needs COE</a>
 </div>
 
+<div class="qf-wrap">
+  <span class="qf-tag">Quick Find</span>
+  <span class="qf-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg></span>
+  <input type="text" id="qfInput" class="qf-input" placeholder="Type a student's name, reg no or CNIC — suggestions appear as you type" autocomplete="off">
+  <div class="qf-drop" id="qfDrop" hidden></div>
+</div>
+
 <div class="card section">
   <div class="section-head">
     <span class="section-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="21" x2="4" y2="14"/><line x1="4" y1="10" x2="4" y2="3"/><line x1="12" y1="21" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="3"/><line x1="20" y1="21" x2="20" y2="16"/><line x1="20" y1="12" x2="20" y2="3"/><line x1="1" y1="14" x2="7" y2="14"/><line x1="9" y1="8" x2="15" y2="8"/><line x1="17" y1="16" x2="23" y2="16"/></svg></span>
@@ -517,6 +524,83 @@
         if (v.length === 0) { restoreList(); return; }
         if (v.length < 3) return;
         debounce = setTimeout(function () { liveSearch(v); }, 300);
+      });
+    }
+    /* ---- Quick Find autosuggest (2+ letters, click opens the profile popup) ---- */
+    var qfInput = document.getElementById('qfInput');
+    var qfDrop = document.getElementById('qfDrop');
+    var qfTimer = null, qfItems = [], qfActive = -1, qfSeq = 0;
+    function qfHide() { if (qfDrop) qfDrop.hidden = true; qfItems = []; qfActive = -1; }
+    function qfRender(list, total, v) {
+      if (!list.length) {
+        qfDrop.innerHTML = '<div class="qf-empty">No student found for &quot;' + esc(v) + '&quot;</div>';
+      } else {
+        var html = list.map(function (s) {
+          var cls = s.pill === 'q' ? 'sp-ok' : (s.pill === 'warn' ? 'sp-warn' : 'sp-bad');
+          return '<button type="button" class="qf-item" data-sid="' + s.id + '">'
+            + '<span class="row-avatar">' + esc((s.name || '?').charAt(0)) + '</span>'
+            + '<span class="qf-main"><span class="qf-name">' + esc(s.name) + '</span>'
+            + '<span class="qf-sub">' + esc(s.reg_no) + (s.degree ? ' \u00B7 ' + esc(s.degree) : '') + '</span></span>'
+            + '<span class="status-plain ' + cls + '"><span class="dot"></span>' + esc(s.status) + '</span>'
+            + '</button>';
+        }).join('');
+        if (total > list.length) {
+          html += '<div class="qf-more">+ ' + (total - list.length) + ' more match(es) — use the Filters search below to see them all</div>';
+        }
+        qfDrop.innerHTML = html;
+      }
+      qfDrop.hidden = false;
+      qfItems = Array.prototype.slice.call(qfDrop.querySelectorAll('.qf-item'));
+      qfActive = -1;
+    }
+    function qfFetch(v) {
+      var seq = ++qfSeq;
+      fetch('/admin/students/search.json?q=' + encodeURIComponent(v))
+        .then(function (r) { return r.json(); })
+        .then(function (d) {
+          if (seq !== qfSeq || !d.ok || qfInput.value.trim() !== v) return;
+          qfRender(d.students.slice(0, 8), d.total, v);
+        })
+        .catch(function () {});
+    }
+    function qfPick(item) {
+      if (!item) return;
+      var sid = item.getAttribute('data-sid');
+      qfHide();
+      openEditor(sid);
+    }
+    if (qfInput && qfDrop) {
+      qfInput.addEventListener('input', function () {
+        clearTimeout(qfTimer);
+        var v = qfInput.value.trim();
+        if (v.length < 2) { qfHide(); return; }
+        qfTimer = setTimeout(function () { qfFetch(v); }, 200);
+      });
+      qfInput.addEventListener('keydown', function (e) {
+        if (e.key === 'Escape') { qfHide(); return; }
+        if (qfDrop.hidden || !qfItems.length) return;
+        if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+          e.preventDefault();
+          qfActive = e.key === 'ArrowDown'
+            ? Math.min(qfActive + 1, qfItems.length - 1)
+            : Math.max(qfActive - 1, 0);
+          qfItems.forEach(function (it, i) { it.classList.toggle('active', i === qfActive); });
+          if (qfItems[qfActive]) qfItems[qfActive].scrollIntoView({ block: 'nearest' });
+        } else if (e.key === 'Enter') {
+          e.preventDefault();
+          qfPick(qfItems[qfActive >= 0 ? qfActive : 0]);
+        }
+      });
+      qfDrop.addEventListener('mousedown', function (e) {
+        var item = e.target.closest('.qf-item');
+        if (item) { e.preventDefault(); qfPick(item); }
+      });
+      document.addEventListener('click', function (e) {
+        if (!qfDrop.hidden && !e.target.closest('.qf-wrap')) qfHide();
+      });
+      qfInput.addEventListener('focus', function () {
+        var v = qfInput.value.trim();
+        if (v.length >= 2 && qfDrop.hidden) qfFetch(v);
       });
     }
   })();
