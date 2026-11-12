@@ -281,6 +281,8 @@
   .pill.nq { @apply bg-red-50 text-red-700; }
   .pill.warn { @apply bg-amber-50 text-amber-700; }
   .pill.info { @apply bg-soft text-primary; }
+  .wide-table td.yn-ok { @apply bg-[#ecfdf5] font-semibold text-emerald-700; }
+  .wide-table td.yn-no { @apply bg-[#fef2f2] font-semibold text-red-700; }
 
   /* ---------- flash / alerts ---------- */
   .flash { @apply mb-[18px]; }

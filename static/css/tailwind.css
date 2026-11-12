@@ -2167,6 +2167,18 @@
     background-color: var(--color-soft);
     color: var(--color-primary);
   }
+  .wide-table td.yn-ok {
+    background-color: #ecfdf5;
+    --tw-font-weight: var(--font-weight-semibold);
+    font-weight: var(--font-weight-semibold);
+    color: var(--color-emerald-700);
+  }
+  .wide-table td.yn-no {
+    background-color: #fef2f2;
+    --tw-font-weight: var(--font-weight-semibold);
+    font-weight: var(--font-weight-semibold);
+    color: var(--color-red-700);
+  }
   .flash {
     margin-bottom: 18px;
   }
