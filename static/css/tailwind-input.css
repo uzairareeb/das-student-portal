@@ -90,6 +90,8 @@
     @apply inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-[13px] bg-soft text-primary;
   }
   .side-brand .mark svg, .side-brand .sp-mark svg { @apply h-6 w-6; }
+  .side-brand .mark-logo { @apply inline-flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-full bg-white shadow-sm ring-1 ring-line; }
+  .side-brand .mark-logo img { @apply h-full w-full rounded-full object-cover; }
   .side-brand .t1 { @apply text-base font-extrabold tracking-wide text-navy; }
   .side-brand .t2 { @apply mt-0.5 text-[11.5px] text-muted; }
   .side-nav { @apply flex flex-1 flex-col gap-1 overflow-y-auto px-3 py-4; }
