@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Academic Schedule — {{ sched.session }} · {{ title }}</title>
+<style>
+  @page { size: A4 landscape; margin: 12mm; }
+  * { box-sizing: border-box; }
+  body { font-family: Arial, Helvetica, sans-serif; color: #1f2a37; margin: 0; padding: 24px; background: #fff; }
+  .toolbar { display: flex; gap: 10px; margin-bottom: 18px; }
+  .toolbar button, .toolbar a { font: 600 13px Arial, sans-serif; padding: 8px 16px; border-radius: 8px; border: 1px solid #1769e8; cursor: pointer; text-decoration: none; }
+  .toolbar button { background: #1769e8; color: #fff; }
+  .toolbar a { background: #fff; color: #1769e8; }
+  .head { display: flex; align-items: center; gap: 18px; }
+  .head img { width: 132px; height: auto; }
+  .head .titles { flex: 1; text-align: center; }
+  .head h1 { font-size: 17px; margin: 0 0 4px; color: #17365d; letter-spacing: .2px; }
+  .head h2 { font-size: 13.5px; margin: 0; color: #1769e8; }
+  .band { margin-top: 14px; background: #17365d; color: #fff; text-align: center; font-weight: 700; font-size: 14px; padding: 8px 6px; border-radius: 4px; }
+  .meta { display: flex; justify-content: space-between; gap: 20px; margin: 12px 2px 10px; font-size: 12px; }
+  .meta b { color: #17365d; }
+  table { width: 100%; border-collapse: collapse; font-size: 12px; }
+  th { background: #17365d; color: #fff; text-align: left; padding: 8px 9px; font-size: 11.5px; }
+  td { border: 1px solid #d6dee9; padding: 7px 9px; vertical-align: top; }
+  tbody tr:nth-child(even) td { background: #f2f7fe; }
+  td.doc { font-weight: 700; color: #17365d; }
+  td.adj { background: #eaf2ff !important; font-weight: 700; color: #1769e8; }
+  .note { margin-top: 12px; font-size: 11.5px; color: #475467; background: #eaf2ff; border-radius: 6px; padding: 9px 12px; }
+  .foot { margin-top: 10px; font-size: 10.5px; color: #667085; display: flex; justify-content: space-between; }
+  @media print {
+    body { padding: 0; }
+    .no-print { display: none !important; }
+  }
+</style>
+</head>
+<body>
+<div class="toolbar no-print">
+  <button type="button" onclick="window.print()">Print Schedule</button>
+  <a href="{{ url_for('admin_schedule') }}">Back to Schedule Generator</a>
+</div>
+
+<div class="head">
+  <img src="{{ url_for('static', filename='img/cuvas-logo.png') }}" alt="CUVAS logo">
+  <div class="titles">
+    <h1>CHOLISTAN UNIVERSITY OF VETERINARY AND ANIMAL SCIENCES, BAHAWALPUR</h1>
+    <h2>Directorate of Advanced Studies</h2>
+  </div>
+</div>
+<div class="band">ACADEMIC SCHEDULE — {{ sched.session | upper }}</div>
+<div class="meta">
+  <div><b>Commencement of Semester:</b> {{ sched.commencement_disp }}</div>
+  <div><b>Termination of Semester:</b> {{ sched.termination_disp }}</div>
+  <div><b>Generated on:</b> {{ gen_str }}</div>
+</div>
+
+<table>
+  <thead>
+    <tr>
+      <th>Document</th>
+      <th>Submission Deadline According to Statutes</th>
+      <th>Scheduled Last Date</th>
+      <th>Day</th>
+      <th>Adjusted Date (Weekend Shift Applied)</th>
+      <th>Adjusted Day</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for r in rows %}
+    <tr>
+      <td class="doc">{{ r.document }}</td>
+      <td>{{ r.statute }}</td>
+      <td>{{ r.scheduled }}</td>
+      <td>{{ r.day }}</td>
+      <td class="{% if r.shifted %}adj{% endif %}">{{ r.adjusted }}</td>
+      <td class="{% if r.shifted %}adj{% endif %}">{{ r.adjusted_day }}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+
+<div class="note"><b>Note:</b> If the scheduled date falls on Saturday or Sunday, it will be automatically adjusted to Monday. The original scheduled date is always preserved in the Scheduled Last Date column.</div>
+<div class="foot">
+  <span>Directorate of Advanced Studies — CUVAS, Bahawalpur</span>
+  <span>Academic Schedule — {{ sched.session }}</span>
+</div>
+
+<script>
+  window.addEventListener('load', function () { setTimeout(function () { window.print(); }, 400); });
+</script>
+</body>
+</html>

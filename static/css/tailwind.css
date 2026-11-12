@@ -66,6 +66,7 @@
     --font-weight-bold: 700;
     --font-weight-extrabold: 800;
     --tracking-tight: -0.025em;
+    --tracking-normal: 0em;
     --tracking-wide: 0.025em;
     --tracking-wider: 0.05em;
     --leading-tight: 1.25;
@@ -397,6 +398,9 @@
   }
   .shrink-0 {
     flex-shrink: 0;
+  }
+  .border-collapse {
+    border-collapse: collapse;
   }
   .-translate-y-1\/2 {
     --tw-translate-y: calc(calc(1 / 2 * 100%) * -1);
@@ -1726,6 +1730,108 @@
     vertical-align: bottom;
     font-size: 11px;
     white-space: normal;
+  }
+  .sched-band {
+    margin-bottom: calc(var(--spacing) * 5);
+    overflow: hidden;
+    border-radius: var(--radius-xl);
+    border-style: var(--tw-border-style);
+    border-width: 1px;
+    border-color: var(--color-line);
+    background-color: var(--color-white);
+    --tw-shadow: 0 1px 3px 0 var(--tw-shadow-color, rgb(0 0 0 / 0.1)), 0 1px 2px -1px var(--tw-shadow-color, rgb(0 0 0 / 0.1));
+    box-shadow: var(--tw-inset-shadow), var(--tw-inset-ring-shadow), var(--tw-ring-offset-shadow), var(--tw-ring-shadow), var(--tw-shadow);
+  }
+  .sched-band-head {
+    display: flex;
+    align-items: center;
+    gap: calc(var(--spacing) * 2.5);
+    background-color: var(--color-navy);
+    padding-inline: calc(var(--spacing) * 5);
+    padding-block: calc(var(--spacing) * 3);
+    font-size: 15px;
+    --tw-font-weight: var(--font-weight-extrabold);
+    font-weight: var(--font-weight-extrabold);
+    color: var(--color-white);
+  }
+  .sched-band-head svg {
+    height: calc(var(--spacing) * 5);
+    width: calc(var(--spacing) * 5);
+  }
+  .sched-band-body {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    column-gap: calc(var(--spacing) * 12);
+    row-gap: calc(var(--spacing) * 2);
+    background-color: #eaf2ff;
+    padding-inline: calc(var(--spacing) * 5);
+    padding-block: calc(var(--spacing) * 3.5);
+  }
+  .sched-band-body .d {
+    font-size: var(--text-base);
+    line-height: var(--tw-leading, var(--text-base--line-height));
+    --tw-font-weight: var(--font-weight-extrabold);
+    font-weight: var(--font-weight-extrabold);
+    color: var(--color-navy);
+  }
+  .sched-band-body .l {
+    margin-left: calc(var(--spacing) * 2.5);
+    font-size: var(--text-sm);
+    line-height: var(--tw-leading, var(--text-sm--line-height));
+    color: var(--color-slate-600);
+  }
+  .sched-table {
+    min-width: 920px;
+  }
+  .sched-table th {
+    background-color: var(--color-navy);
+    font-size: 13px;
+    --tw-tracking: var(--tracking-normal);
+    letter-spacing: var(--tracking-normal);
+    color: var(--color-white);
+    text-transform: none;
+  }
+  .sched-table td {
+    vertical-align: top;
+    white-space: normal;
+  }
+  .sched-table td.doc {
+    min-width: 180px;
+    --tw-font-weight: var(--font-weight-bold);
+    font-weight: var(--font-weight-bold);
+    color: var(--color-navy);
+  }
+  .sched-table td.statute {
+    min-width: 240px;
+    color: var(--color-slate-600);
+  }
+  td.sched-adj {
+    background-color: #eaf2ff;
+    --tw-font-weight: var(--font-weight-bold);
+    font-weight: var(--font-weight-bold);
+    color: var(--color-primary);
+  }
+  .sched-note {
+    margin-top: calc(var(--spacing) * 4);
+    display: flex;
+    align-items: flex-start;
+    gap: calc(var(--spacing) * 2.5);
+    border-radius: 10px;
+    background-color: #eaf2ff;
+    padding-inline: calc(var(--spacing) * 4);
+    padding-block: calc(var(--spacing) * 3);
+    font-size: 13px;
+    --tw-leading: var(--leading-relaxed);
+    line-height: var(--leading-relaxed);
+    color: var(--color-slate-700);
+  }
+  .sched-note svg {
+    margin-top: calc(var(--spacing) * 0.5);
+    height: 18px;
+    width: 18px;
+    flex-shrink: 0;
+    color: var(--color-primary);
   }
   .wide-table td.degree-cell {
     max-width: 165px;

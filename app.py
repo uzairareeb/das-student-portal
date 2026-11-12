@@ -25,6 +25,7 @@ from flask import (Flask, Response, flash, g, redirect, render_template,
 from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.utils import secure_filename
 from viva_pdf import build_viva_pdf
+from academic_schedule import build_schedule, fmt_date as sched_fmt
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DB_PATH = os.path.join(BASE_DIR, "students.db")
@@ -2183,6 +2184,7 @@ def admin_viva_export_pdf():
 
 
 TASK_LABELS = {
+    "schedule_generate": "Academic schedule generated",
     "student_add": "Student added", "student_edit": "Student record updated",
     "student_delete": "Student deleted", "student_bulk_delete": "Students deleted (bulk)",
     "student_bulk_update": "Bulk update applied", "student_delete_all": "All students deleted",
@@ -2252,6 +2254,368 @@ def admin_reports():
         status_list=STATUS_LIST, sessions=distinct_values("session"),
         degrees=distinct_values("degree"), genders=GENDER_OPTS,
         folders=FOLDER_OPTS)
+
+
+def _pkt_now():
+    """Current time in Pakistan (the Vercel server runs UTC)."""
+    try:
+        from zoneinfo import ZoneInfo
+        return datetime.now(ZoneInfo("Asia/Karachi"))
+    except Exception:
+        return datetime.now(timezone.utc) + timedelta(hours=5)
+
+
+def _parse_schedule_inputs(args):
+    """Validate Academic Schedule Generator inputs.
+    Returns (session, commencement, termination, rows, error)."""
+    session = (args.get("session") or "").strip()
+    c_raw = (args.get("commencement") or "").strip()
+    t_raw = (args.get("termination") or "").strip()
+    if not session or not c_raw or not t_raw:
+        return (session, None, None, None,
+                "Academic Session, Commencement and Termination dates are "
+                "all required.")
+    try:
+        commencement = datetime.strptime(c_raw, "%Y-%m-%d").date()
+        termination = datetime.strptime(t_raw, "%Y-%m-%d").date()
+    except ValueError:
+        return (session, None, None, None,
+                "Please provide valid commencement and termination dates.")
+    if termination <= commencement:
+        return (session, None, None, None,
+                "Termination of Semester must be later than Commencement "
+                "of Semester.")
+    return (session, commencement, termination,
+            build_schedule(commencement, termination), None)
+
+
+def _schedule_ctx(session, commencement, termination):
+    return {
+        "session": session,
+        "commencement_iso": commencement.isoformat(),
+        "termination_iso": termination.isoformat(),
+        "commencement_disp": (f"{sched_fmt(commencement)} "
+                              f"({commencement.strftime('%A')})"),
+        "termination_disp": (f"{sched_fmt(termination)} "
+                             f"({termination.strftime('%A')})"),
+    }
+
+
+def _schedule_file_tag(session):
+    return re.sub(r"[^A-Za-z0-9]+", "_", session).strip("_") or "Session"
+
+
+@app.route("/admin/schedule", methods=["GET", "POST"])
+@admin_required
+def admin_schedule():
+    """Academic Schedule Generator — statutory submission deadlines for a
+    semester, with weekend dates shifted to the following Monday."""
+    form = {"session": "", "commencement": "", "termination": ""}
+    rows, sched = None, None
+    if request.method == "POST":
+        form = {k: (request.form.get(k) or "").strip() for k in form}
+        session, commencement, termination, rows, error = \
+            _parse_schedule_inputs(request.form)
+        if error:
+            flash(error)
+            rows = None
+        else:
+            sched = _schedule_ctx(session, commencement, termination)
+            log_activity("admin", "schedule_generate",
+                         f"{session}: {commencement} to {termination}")
+    return render_template("admin_schedule.html", uni=UNI_NAME,
+                           title=PORTAL_TITLE, form=form, rows=rows,
+                           sched=sched)
+
+
+@app.route("/admin/schedule/export-pdf")
+@admin_required
+def admin_schedule_pdf():
+    """Professional PDF of a generated academic schedule."""
+    from xml.sax.saxutils import escape as _esc
+    from reportlab.lib import colors
+    from reportlab.lib.pagesizes import A4, landscape
+    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+    from reportlab.lib.units import mm
+    from reportlab.pdfgen import canvas as _pdfcanvas
+    from reportlab.platypus import (BaseDocTemplate, Frame, Image,
+                                    PageTemplate, Paragraph, Spacer, Table,
+                                    TableStyle)
+
+    session, commencement, termination, rows, error = \
+        _parse_schedule_inputs(request.args)
+    if error:
+        flash(error)
+        return redirect(url_for("admin_schedule"))
+    ctx = _schedule_ctx(session, commencement, termination)
+    gen_str = _pkt_now().strftime("%d %b %Y, %I:%M %p") + " (PKT)"
+
+    NAVY = colors.HexColor("#17365D")
+    BLUE = colors.HexColor("#1769E8")
+    INK = colors.HexColor("#1F2A37")
+    GREY = colors.HexColor("#667085")
+    LINE = colors.HexColor("#D6DEE9")
+    ZEBRA = colors.HexColor("#F2F7FE")
+    PAGE_W, PAGE_H = landscape(A4)
+
+    styles = getSampleStyleSheet()
+    uni_style = ParagraphStyle("suni", parent=styles["Normal"], fontSize=13,
+                               leading=16, fontName="Helvetica-Bold",
+                               textColor=NAVY, alignment=1)
+    das_style = ParagraphStyle("sdas", parent=styles["Normal"], fontSize=10.5,
+                               leading=13, fontName="Helvetica-Bold",
+                               textColor=BLUE, alignment=1)
+    band_style = ParagraphStyle("sband", parent=styles["Normal"], fontSize=11,
+                                leading=14, fontName="Helvetica-Bold",
+                                textColor=colors.white, alignment=1)
+    meta_style = ParagraphStyle("smeta", parent=styles["Normal"], fontSize=8.5,
+                                leading=12, textColor=INK)
+    meta_r = ParagraphStyle("smetar", parent=meta_style, alignment=2)
+    cell = ParagraphStyle("scell", parent=styles["Normal"], fontSize=8,
+                          leading=10, textColor=INK)
+    cell_b = ParagraphStyle("scellb", parent=cell, fontName="Helvetica-Bold")
+    head_cell = ParagraphStyle("shcell", parent=styles["Normal"], fontSize=7.5,
+                               leading=9.5, textColor=colors.white,
+                               fontName="Helvetica-Bold", alignment=1)
+
+    class NumberedCanvas(_pdfcanvas.Canvas):
+        """Footer on every page, with a true 'Page X of Y' count."""
+        def __init__(self, *args, **kwargs):
+            super().__init__(*args, **kwargs)
+            self._saved = []
+
+        def showPage(self):
+            self._saved.append(dict(self.__dict__))
+            self._startPage()
+
+        def save(self):
+            total = len(self._saved)
+            for state in self._saved:
+                self.__dict__.update(state)
+                self._draw_footer(total)
+                super().showPage()
+            super().save()
+
+        def _draw_footer(self, total):
+            self.saveState()
+            self.setStrokeColor(LINE)
+            self.setLineWidth(0.6)
+            self.line(10 * mm, 11 * mm, PAGE_W - 10 * mm, 11 * mm)
+            self.setFont("Helvetica", 6.5)
+            self.setFillColor(GREY)
+            self.drawString(10 * mm, 7 * mm,
+                            "Directorate of Advanced Studies - CUVAS, "
+                            "Bahawalpur")
+            self.drawCentredString(PAGE_W / 2.0, 7 * mm,
+                                   f"Academic Schedule - {session}")
+            self.drawRightString(PAGE_W - 10 * mm, 7 * mm,
+                                 f"Page {self._pageNumber} of {total}")
+            self.restoreState()
+
+    buf = io.BytesIO()
+    doc = BaseDocTemplate(
+        buf, pagesize=landscape(A4),
+        leftMargin=10 * mm, rightMargin=10 * mm,
+        topMargin=9 * mm, bottomMargin=14 * mm,
+        title=f"Academic Schedule - {session}",
+        author="Directorate of Advanced Studies, CUVAS")
+    frame = Frame(doc.leftMargin, doc.bottomMargin, doc.width, doc.height,
+                  id="main")
+    doc.addPageTemplates([PageTemplate(id="page", frames=[frame])])
+
+    story = []
+    logo_path = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                             "static", "img", "cuvas-logo.png")
+    logo_flow = (Image(logo_path, width=37 * mm, height=14.8 * mm)
+                 if os.path.exists(logo_path) else Paragraph("", meta_style))
+    hdr = Table([[logo_flow,
+                  [Paragraph("CHOLISTAN UNIVERSITY OF VETERINARY AND ANIMAL "
+                             "SCIENCES, BAHAWALPUR", uni_style),
+                   Paragraph("Directorate of Advanced Studies", das_style)]]],
+                colWidths=[42 * mm, 235 * mm])
+    hdr.setStyle(TableStyle([
+        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+        ("LEFTPADDING", (0, 0), (-1, -1), 0),
+        ("RIGHTPADDING", (0, 0), (-1, -1), 0),
+        ("TOPPADDING", (0, 0), (-1, -1), 0),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 2),
+    ]))
+    story.append(hdr)
+    band = Table([[Paragraph("ACADEMIC SCHEDULE — "
+                             + _esc(session.upper()), band_style)]],
+                 colWidths=[277 * mm])
+    band.setStyle(TableStyle([
+        ("BACKGROUND", (0, 0), (-1, -1), NAVY),
+        ("TOPPADDING", (0, 0), (-1, -1), 6),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
+        ("LEFTPADDING", (0, 0), (-1, -1), 0),
+        ("RIGHTPADDING", (0, 0), (-1, -1), 0),
+        ("ROUNDEDCORNERS", [3, 3, 3, 3]),
+    ]))
+    story.append(band)
+    story.append(Spacer(1, 3 * mm))
+    meta = Table([
+        [Paragraph(f"<b>Commencement of Semester:</b> "
+                   f"{_esc(ctx['commencement_disp'])}", meta_style),
+         Paragraph(f"<b>Termination of Semester:</b> "
+                   f"{_esc(ctx['termination_disp'])}", meta_r)],
+        [Paragraph(f"<b>Academic Session:</b> {_esc(session)}", meta_style),
+         Paragraph(f"<b>Generated on:</b> {_esc(gen_str)}", meta_r)],
+    ], colWidths=[150 * mm, 127 * mm])
+    meta.setStyle(TableStyle([
+        ("VALIGN", (0, 0), (-1, -1), "TOP"),
+        ("LEFTPADDING", (0, 0), (-1, -1), 0),
+        ("RIGHTPADDING", (0, 0), (-1, -1), 0),
+        ("TOPPADDING", (0, 0), (-1, -1), 1),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 1),
+    ]))
+    story.append(meta)
+    story.append(Spacer(1, 3 * mm))
+
+    def adj_cell(text, shifted):
+        if shifted:
+            return Paragraph(
+                f'<b><font color="#1769E8">{_esc(text)}</font></b>', cell)
+        return Paragraph(_esc(text), cell)
+
+    headers = ["Document", "Submission Deadline According to Statutes",
+               "Scheduled Last Date", "Day",
+               "Adjusted Date (Weekend Shift Applied)", "Adjusted Day"]
+    widths = [60 * mm, 88 * mm, 34 * mm, 28 * mm, 34 * mm, 33 * mm]
+    data = [[Paragraph(h, head_cell) for h in headers]]
+    for r in rows:
+        data.append([
+            Paragraph(_esc(r["document"]), cell_b),
+            Paragraph(_esc(r["statute"]), cell),
+            Paragraph(_esc(r["scheduled"]), cell),
+            Paragraph(_esc(r["day"]), cell),
+            adj_cell(r["adjusted"], r["shifted"]),
+            adj_cell(r["adjusted_day"], r["shifted"]),
+        ])
+    tbl = Table(data, colWidths=widths, repeatRows=1)
+    tbl.setStyle(TableStyle([
+        ("BACKGROUND", (0, 0), (-1, 0), NAVY),
+        ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
+        ("VALIGN", (0, 0), (-1, -1), "TOP"),
+        ("GRID", (0, 0), (-1, -1), 0.4, LINE),
+        ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, ZEBRA]),
+        ("TOPPADDING", (0, 0), (-1, -1), 4),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
+        ("LEFTPADDING", (0, 0), (-1, -1), 4),
+        ("RIGHTPADDING", (0, 0), (-1, -1), 4),
+    ]))
+    story.append(tbl)
+    story.append(Spacer(1, 4 * mm))
+    story.append(Paragraph(
+        "<b>Note:</b> If the scheduled date falls on Saturday or Sunday, it "
+        "will be automatically adjusted to Monday. The original scheduled "
+        "date is always preserved in the Scheduled Last Date column.",
+        meta_style))
+    doc.build(story, canvasmaker=NumberedCanvas)
+    buf.seek(0)
+    resp = Response(buf.getvalue(), mimetype="application/pdf")
+    resp.headers["Content-Disposition"] = \
+        f"attachment; filename=Academic_Schedule_{_schedule_file_tag(session)}.pdf"
+    return resp
+
+
+@app.route("/admin/schedule/export-excel")
+@admin_required
+def admin_schedule_excel():
+    """Excel export of a generated academic schedule."""
+    from openpyxl import Workbook
+    from openpyxl.styles import Font, PatternFill, Alignment
+
+    session, commencement, termination, rows, error = \
+        _parse_schedule_inputs(request.args)
+    if error:
+        flash(error)
+        return redirect(url_for("admin_schedule"))
+    ctx = _schedule_ctx(session, commencement, termination)
+    gen_str = _pkt_now().strftime("%d %b %Y, %I:%M %p") + " (PKT)"
+
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Academic Schedule"
+    navy = Font(bold=True, color="17365D")
+    ws.merge_cells("A1:F1")
+    c = ws["A1"]
+    c.value = ("CHOLISTAN UNIVERSITY OF VETERINARY AND ANIMAL SCIENCES, "
+               "BAHAWALPUR")
+    c.font = Font(bold=True, size=13, color="17365D")
+    ws.merge_cells("A2:F2")
+    c = ws["A2"]
+    c.value = "Directorate of Advanced Studies"
+    c.font = Font(bold=True, size=11, color="1769E8")
+    ws.merge_cells("A3:F3")
+    c = ws["A3"]
+    c.value = f"Academic Schedule — {session}"
+    c.font = Font(bold=True, size=12, color="17365D")
+    meta_rows = [("Academic Session:", session),
+                 ("Commencement of Semester:", ctx["commencement_disp"]),
+                 ("Termination of Semester:", ctx["termination_disp"]),
+                 ("Generated on:", gen_str)]
+    r0 = 5
+    for i, (k, v) in enumerate(meta_rows):
+        kc = ws.cell(row=r0 + i, column=1, value=k)
+        kc.font = Font(bold=True)
+        ws.merge_cells(start_row=r0 + i, start_column=2,
+                       end_row=r0 + i, end_column=6)
+        ws.cell(row=r0 + i, column=2, value=v)
+    hr = r0 + len(meta_rows) + 1
+    headers = ["Document", "Submission Deadline According to Statutes",
+               "Scheduled Last Date", "Day",
+               "Adjusted Date (Weekend Shift Applied)", "Adjusted Day"]
+    for j, h in enumerate(headers, start=1):
+        cell = ws.cell(row=hr, column=j, value=h)
+        cell.font = Font(bold=True, color="FFFFFF")
+        cell.fill = PatternFill("solid", fgColor="17365D")
+        cell.alignment = Alignment(horizontal="center", vertical="center",
+                                   wrap_text=True)
+    adj_font = Font(bold=True, color="1769E8")
+    for i, r in enumerate(rows, start=hr + 1):
+        ws.cell(row=i, column=1, value=r["document"]).font = Font(bold=True)
+        ws.cell(row=i, column=2, value=r["statute"])
+        ws.cell(row=i, column=3, value=r["scheduled"])
+        ws.cell(row=i, column=4, value=r["day"])
+        a1 = ws.cell(row=i, column=5, value=r["adjusted"])
+        a2 = ws.cell(row=i, column=6, value=r["adjusted_day"])
+        if r["shifted"]:
+            a1.font = adj_font
+            a2.font = adj_font
+    nr = hr + len(rows) + 2
+    ws.merge_cells(start_row=nr, start_column=1, end_row=nr, end_column=6)
+    nc = ws.cell(row=nr, column=1,
+                 value="Note: If the scheduled date falls on Saturday or "
+                       "Sunday, it will be automatically adjusted to "
+                       "Monday.")
+    nc.font = Font(italic=True, color="667085")
+    for col, w in zip("ABCDEF", [38, 54, 30, 22, 30, 24]):
+        ws.column_dimensions[col].width = w
+    buf = io.BytesIO()
+    wb.save(buf)
+    buf.seek(0)
+    resp = Response(buf.getvalue(),
+                    mimetype="application/vnd.openxmlformats-officedocument."
+                             "spreadsheetml.sheet")
+    resp.headers["Content-Disposition"] = \
+        f"attachment; filename=Academic_Schedule_{_schedule_file_tag(session)}.xlsx"
+    return resp
+
+
+@app.route("/admin/schedule/print")
+@admin_required
+def admin_schedule_print():
+    """Clean A4 print view of a generated academic schedule."""
+    session, commencement, termination, rows, error = \
+        _parse_schedule_inputs(request.args)
+    if error:
+        flash(error)
+        return redirect(url_for("admin_schedule"))
+    ctx = _schedule_ctx(session, commencement, termination)
+    gen_str = _pkt_now().strftime("%d %b %Y, %I:%M %p") + " (PKT)"
+    return render_template("schedule_print.html", rows=rows, sched=ctx,
+                           gen_str=gen_str)
 
 
 @app.context_processor

@@ -213,6 +213,22 @@
   table.wide-table { @apply text-xs; }
   table.wide-table th, table.wide-table td { @apply px-1.5 py-1.5; }
   table.wide-table th { @apply text-[11px] whitespace-normal align-bottom; }
+
+  /* ---------- academic schedule generator ---------- */
+  .sched-band { @apply mb-5 overflow-hidden rounded-xl border border-line bg-white shadow-sm; }
+  .sched-band-head { @apply flex items-center gap-2.5 bg-navy px-5 py-3 text-[15px] font-extrabold text-white; }
+  .sched-band-head svg { @apply h-5 w-5; }
+  .sched-band-body { @apply flex flex-wrap items-center gap-x-12 gap-y-2 bg-[#eaf2ff] px-5 py-3.5; }
+  .sched-band-body .d { @apply text-base font-extrabold text-navy; }
+  .sched-band-body .l { @apply ml-2.5 text-sm text-slate-600; }
+  .sched-table { @apply min-w-[920px]; }
+  .sched-table th { @apply bg-navy text-[13px] normal-case tracking-normal text-white; }
+  .sched-table td { @apply whitespace-normal align-top; }
+  .sched-table td.doc { @apply min-w-[180px] font-bold text-navy; }
+  .sched-table td.statute { @apply min-w-[240px] text-slate-600; }
+  td.sched-adj { @apply bg-[#eaf2ff] font-bold text-primary; }
+  .sched-note { @apply mt-4 flex items-start gap-2.5 rounded-[10px] bg-[#eaf2ff] px-4 py-3 text-[13px] leading-relaxed text-slate-700; }
+  .sched-note svg { @apply mt-0.5 h-[18px] w-[18px] shrink-0 text-primary; }
   .wide-table td.degree-cell { @apply min-w-[110px] max-w-[165px]; }
   .wide-table td.comments-cell { @apply min-w-[110px] max-w-[175px]; }
   .wide-table .pill { @apply px-[7px] py-[3px] text-[10.5px] whitespace-nowrap; }
