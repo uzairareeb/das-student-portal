@@ -67,7 +67,6 @@
     --font-weight-bold: 700;
     --font-weight-extrabold: 800;
     --tracking-tight: -0.025em;
-    --tracking-normal: 0em;
     --tracking-wide: 0.025em;
     --tracking-wider: 0.05em;
     --leading-tight: 1.25;
@@ -2009,6 +2008,39 @@
   }
   .sched-toast.err {
     background-color: var(--color-red-600);
+  }
+  .ext-item {
+    display: flex;
+    align-items: flex-start;
+    gap: calc(var(--spacing) * 3);
+    border-bottom-style: var(--tw-border-style);
+    border-bottom-width: 1px;
+    border-color: var(--color-line);
+    padding-block: calc(var(--spacing) * 3);
+  }
+  .ext-item:last-child {
+    border-bottom: 0;
+  }
+  .ext-badge {
+    flex-shrink: 0;
+    border-radius: calc(infinity * 1px);
+    background-color: #eaf2ff;
+    padding-inline: calc(var(--spacing) * 2.5);
+    padding-block: var(--spacing);
+    font-size: 11px;
+    --tw-font-weight: var(--font-weight-bold);
+    font-weight: var(--font-weight-bold);
+    color: var(--color-primary);
+  }
+  .ext-main {
+    font-size: var(--text-sm);
+    line-height: var(--tw-leading, var(--text-sm--line-height));
+    color: var(--color-ink);
+  }
+  .ext-meta {
+    margin-top: calc(var(--spacing) * 0.5);
+    font-size: 13px;
+    color: var(--color-muted);
   }
   .saved-row {
     display: flex;

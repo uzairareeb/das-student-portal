@@ -347,6 +347,7 @@ def init_db():
     _fix_passout_rows(db)
     _fix_department_rows(db)
     _migrate_add_saved_schedules(db)
+    _migrate_add_schedule_extensions(db)
     # Admin password comes from the env var (source of truth), stored hashed.
     pw_hash = generate_password_hash(
         os.environ.get("ADMIN_PASSWORD", "admin123") or "admin123")
@@ -500,6 +501,23 @@ def _migrate_add_doc_status(db):
     except Exception:
         pass
 
+
+
+def _migrate_add_schedule_extensions(db):
+    """Final Thesis extension history on saved schedules."""
+    try:
+        if USE_PG:
+            db.execute("ALTER TABLE saved_schedules ADD COLUMN IF NOT EXISTS"
+                       " extensions_json TEXT DEFAULT '[]'")
+        else:
+            cols = [r[1] for r in
+                    db.fetchall("PRAGMA table_info(saved_schedules)")]
+            if "extensions_json" not in cols:
+                db.execute("ALTER TABLE saved_schedules ADD COLUMN"
+                           " extensions_json TEXT DEFAULT '[]'")
+        db.commit()
+    except Exception:
+        pass
 
 
 def _migrate_add_saved_schedules(db):
@@ -2202,6 +2220,7 @@ def admin_viva_export_pdf():
 TASK_LABELS = {
     "schedule_generate": "Academic schedule generated",
     "schedule_save": "Academic schedule saved",
+    "schedule_extend": "Final Thesis date extended",
     "schedule_delete": "Saved schedule deleted",
     "student_add": "Student added", "student_edit": "Student record updated",
     "student_delete": "Student deleted", "student_bulk_delete": "Students deleted (bulk)",
@@ -2395,6 +2414,56 @@ def _saved_ctx_rows(rec):
             [display_row(r) for r in rows])
 
 
+def _final_thesis_date(rows):
+    for r in rows:
+        if r["document"] == "Final Thesis":
+            return r["scheduled"][0]
+    return None
+
+
+def _parse_extensions(rec):
+    import json
+    if rec is None:
+        return []
+    try:
+        rec = dict(rec)
+    except (TypeError, ValueError):
+        return []
+    try:
+        items = json.loads(rec.get("extensions_json") or "[]")
+    except (TypeError, ValueError):
+        return []
+    return items if isinstance(items, list) else []
+
+
+def _extensions_disp(rec):
+    """Display-ready Final Thesis extension history of a saved record:
+    old date -> new date, when it was done (PKT date + time), and by whom."""
+    out = []
+    for e in _parse_extensions(rec):
+        try:
+            old_d = datetime.strptime(e["old"], "%Y-%m-%d").date()
+            new_d = datetime.strptime(e["new"], "%Y-%m-%d").date()
+            at_dt = datetime.strptime(e["at"], "%Y-%m-%d %H:%M:%S")
+        except (TypeError, ValueError, KeyError):
+            continue
+        out.append({
+            "old_disp": sched_fmt(old_d),
+            "new_disp": sched_fmt(new_d),
+            "at_disp": (at_dt.strftime("%d %b %Y") + " at "
+                        + at_dt.strftime("%I:%M %p") + " (PKT)"),
+            "extended": new_d > old_d,
+            "by": e.get("by") or "Admin",
+        })
+    return out
+
+
+def _extensions_for_session(session_name):
+    rec = get_db().fetchone(
+        "SELECT * FROM saved_schedules WHERE session=?", (session_name,))
+    return _extensions_disp(rec) if rec else []
+
+
 def _schedule_payload():
     """Resolve (ctx, display rows, error) for the schedule exports from
     the current request: POST = the edited results form; GET ?saved=<id>
@@ -2432,6 +2501,7 @@ def admin_schedule():
     schedules savable session-wise."""
     form = {"session": "", "commencement": "", "termination": ""}
     rows, sched, saved_id, notice = None, None, None, None
+    extensions = []
     if request.method == "POST":
         form = {k: (request.form.get(k) or "").strip() for k in form}
         session, commencement, termination, raw_rows, error = \
@@ -2445,28 +2515,32 @@ def admin_schedule():
         else:
             sched = _schedule_ctx(session, commencement, termination)
             rows = [display_row(r) for r in raw_rows]
+            extensions = _extensions_for_session(session)
             log_activity("admin", "schedule_generate",
                          f"{session}: {commencement} to {termination}")
             if ajax:
                 return render_template("_schedule_results.html",
                                        rows=rows, sched=sched,
-                                       notice=None)
+                                       notice=None,
+                                       extensions=extensions)
     elif request.args.get("saved"):
         rec = _get_saved_schedule(request.args.get("saved"))
         if rec:
             saved_id = rec["id"]
+            extensions = _extensions_disp(rec)
             sched, rows = _saved_ctx_rows(rec)
             form = {"session": rec["session"],
                     "commencement": rec["commencement"],
                     "termination": rec["termination"]}
             notice = (f"Saved schedule — last updated "
-                      f"{rec['updated_disp']}. You can adjust any date, "
-                      f"then Save again or download.")
+                      f"{rec['updated_disp']}. You can extend the Final "
+                      f"Thesis date, then Save again or download.")
         else:
             flash("That saved schedule could not be found.")
     return render_template("admin_schedule.html", uni=UNI_NAME,
                            title=PORTAL_TITLE, form=form, rows=rows,
                            sched=sched, saved_id=saved_id, notice=notice,
+                           extensions=extensions,
                            saved_list=_list_saved_schedules())
 
 
@@ -2489,29 +2563,48 @@ def admin_schedule_save():
     now_iso = _pkt_now().strftime("%Y-%m-%d %H:%M:%S")
     payload = json.dumps(serialize_rows(rows))
     existing = db.fetchone(
-        "SELECT id FROM saved_schedules WHERE session=?", (session,))
+        "SELECT * FROM saved_schedules WHERE session=?", (session,))
+    extensions = _parse_extensions(existing) if existing else []
+    new_final = _final_thesis_date(rows)
+    if existing:
+        baseline = _final_thesis_date(
+            deserialize_rows(json.loads(existing["rows_json"])))
+    else:
+        baseline = _final_thesis_date(
+            build_schedule(commencement, termination))
+    extended = False
+    if new_final and baseline and new_final != baseline:
+        extensions.append({"old": baseline.isoformat(),
+                           "new": new_final.isoformat(),
+                           "at": now_iso, "by": "Admin"})
+        extended = True
+    ext_payload = json.dumps(extensions)
     if existing:
         db.execute(
             "UPDATE saved_schedules SET commencement=?, termination=?,"
-            " rows_json=?, updated_at=? WHERE id=?",
+            " rows_json=?, extensions_json=?, updated_at=? WHERE id=?",
             (commencement.isoformat(), termination.isoformat(), payload,
-             now_iso, existing["id"]))
+             ext_payload, now_iso, existing["id"]))
         sid = existing["id"]
     elif USE_PG:
         sid = db.fetchone(
             "INSERT INTO saved_schedules (session, commencement,"
-            " termination, rows_json, created_at, updated_at) VALUES"
-            " (?, ?, ?, ?, ?, ?) RETURNING id",
+            " termination, rows_json, extensions_json, created_at,"
+            " updated_at) VALUES (?, ?, ?, ?, ?, ?, ?) RETURNING id",
             (session, commencement.isoformat(), termination.isoformat(),
-             payload, now_iso, now_iso))["id"]
+             payload, ext_payload, now_iso, now_iso))["id"]
     else:
         sid = db.execute(
             "INSERT INTO saved_schedules (session, commencement,"
-            " termination, rows_json, created_at, updated_at) VALUES"
-            " (?, ?, ?, ?, ?, ?)",
+            " termination, rows_json, extensions_json, created_at,"
+            " updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
             (session, commencement.isoformat(), termination.isoformat(),
-             payload, now_iso, now_iso)).lastrowid
+             payload, ext_payload, now_iso, now_iso)).lastrowid
     log_activity("admin", "schedule_save", session)
+    if extended:
+        log_activity("admin", "schedule_extend",
+                     f"{session}: Final Thesis {baseline.isoformat()}"
+                     f" to {new_final.isoformat()}")
     flash(f"Schedule saved for {session}.")
     return redirect(url_for("admin_schedule", saved=sid))
 

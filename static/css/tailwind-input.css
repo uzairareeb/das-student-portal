@@ -247,6 +247,11 @@
   .sched-note svg { @apply mt-0.5 h-[18px] w-[18px] shrink-0 text-primary; }
   .sched-toast { @apply fixed bottom-7 left-1/2 z-[200] -translate-x-1/2 rounded-xl bg-navy px-5 py-3.5 text-sm font-semibold whitespace-nowrap text-white shadow-xl; }
   .sched-toast.err { @apply bg-red-600; }
+  .ext-item { @apply flex items-start gap-3 border-b border-line py-3; }
+  .ext-item:last-child { border-bottom: 0; }
+  .ext-badge { @apply shrink-0 rounded-full bg-[#eaf2ff] px-2.5 py-1 text-[11px] font-bold text-primary; }
+  .ext-main { @apply text-sm text-ink; }
+  .ext-meta { @apply mt-0.5 text-[13px] text-muted; }
   .saved-row { @apply flex flex-wrap items-center gap-3 border-b border-line py-3.5; }
   .saved-row:last-child { border-bottom: 0; }
   .saved-row .s-title { @apply text-[15px] font-bold text-navy; }

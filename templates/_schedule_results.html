@@ -95,4 +95,21 @@
     </div>
   </div>
 </form>
+{% if extensions %}
+<div class="card section">
+  <div class="section-head">
+    <span class="section-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v5h5"/><path d="M3.05 13A9 9 0 1 0 6 5.3L3 8"/><path d="M12 7v5l4 2"/></svg></span>
+    <h3>Final Thesis Extension History</h3>
+  </div>
+  {% for e in extensions %}
+  <div class="ext-item">
+    <span class="ext-badge">{{ 'Extended' if e.extended else 'Changed' }}</span>
+    <div>
+      <div class="ext-main">Final Thesis date: <strong>{{ e.old_disp }}</strong> → <strong>{{ e.new_disp }}</strong></div>
+      <div class="ext-meta">{{ 'Extended' if e.extended else 'Changed' }} on {{ e.at_disp }} by {{ e.by }}</div>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+{% endif %}
 {% endif %}
