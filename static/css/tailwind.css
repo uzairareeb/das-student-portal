@@ -55,12 +55,15 @@
     --text-sm--line-height: calc(1.25 / 0.875);
     --text-base: 1rem;
     --text-base--line-height: calc(1.5 / 1);
+    --text-lg: 1.125rem;
+    --text-lg--line-height: calc(1.75 / 1.125);
     --text-xl: 1.25rem;
     --text-xl--line-height: calc(1.75 / 1.25);
     --text-2xl: 1.5rem;
     --text-2xl--line-height: calc(2 / 1.5);
     --text-3xl: 1.875rem;
     --text-3xl--line-height: calc(2.25 / 1.875);
+    --font-weight-normal: 400;
     --font-weight-medium: 500;
     --font-weight-semibold: 600;
     --font-weight-bold: 700;
@@ -245,6 +248,9 @@
 @layer utilities {
   .pointer-events-none {
     pointer-events: none;
+  }
+  .visible {
+    visibility: visible;
   }
   .absolute {
     position: absolute;
@@ -432,6 +438,9 @@
   }
   .gap-\[18px\] {
     gap: 18px;
+  }
+  .self-stretch {
+    align-self: stretch;
   }
   .overflow-hidden {
     overflow: hidden;
@@ -1731,52 +1740,75 @@
     font-size: 11px;
     white-space: normal;
   }
+  .gen-btn {
+    min-height: 50px;
+    width: 100%;
+    font-size: var(--text-base);
+    line-height: var(--tw-leading, var(--text-base--line-height));
+  }
+  .sched-notice {
+    margin-bottom: calc(var(--spacing) * 4);
+    border-radius: 10px;
+    border-style: var(--tw-border-style);
+    border-width: 1px;
+    border-color: var(--color-line);
+    background-color: #eaf2ff;
+    padding-inline: calc(var(--spacing) * 4);
+    padding-block: calc(var(--spacing) * 3);
+    font-size: var(--text-sm);
+    line-height: var(--tw-leading, var(--text-sm--line-height));
+    color: var(--color-slate-700);
+  }
   .sched-band {
     margin-bottom: calc(var(--spacing) * 5);
-    overflow: hidden;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    column-gap: calc(var(--spacing) * 10);
+    row-gap: calc(var(--spacing) * 3);
     border-radius: var(--radius-xl);
     border-style: var(--tw-border-style);
     border-width: 1px;
     border-color: var(--color-line);
-    background-color: var(--color-white);
+    background-color: #eaf2ff;
+    padding-inline: calc(var(--spacing) * 5);
+    padding-block: calc(var(--spacing) * 4);
     --tw-shadow: 0 1px 3px 0 var(--tw-shadow-color, rgb(0 0 0 / 0.1)), 0 1px 2px -1px var(--tw-shadow-color, rgb(0 0 0 / 0.1));
     box-shadow: var(--tw-inset-shadow), var(--tw-inset-ring-shadow), var(--tw-ring-offset-shadow), var(--tw-ring-shadow), var(--tw-shadow);
   }
-  .sched-band-head {
-    display: flex;
-    align-items: center;
-    gap: calc(var(--spacing) * 2.5);
-    background-color: var(--color-navy);
-    padding-inline: calc(var(--spacing) * 5);
-    padding-block: calc(var(--spacing) * 3);
-    font-size: 15px;
-    --tw-font-weight: var(--font-weight-extrabold);
-    font-weight: var(--font-weight-extrabold);
-    color: var(--color-white);
+  .sched-band .sb-sub {
+    font-size: var(--text-xs);
+    line-height: var(--tw-leading, var(--text-xs--line-height));
+    --tw-font-weight: var(--font-weight-bold);
+    font-weight: var(--font-weight-bold);
+    --tw-tracking: var(--tracking-wider);
+    letter-spacing: var(--tracking-wider);
+    color: var(--color-slate-500);
+    text-transform: uppercase;
   }
-  .sched-band-head svg {
-    height: calc(var(--spacing) * 5);
-    width: calc(var(--spacing) * 5);
-  }
-  .sched-band-body {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    column-gap: calc(var(--spacing) * 12);
-    row-gap: calc(var(--spacing) * 2);
-    background-color: #eaf2ff;
-    padding-inline: calc(var(--spacing) * 5);
-    padding-block: calc(var(--spacing) * 3.5);
-  }
-  .sched-band-body .d {
-    font-size: var(--text-base);
-    line-height: var(--tw-leading, var(--text-base--line-height));
+  .sched-band .sb-title {
+    font-size: var(--text-lg);
+    line-height: var(--tw-leading, var(--text-lg--line-height));
+    --tw-leading: var(--leading-snug);
+    line-height: var(--leading-snug);
     --tw-font-weight: var(--font-weight-extrabold);
     font-weight: var(--font-weight-extrabold);
     color: var(--color-navy);
   }
-  .sched-band-body .l {
-    margin-left: calc(var(--spacing) * 2.5);
+  .sched-band .sb-dates {
+    display: flex;
+    flex-wrap: wrap;
+    column-gap: calc(var(--spacing) * 10);
+    row-gap: calc(var(--spacing) * 1.5);
+  }
+  .sched-band .sb-d {
+    --tw-font-weight: var(--font-weight-extrabold);
+    font-weight: var(--font-weight-extrabold);
+    color: var(--color-navy);
+  }
+  .sched-band .sb-l {
+    margin-left: calc(var(--spacing) * 2);
     font-size: var(--text-sm);
     line-height: var(--tw-leading, var(--text-sm--line-height));
     color: var(--color-slate-600);
@@ -1784,33 +1816,92 @@
   .sched-table {
     min-width: 920px;
   }
-  .sched-table th {
-    background-color: var(--color-navy);
+  .sched-table thead th {
     font-size: 13px;
     --tw-tracking: var(--tracking-normal);
     letter-spacing: var(--tracking-normal);
     color: var(--color-white);
     text-transform: none;
+    background: linear-gradient(90deg, #1769e8, #38bdf8);
   }
   .sched-table td {
+    padding-inline: calc(var(--spacing) * 3.5);
+    padding-block: calc(var(--spacing) * 3.5);
     vertical-align: top;
     white-space: normal;
   }
+  .sched-table tbody tr:nth-child(even) {
+    background: #f8fbff;
+  }
   .sched-table td.doc {
-    min-width: 180px;
+    min-width: 170px;
     --tw-font-weight: var(--font-weight-bold);
     font-weight: var(--font-weight-bold);
     color: var(--color-navy);
   }
   .sched-table td.statute {
-    min-width: 240px;
+    min-width: 230px;
+    font-size: 13px;
+    color: var(--color-slate-500);
+  }
+  .sched-mini {
+    margin-bottom: var(--spacing);
+    display: block;
+    font-size: 11px;
+    --tw-font-weight: var(--font-weight-bold);
+    font-weight: var(--font-weight-bold);
+    --tw-tracking: var(--tracking-wide);
+    letter-spacing: var(--tracking-wide);
+    color: var(--color-muted);
+    text-transform: uppercase;
+  }
+  .sched-date {
+    width: 152px;
+    border-radius: var(--radius-lg);
+    border-style: var(--tw-border-style);
+    border-width: 1px;
+    border-color: var(--color-line);
+    background-color: #f7f9fc;
+    padding-inline: calc(var(--spacing) * 2.5);
+    padding-block: calc(var(--spacing) * 2);
+    font-size: var(--text-sm);
+    line-height: var(--tw-leading, var(--text-sm--line-height));
+    color: var(--color-ink);
+    &:focus {
+      border-color: var(--color-primary);
+    }
+    &:focus {
+      background-color: var(--color-white);
+    }
+    &:focus {
+      --tw-outline-style: none;
+      outline-style: none;
+    }
+  }
+  .sched-day {
+    font-size: var(--text-sm);
+    line-height: var(--tw-leading, var(--text-sm--line-height));
     color: var(--color-slate-600);
   }
   td.sched-adj {
     background-color: #eaf2ff;
+  }
+  .adj-text, .adj-day {
     --tw-font-weight: var(--font-weight-bold);
     font-weight: var(--font-weight-bold);
     color: var(--color-primary);
+  }
+  .adj-none {
+    --tw-font-weight: var(--font-weight-normal);
+    font-weight: var(--font-weight-normal);
+    color: var(--color-slate-400);
+  }
+  .sched-actions {
+    margin-top: calc(var(--spacing) * 4);
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: calc(var(--spacing) * 2.5);
   }
   .sched-note {
     margin-top: calc(var(--spacing) * 4);
@@ -1832,6 +1923,37 @@
     width: 18px;
     flex-shrink: 0;
     color: var(--color-primary);
+  }
+  .saved-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: calc(var(--spacing) * 3);
+    border-bottom-style: var(--tw-border-style);
+    border-bottom-width: 1px;
+    border-color: var(--color-line);
+    padding-block: calc(var(--spacing) * 3.5);
+  }
+  .saved-row:last-child {
+    border-bottom: 0;
+  }
+  .saved-row .s-title {
+    font-size: 15px;
+    --tw-font-weight: var(--font-weight-bold);
+    font-weight: var(--font-weight-bold);
+    color: var(--color-navy);
+  }
+  .saved-row .s-meta {
+    margin-top: calc(var(--spacing) * 0.5);
+    font-size: 13px;
+    color: var(--color-muted);
+  }
+  .saved-row .s-actions {
+    margin-left: auto;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: calc(var(--spacing) * 2);
   }
   .wide-table td.degree-cell {
     max-width: 165px;

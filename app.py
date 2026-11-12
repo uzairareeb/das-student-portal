@@ -25,7 +25,11 @@ from flask import (Flask, Response, flash, g, redirect, render_template,
 from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.utils import secure_filename
 from viva_pdf import build_viva_pdf
-from academic_schedule import build_schedule, fmt_date as sched_fmt
+from academic_schedule import (RULES as SCHEDULE_RULES,
+                               build_schedule, deserialize_rows,
+                               display_row,
+                               fmt_date as sched_fmt, make_row,
+                               serialize_rows)
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DB_PATH = os.path.join(BASE_DIR, "students.db")
@@ -342,6 +346,7 @@ def init_db():
     _migrate_add_doc_status(db)
     _fix_passout_rows(db)
     _fix_department_rows(db)
+    _migrate_add_saved_schedules(db)
     # Admin password comes from the env var (source of truth), stored hashed.
     pw_hash = generate_password_hash(
         os.environ.get("ADMIN_PASSWORD", "admin123") or "admin123")
@@ -494,6 +499,17 @@ def _migrate_add_doc_status(db):
         db.commit()
     except Exception:
         pass
+
+
+
+def _migrate_add_saved_schedules(db):
+    """Saved academic schedules (Schedule Generator — session-wise)."""
+    id_def = ("id SERIAL PRIMARY KEY" if USE_PG
+              else "id INTEGER PRIMARY KEY AUTOINCREMENT")
+    db.execute(
+        f"CREATE TABLE IF NOT EXISTS saved_schedules ({id_def},"
+        " session TEXT UNIQUE, commencement TEXT, termination TEXT,"
+        " rows_json TEXT, created_at TEXT, updated_at TEXT)")
 
 
 def _fix_passout_rows(db):
@@ -2185,6 +2201,8 @@ def admin_viva_export_pdf():
 
 TASK_LABELS = {
     "schedule_generate": "Academic schedule generated",
+    "schedule_save": "Academic schedule saved",
+    "schedule_delete": "Saved schedule deleted",
     "student_add": "Student added", "student_edit": "Student record updated",
     "student_delete": "Student deleted", "student_bulk_delete": "Students deleted (bulk)",
     "student_bulk_update": "Bulk update applied", "student_delete_all": "All students deleted",
@@ -2267,7 +2285,8 @@ def _pkt_now():
 
 def _parse_schedule_inputs(args):
     """Validate Academic Schedule Generator inputs.
-    Returns (session, commencement, termination, rows, error)."""
+    Returns (session, commencement, termination, rows, error) where rows
+    are raw-date rows from academic_schedule.build_schedule."""
     session = (args.get("session") or "").strip()
     c_raw = (args.get("commencement") or "").strip()
     t_raw = (args.get("termination") or "").strip()
@@ -2305,33 +2324,214 @@ def _schedule_file_tag(session):
     return re.sub(r"[^A-Za-z0-9]+", "_", session).strip("_") or "Session"
 
 
+def _rows_from_form(form):
+    """Rebuild schedule rows from the editable results form (the admin may
+    have changed any scheduled date). Returns (rows, error). Adjusted
+    dates are re-derived with the weekend rule."""
+    rows = []
+    for i, (document, statute, rule) in enumerate(SCHEDULE_RULES):
+        if rule[0] == "range":
+            raw = [(form.get(f"sched_{i}_start") or "").strip(),
+                   (form.get(f"sched_{i}_end") or "").strip()]
+        else:
+            raw = [(form.get(f"sched_{i}") or "").strip()]
+        dates = []
+        for v in raw:
+            if not v:
+                return (None, "All scheduled dates are required — please "
+                              "fill every date in the schedule table.")
+            try:
+                dates.append(datetime.strptime(v, "%Y-%m-%d").date())
+            except ValueError:
+                return None, "One of the scheduled dates is invalid."
+        if len(dates) == 2 and dates[1] < dates[0]:
+            return (None, f"The {document} end date must not be before "
+                          f"its start date.")
+        rows.append(make_row(document, statute, dates))
+    return rows, None
+
+
+def _disp_ts(ts):
+    try:
+        return datetime.strptime(ts, "%Y-%m-%d %H:%M:%S").strftime("%d %b %Y")
+    except (TypeError, ValueError):
+        return ts or ""
+
+
+def _get_saved_schedule(sid):
+    try:
+        sid = int(sid)
+    except (TypeError, ValueError):
+        return None
+    row = get_db().fetchone(
+        "SELECT * FROM saved_schedules WHERE id=?", (sid,))
+    if not row:
+        return None
+    rec = dict(row)
+    rec["updated_disp"] = _disp_ts(rec.get("updated_at"))
+    return rec
+
+
+def _list_saved_schedules():
+    try:
+        rows = get_db().fetchall(
+            "SELECT id, session, commencement, termination, updated_at"
+            " FROM saved_schedules ORDER BY updated_at DESC, id DESC")
+    except Exception:
+        return []
+    out = []
+    for r in rows:
+        d = dict(r)
+        d["updated_disp"] = _disp_ts(d.get("updated_at"))
+        try:
+            d["commencement_disp"] = sched_fmt(
+                datetime.strptime(d["commencement"], "%Y-%m-%d").date())
+            d["termination_disp"] = sched_fmt(
+                datetime.strptime(d["termination"], "%Y-%m-%d").date())
+        except (TypeError, ValueError):
+            d["commencement_disp"] = d["termination_disp"] = ""
+        out.append(d)
+    return out
+
+
+def _saved_ctx_rows(rec):
+    """(ctx, display rows) for a saved_schedules record."""
+    import json
+    commencement = datetime.strptime(rec["commencement"], "%Y-%m-%d").date()
+    termination = datetime.strptime(rec["termination"], "%Y-%m-%d").date()
+    rows = deserialize_rows(json.loads(rec["rows_json"]))
+    return (_schedule_ctx(rec["session"], commencement, termination),
+            [display_row(r) for r in rows])
+
+
+def _schedule_payload():
+    """Resolve (ctx, display rows, error) for the schedule exports from
+    the current request: POST = the edited results form; GET ?saved=<id>
+    = a saved schedule; GET with session/dates = a fresh generation."""
+    if request.method == "POST":
+        session, commencement, termination, _r, error = \
+            _parse_schedule_inputs(request.form)
+        if error:
+            return None, None, error
+        rows, error = _rows_from_form(request.form)
+        if error:
+            return None, None, error
+        return (_schedule_ctx(session, commencement, termination),
+                [display_row(r) for r in rows], None)
+    if request.args.get("saved"):
+        rec = _get_saved_schedule(request.args.get("saved"))
+        if not rec:
+            return None, None, "That saved schedule could not be found."
+        ctx, drows = _saved_ctx_rows(rec)
+        return ctx, drows, None
+    session, commencement, termination, raw_rows, error = \
+        _parse_schedule_inputs(request.args)
+    if error:
+        return None, None, error
+    return (_schedule_ctx(session, commencement, termination),
+            [display_row(r) for r in raw_rows], None)
+
+
 @app.route("/admin/schedule", methods=["GET", "POST"])
 @admin_required
 def admin_schedule():
     """Academic Schedule Generator — statutory submission deadlines for a
-    semester, with weekend dates shifted to the following Monday."""
+    semester, weekend dates shifted to Monday, dates editable, and
+    schedules savable session-wise."""
     form = {"session": "", "commencement": "", "termination": ""}
-    rows, sched = None, None
+    rows, sched, saved_id, notice = None, None, None, None
     if request.method == "POST":
         form = {k: (request.form.get(k) or "").strip() for k in form}
-        session, commencement, termination, rows, error = \
+        session, commencement, termination, raw_rows, error = \
             _parse_schedule_inputs(request.form)
         if error:
             flash(error)
-            rows = None
         else:
             sched = _schedule_ctx(session, commencement, termination)
+            rows = [display_row(r) for r in raw_rows]
             log_activity("admin", "schedule_generate",
                          f"{session}: {commencement} to {termination}")
+    elif request.args.get("saved"):
+        rec = _get_saved_schedule(request.args.get("saved"))
+        if rec:
+            saved_id = rec["id"]
+            sched, rows = _saved_ctx_rows(rec)
+            form = {"session": rec["session"],
+                    "commencement": rec["commencement"],
+                    "termination": rec["termination"]}
+            notice = (f"Saved schedule — last updated "
+                      f"{rec['updated_disp']}. You can adjust any date, "
+                      f"then Save again or download.")
+        else:
+            flash("That saved schedule could not be found.")
     return render_template("admin_schedule.html", uni=UNI_NAME,
                            title=PORTAL_TITLE, form=form, rows=rows,
-                           sched=sched)
+                           sched=sched, saved_id=saved_id, notice=notice,
+                           saved_list=_list_saved_schedules())
 
 
-@app.route("/admin/schedule/export-pdf")
+@app.route("/admin/schedule/save", methods=["POST"])
+@admin_required
+def admin_schedule_save():
+    """Save (or update) the schedule in the form, keyed by session."""
+    import json
+    session, commencement, termination, _r, error = \
+        _parse_schedule_inputs(request.form)
+    if error:
+        flash(error)
+        return redirect(url_for("admin_schedule"))
+    rows, error = _rows_from_form(request.form)
+    if error:
+        flash(error)
+        return redirect(url_for("admin_schedule"))
+    db = get_db()
+    now_iso = _pkt_now().strftime("%Y-%m-%d %H:%M:%S")
+    payload = json.dumps(serialize_rows(rows))
+    existing = db.fetchone(
+        "SELECT id FROM saved_schedules WHERE session=?", (session,))
+    if existing:
+        db.execute(
+            "UPDATE saved_schedules SET commencement=?, termination=?,"
+            " rows_json=?, updated_at=? WHERE id=?",
+            (commencement.isoformat(), termination.isoformat(), payload,
+             now_iso, existing["id"]))
+        sid = existing["id"]
+    elif USE_PG:
+        sid = db.fetchone(
+            "INSERT INTO saved_schedules (session, commencement,"
+            " termination, rows_json, created_at, updated_at) VALUES"
+            " (?, ?, ?, ?, ?, ?) RETURNING id",
+            (session, commencement.isoformat(), termination.isoformat(),
+             payload, now_iso, now_iso))["id"]
+    else:
+        sid = db.execute(
+            "INSERT INTO saved_schedules (session, commencement,"
+            " termination, rows_json, created_at, updated_at) VALUES"
+            " (?, ?, ?, ?, ?, ?)",
+            (session, commencement.isoformat(), termination.isoformat(),
+             payload, now_iso, now_iso)).lastrowid
+    log_activity("admin", "schedule_save", session)
+    flash(f"Schedule saved for {session}.")
+    return redirect(url_for("admin_schedule", saved=sid))
+
+
+@app.route("/admin/schedule/delete", methods=["POST"])
+@admin_required
+def admin_schedule_delete():
+    rec = _get_saved_schedule(request.form.get("id"))
+    if rec:
+        get_db().execute("DELETE FROM saved_schedules WHERE id=?",
+                         (rec["id"],))
+        log_activity("admin", "schedule_delete", rec["session"])
+        flash(f"Saved schedule for {rec['session']} deleted.")
+    return redirect(url_for("admin_schedule"))
+
+
+@app.route("/admin/schedule/export-pdf", methods=["GET", "POST"])
 @admin_required
 def admin_schedule_pdf():
-    """Professional PDF of a generated academic schedule."""
+    """Modern professional PDF of an academic schedule. The statutory
+    rule text is admin-only and is NOT included in the PDF."""
     from xml.sax.saxutils import escape as _esc
     from reportlab.lib import colors
     from reportlab.lib.pagesizes import A4, landscape
@@ -2342,40 +2542,44 @@ def admin_schedule_pdf():
                                     PageTemplate, Paragraph, Spacer, Table,
                                     TableStyle)
 
-    session, commencement, termination, rows, error = \
-        _parse_schedule_inputs(request.args)
+    ctx, rows, error = _schedule_payload()
     if error:
         flash(error)
         return redirect(url_for("admin_schedule"))
-    ctx = _schedule_ctx(session, commencement, termination)
+    session = ctx["session"]
     gen_str = _pkt_now().strftime("%d %b %Y, %I:%M %p") + " (PKT)"
 
-    NAVY = colors.HexColor("#17365D")
+    BLACK = colors.HexColor("#111111")
     BLUE = colors.HexColor("#1769E8")
+    SKY = colors.HexColor("#38BDF8")
     INK = colors.HexColor("#1F2A37")
     GREY = colors.HexColor("#667085")
     LINE = colors.HexColor("#D6DEE9")
-    ZEBRA = colors.HexColor("#F2F7FE")
+    ZEBRA = colors.HexColor("#F7FAFE")
+    BOX = colors.HexColor("#EFF5FE")
     PAGE_W, PAGE_H = landscape(A4)
 
     styles = getSampleStyleSheet()
-    uni_style = ParagraphStyle("suni", parent=styles["Normal"], fontSize=13,
+    uni_style = ParagraphStyle("suni", parent=styles["Normal"], fontSize=13.5,
                                leading=16, fontName="Helvetica-Bold",
-                               textColor=NAVY, alignment=1)
+                               textColor=BLACK, alignment=1)
     das_style = ParagraphStyle("sdas", parent=styles["Normal"], fontSize=10.5,
                                leading=13, fontName="Helvetica-Bold",
-                               textColor=BLUE, alignment=1)
-    band_style = ParagraphStyle("sband", parent=styles["Normal"], fontSize=11,
-                                leading=14, fontName="Helvetica-Bold",
+                               textColor=BLACK, alignment=1)
+    title_style = ParagraphStyle("stitle", parent=styles["Normal"],
+                                 fontSize=15, leading=18,
+                                 fontName="Helvetica-Bold", textColor=BLACK)
+    pill_style = ParagraphStyle("spill", parent=styles["Normal"], fontSize=10,
+                                leading=13, fontName="Helvetica-Bold",
                                 textColor=colors.white, alignment=1)
     meta_style = ParagraphStyle("smeta", parent=styles["Normal"], fontSize=8.5,
                                 leading=12, textColor=INK)
     meta_r = ParagraphStyle("smetar", parent=meta_style, alignment=2)
-    cell = ParagraphStyle("scell", parent=styles["Normal"], fontSize=8,
-                          leading=10, textColor=INK)
+    cell = ParagraphStyle("scell", parent=styles["Normal"], fontSize=8.5,
+                          leading=11, textColor=INK)
     cell_b = ParagraphStyle("scellb", parent=cell, fontName="Helvetica-Bold")
-    head_cell = ParagraphStyle("shcell", parent=styles["Normal"], fontSize=7.5,
-                               leading=9.5, textColor=colors.white,
+    head_cell = ParagraphStyle("shcell", parent=styles["Normal"], fontSize=8,
+                               leading=10, textColor=colors.white,
                                fontName="Helvetica-Bold", alignment=1)
 
     class NumberedCanvas(_pdfcanvas.Canvas):
@@ -2441,19 +2645,43 @@ def admin_schedule_pdf():
         ("BOTTOMPADDING", (0, 0), (-1, -1), 2),
     ]))
     story.append(hdr)
-    band = Table([[Paragraph("ACADEMIC SCHEDULE — "
-                             + _esc(session.upper()), band_style)]],
-                 colWidths=[277 * mm])
-    band.setStyle(TableStyle([
-        ("BACKGROUND", (0, 0), (-1, -1), NAVY),
-        ("TOPPADDING", (0, 0), (-1, -1), 6),
-        ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
+
+    accent = Table([["", ""]], colWidths=[200 * mm, 77 * mm],
+                   rowHeights=[1.6 * mm])
+    accent.setStyle(TableStyle([
+        ("BACKGROUND", (0, 0), (0, 0), BLUE),
+        ("BACKGROUND", (1, 0), (1, 0), SKY),
         ("LEFTPADDING", (0, 0), (-1, -1), 0),
         ("RIGHTPADDING", (0, 0), (-1, -1), 0),
-        ("ROUNDEDCORNERS", [3, 3, 3, 3]),
+        ("TOPPADDING", (0, 0), (-1, -1), 0),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 0),
     ]))
-    story.append(band)
-    story.append(Spacer(1, 3 * mm))
+    story.append(accent)
+    story.append(Spacer(1, 4 * mm))
+
+    pill = Table([[Paragraph(_esc(session.upper()), pill_style)]],
+                 colWidths=[92 * mm])
+    pill.setStyle(TableStyle([
+        ("BACKGROUND", (0, 0), (-1, -1), BLUE),
+        ("ROUNDEDCORNERS", [6, 6, 6, 6]),
+        ("TOPPADDING", (0, 0), (-1, -1), 5),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
+        ("LEFTPADDING", (0, 0), (-1, -1), 6),
+        ("RIGHTPADDING", (0, 0), (-1, -1), 6),
+    ]))
+    title_row = Table([[Paragraph("ACADEMIC SCHEDULE", title_style), pill]],
+                      colWidths=[185 * mm, 92 * mm])
+    title_row.setStyle(TableStyle([
+        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+        ("LEFTPADDING", (0, 0), (-1, -1), 0),
+        ("RIGHTPADDING", (0, 0), (-1, -1), 0),
+        ("TOPPADDING", (0, 0), (-1, -1), 0),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 0),
+        ("ALIGN", (1, 0), (1, 0), "RIGHT"),
+    ]))
+    story.append(title_row)
+    story.append(Spacer(1, 3.5 * mm))
+
     meta = Table([
         [Paragraph(f"<b>Commencement of Semester:</b> "
                    f"{_esc(ctx['commencement_disp'])}", meta_style),
@@ -2461,55 +2689,56 @@ def admin_schedule_pdf():
                    f"{_esc(ctx['termination_disp'])}", meta_r)],
         [Paragraph(f"<b>Academic Session:</b> {_esc(session)}", meta_style),
          Paragraph(f"<b>Generated on:</b> {_esc(gen_str)}", meta_r)],
-    ], colWidths=[150 * mm, 127 * mm])
+    ], colWidths=[150 * mm, 123 * mm])
     meta.setStyle(TableStyle([
+        ("BACKGROUND", (0, 0), (-1, -1), BOX),
+        ("BOX", (0, 0), (-1, -1), 0.6, LINE),
+        ("ROUNDEDCORNERS", [4, 4, 4, 4]),
         ("VALIGN", (0, 0), (-1, -1), "TOP"),
-        ("LEFTPADDING", (0, 0), (-1, -1), 0),
-        ("RIGHTPADDING", (0, 0), (-1, -1), 0),
-        ("TOPPADDING", (0, 0), (-1, -1), 1),
-        ("BOTTOMPADDING", (0, 0), (-1, -1), 1),
+        ("LEFTPADDING", (0, 0), (-1, -1), 8),
+        ("RIGHTPADDING", (0, 0), (-1, -1), 8),
+        ("TOPPADDING", (0, 0), (-1, -1), 3),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 3),
     ]))
     story.append(meta)
-    story.append(Spacer(1, 3 * mm))
+    story.append(Spacer(1, 4 * mm))
 
     def adj_cell(text, shifted):
         if shifted:
             return Paragraph(
                 f'<b><font color="#1769E8">{_esc(text)}</font></b>', cell)
-        return Paragraph(_esc(text), cell)
+        return Paragraph(f'<font color="#98A2B3">{_esc(text)}</font>', cell)
 
-    headers = ["Document", "Submission Deadline According to Statutes",
-               "Scheduled Last Date", "Day",
+    headers = ["Document", "Scheduled Last Date", "Day",
                "Adjusted Date (Weekend Shift Applied)", "Adjusted Day"]
-    widths = [60 * mm, 88 * mm, 34 * mm, 28 * mm, 34 * mm, 33 * mm]
+    widths = [74 * mm, 52 * mm, 40 * mm, 58 * mm, 53 * mm]
     data = [[Paragraph(h, head_cell) for h in headers]]
     for r in rows:
         data.append([
             Paragraph(_esc(r["document"]), cell_b),
-            Paragraph(_esc(r["statute"]), cell),
-            Paragraph(_esc(r["scheduled"]), cell),
-            Paragraph(_esc(r["day"]), cell),
-            adj_cell(r["adjusted"], r["shifted"]),
-            adj_cell(r["adjusted_day"], r["shifted"]),
+            Paragraph(_esc(r["scheduled_text"]), cell),
+            Paragraph(_esc(r["day_text"]), cell),
+            adj_cell(r["adjusted_text"], r["shifted"]),
+            adj_cell(r["adjusted_day_text"], r["shifted"]),
         ])
     tbl = Table(data, colWidths=widths, repeatRows=1)
     tbl.setStyle(TableStyle([
-        ("BACKGROUND", (0, 0), (-1, 0), NAVY),
+        ("BACKGROUND", (0, 0), (-1, 0), BLUE),
         ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
         ("VALIGN", (0, 0), (-1, -1), "TOP"),
         ("GRID", (0, 0), (-1, -1), 0.4, LINE),
         ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, ZEBRA]),
-        ("TOPPADDING", (0, 0), (-1, -1), 4),
-        ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
-        ("LEFTPADDING", (0, 0), (-1, -1), 4),
-        ("RIGHTPADDING", (0, 0), (-1, -1), 4),
+        ("TOPPADDING", (0, 0), (-1, -1), 5),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
+        ("LEFTPADDING", (0, 0), (-1, -1), 5),
+        ("RIGHTPADDING", (0, 0), (-1, -1), 5),
     ]))
     story.append(tbl)
     story.append(Spacer(1, 4 * mm))
     story.append(Paragraph(
         "<b>Note:</b> If the scheduled date falls on Saturday or Sunday, it "
-        "will be automatically adjusted to Monday. The original scheduled "
-        "date is always preserved in the Scheduled Last Date column.",
+        "is automatically adjusted to the following Monday; only the "
+        "adjusted dates are shown in the Adjusted columns.",
         meta_style))
     doc.build(story, canvasmaker=NumberedCanvas)
     buf.seek(0)
@@ -2519,38 +2748,36 @@ def admin_schedule_pdf():
     return resp
 
 
-@app.route("/admin/schedule/export-excel")
+@app.route("/admin/schedule/export-excel", methods=["GET", "POST"])
 @admin_required
 def admin_schedule_excel():
-    """Excel export of a generated academic schedule."""
+    """Excel export of an academic schedule."""
     from openpyxl import Workbook
     from openpyxl.styles import Font, PatternFill, Alignment
 
-    session, commencement, termination, rows, error = \
-        _parse_schedule_inputs(request.args)
+    ctx, rows, error = _schedule_payload()
     if error:
         flash(error)
         return redirect(url_for("admin_schedule"))
-    ctx = _schedule_ctx(session, commencement, termination)
+    session = ctx["session"]
     gen_str = _pkt_now().strftime("%d %b %Y, %I:%M %p") + " (PKT)"
 
     wb = Workbook()
     ws = wb.active
     ws.title = "Academic Schedule"
-    navy = Font(bold=True, color="17365D")
     ws.merge_cells("A1:F1")
     c = ws["A1"]
     c.value = ("CHOLISTAN UNIVERSITY OF VETERINARY AND ANIMAL SCIENCES, "
                "BAHAWALPUR")
-    c.font = Font(bold=True, size=13, color="17365D")
+    c.font = Font(bold=True, size=13, color="111111")
     ws.merge_cells("A2:F2")
     c = ws["A2"]
     c.value = "Directorate of Advanced Studies"
-    c.font = Font(bold=True, size=11, color="1769E8")
+    c.font = Font(bold=True, size=11, color="111111")
     ws.merge_cells("A3:F3")
     c = ws["A3"]
     c.value = f"Academic Schedule — {session}"
-    c.font = Font(bold=True, size=12, color="17365D")
+    c.font = Font(bold=True, size=12, color="1769E8")
     meta_rows = [("Academic Session:", session),
                  ("Commencement of Semester:", ctx["commencement_disp"]),
                  ("Termination of Semester:", ctx["termination_disp"]),
@@ -2569,17 +2796,17 @@ def admin_schedule_excel():
     for j, h in enumerate(headers, start=1):
         cell = ws.cell(row=hr, column=j, value=h)
         cell.font = Font(bold=True, color="FFFFFF")
-        cell.fill = PatternFill("solid", fgColor="17365D")
+        cell.fill = PatternFill("solid", fgColor="1769E8")
         cell.alignment = Alignment(horizontal="center", vertical="center",
                                    wrap_text=True)
     adj_font = Font(bold=True, color="1769E8")
     for i, r in enumerate(rows, start=hr + 1):
         ws.cell(row=i, column=1, value=r["document"]).font = Font(bold=True)
         ws.cell(row=i, column=2, value=r["statute"])
-        ws.cell(row=i, column=3, value=r["scheduled"])
-        ws.cell(row=i, column=4, value=r["day"])
-        a1 = ws.cell(row=i, column=5, value=r["adjusted"])
-        a2 = ws.cell(row=i, column=6, value=r["adjusted_day"])
+        ws.cell(row=i, column=3, value=r["scheduled_text"])
+        ws.cell(row=i, column=4, value=r["day_text"])
+        a1 = ws.cell(row=i, column=5, value=r["adjusted_text"])
+        a2 = ws.cell(row=i, column=6, value=r["adjusted_day_text"])
         if r["shifted"]:
             a1.font = adj_font
             a2.font = adj_font
@@ -2587,8 +2814,9 @@ def admin_schedule_excel():
     ws.merge_cells(start_row=nr, start_column=1, end_row=nr, end_column=6)
     nc = ws.cell(row=nr, column=1,
                  value="Note: If the scheduled date falls on Saturday or "
-                       "Sunday, it will be automatically adjusted to "
-                       "Monday.")
+                       "Sunday, it is automatically adjusted to the "
+                       "following Monday; only adjusted dates are shown "
+                       "in the Adjusted columns.")
     nc.font = Font(italic=True, color="667085")
     for col, w in zip("ABCDEF", [38, 54, 30, 22, 30, 24]):
         ws.column_dimensions[col].width = w
@@ -2603,16 +2831,14 @@ def admin_schedule_excel():
     return resp
 
 
-@app.route("/admin/schedule/print")
+@app.route("/admin/schedule/print", methods=["GET", "POST"])
 @admin_required
 def admin_schedule_print():
-    """Clean A4 print view of a generated academic schedule."""
-    session, commencement, termination, rows, error = \
-        _parse_schedule_inputs(request.args)
+    """Clean A4 print view of an academic schedule."""
+    ctx, rows, error = _schedule_payload()
     if error:
         flash(error)
         return redirect(url_for("admin_schedule"))
-    ctx = _schedule_ctx(session, commencement, termination)
     gen_str = _pkt_now().strftime("%d %b %Y, %I:%M %p") + " (PKT)"
     return render_template("schedule_print.html", rows=rows, sched=ctx,
                            gen_str=gen_str)

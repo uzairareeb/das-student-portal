@@ -215,20 +215,34 @@
   table.wide-table th { @apply text-[11px] whitespace-normal align-bottom; }
 
   /* ---------- academic schedule generator ---------- */
-  .sched-band { @apply mb-5 overflow-hidden rounded-xl border border-line bg-white shadow-sm; }
-  .sched-band-head { @apply flex items-center gap-2.5 bg-navy px-5 py-3 text-[15px] font-extrabold text-white; }
-  .sched-band-head svg { @apply h-5 w-5; }
-  .sched-band-body { @apply flex flex-wrap items-center gap-x-12 gap-y-2 bg-[#eaf2ff] px-5 py-3.5; }
-  .sched-band-body .d { @apply text-base font-extrabold text-navy; }
-  .sched-band-body .l { @apply ml-2.5 text-sm text-slate-600; }
+  .gen-btn { @apply min-h-[50px] w-full text-base; }
+  .sched-notice { @apply mb-4 rounded-[10px] border border-line bg-[#eaf2ff] px-4 py-3 text-sm text-slate-700; }
+  .sched-band { @apply mb-5 flex flex-wrap items-center justify-between gap-x-10 gap-y-3 rounded-xl border border-line bg-[#eaf2ff] px-5 py-4 shadow-sm; }
+  .sched-band .sb-sub { @apply text-xs font-bold tracking-wider text-slate-500 uppercase; }
+  .sched-band .sb-title { @apply text-lg leading-snug font-extrabold text-navy; }
+  .sched-band .sb-dates { @apply flex flex-wrap gap-x-10 gap-y-1.5; }
+  .sched-band .sb-d { @apply font-extrabold text-navy; }
+  .sched-band .sb-l { @apply ml-2 text-sm text-slate-600; }
   .sched-table { @apply min-w-[920px]; }
-  .sched-table th { @apply bg-navy text-[13px] normal-case tracking-normal text-white; }
-  .sched-table td { @apply whitespace-normal align-top; }
-  .sched-table td.doc { @apply min-w-[180px] font-bold text-navy; }
-  .sched-table td.statute { @apply min-w-[240px] text-slate-600; }
-  td.sched-adj { @apply bg-[#eaf2ff] font-bold text-primary; }
+  .sched-table thead th { @apply text-[13px] normal-case tracking-normal text-white; background: linear-gradient(90deg, #1769e8, #38bdf8); }
+  .sched-table td { @apply px-3.5 py-3.5 align-top whitespace-normal; }
+  .sched-table tbody tr:nth-child(even) { background: #f8fbff; }
+  .sched-table td.doc { @apply min-w-[170px] font-bold text-navy; }
+  .sched-table td.statute { @apply min-w-[230px] text-[13px] text-slate-500; }
+  .sched-mini { @apply mb-1 block text-[11px] font-bold tracking-wide text-muted uppercase; }
+  .sched-date { @apply w-[152px] rounded-lg border border-line bg-[#f7f9fc] px-2.5 py-2 text-sm text-ink focus:border-primary focus:bg-white focus:outline-none; }
+  .sched-day { @apply text-sm text-slate-600; }
+  td.sched-adj { @apply bg-[#eaf2ff]; }
+  .adj-text, .adj-day { @apply font-bold text-primary; }
+  .adj-none { @apply font-normal text-slate-400; }
+  .sched-actions { @apply mt-4 flex flex-wrap items-center gap-2.5; }
   .sched-note { @apply mt-4 flex items-start gap-2.5 rounded-[10px] bg-[#eaf2ff] px-4 py-3 text-[13px] leading-relaxed text-slate-700; }
   .sched-note svg { @apply mt-0.5 h-[18px] w-[18px] shrink-0 text-primary; }
+  .saved-row { @apply flex flex-wrap items-center gap-3 border-b border-line py-3.5; }
+  .saved-row:last-child { border-bottom: 0; }
+  .saved-row .s-title { @apply text-[15px] font-bold text-navy; }
+  .saved-row .s-meta { @apply mt-0.5 text-[13px] text-muted; }
+  .saved-row .s-actions { @apply ml-auto flex flex-wrap items-center gap-2; }
   .wide-table td.degree-cell { @apply min-w-[110px] max-w-[165px]; }
   .wide-table td.comments-cell { @apply min-w-[110px] max-w-[175px]; }
   .wide-table .pill { @apply px-[7px] py-[3px] text-[10.5px] whitespace-nowrap; }
