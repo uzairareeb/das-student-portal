@@ -293,6 +293,11 @@
   .pconn.done { background: #059669; }
   .prog-cap { margin-top: 6px; font-size: 11.5px; color: #94a3b8; white-space: nowrap; }
   .prog-cap b { color: #17365d; }
+  .status-plain { display: inline-flex; align-items: center; gap: 7px; font-weight: 700; color: #17365d; white-space: nowrap; }
+  .status-plain .dot { width: 8px; height: 8px; border-radius: 999px; flex: none; }
+  .status-plain.sp-ok .dot { background: #10b981; }
+  .status-plain.sp-warn .dot { background: #f59e0b; }
+  .status-plain.sp-bad .dot { background: #ef4444; }
 
   /* ---------- flash / alerts ---------- */
   .flash { @apply mb-[18px]; }

@@ -2231,6 +2231,29 @@
   .prog-cap b {
     color: #17365d;
   }
+  .status-plain {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    font-weight: 700;
+    color: #17365d;
+    white-space: nowrap;
+  }
+  .status-plain .dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 999px;
+    flex: none;
+  }
+  .status-plain.sp-ok .dot {
+    background: #10b981;
+  }
+  .status-plain.sp-warn .dot {
+    background: #f59e0b;
+  }
+  .status-plain.sp-bad .dot {
+    background: #ef4444;
+  }
   .flash {
     margin-bottom: 18px;
   }

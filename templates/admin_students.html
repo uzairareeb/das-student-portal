@@ -147,9 +147,9 @@
             </td>
             <td>{{ s.coe_display }}</td>
             <td>
-              {% if s.status in ['Continue', 'Viva Done', 'Pass Out', 'Sent to COE'] %}<span class="status-chip sc-ok"><span class="dot"></span>{{ s.status }}</span>
-              {% elif s.status in ['Viva Pending', 'Defense Pending'] %}<span class="status-chip sc-warn"><span class="dot"></span>{{ s.status }}</span>
-              {% else %}<span class="status-chip sc-bad"><span class="dot"></span>{{ s.status }}</span>{% endif %}
+              {% if s.status in ['Continue', 'Viva Done', 'Pass Out', 'Sent to COE'] %}<span class="status-plain sp-ok"><span class="dot"></span>{{ s.status }}</span>
+              {% elif s.status in ['Viva Pending', 'Defense Pending'] %}<span class="status-plain sp-warn"><span class="dot"></span>{{ s.status }}</span>
+              {% else %}<span class="status-plain sp-bad"><span class="dot"></span>{{ s.status }}</span>{% endif %}
             </td>
             <td><button type="button" class="btn ghost sm profile-btn" data-sid="{{ s.id }}">Profile</button></td>
           </tr>
@@ -446,8 +446,8 @@
       return html;
     }
     function statusChip(st, pill) {
-      var cls = pill === 'q' ? 'sc-ok' : (pill === 'warn' ? 'sc-warn' : 'sc-bad');
-      return '<span class="status-chip ' + cls + '"><span class="dot"></span>' + esc(st) + '</span>';
+      var cls = pill === 'q' ? 'sp-ok' : (pill === 'warn' ? 'sp-warn' : 'sp-bad');
+      return '<span class="status-plain ' + cls + '"><span class="dot"></span>' + esc(st) + '</span>';
     }
     function rowHTML(s) {
       return '<tr data-dept="' + esc(s.department) + '">'
