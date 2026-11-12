@@ -97,6 +97,20 @@
     <span class="hint">{{ per_page }} per page</span>
     <span class="hint" id="liveHint" hidden style="color:var(--primary);font-weight:600"></span>
     <span style="flex:1"></span>
+    <span class="cols-wrap">
+      <button type="button" class="btn ghost sm" id="colsBtn">Columns &#9662;</button>
+      <span class="cols-panel" id="colsPanel" hidden>
+        <label><input type="checkbox" data-col-toggle="reg"> Reg.No</label>
+        <label><input type="checkbox" data-col-toggle="degree"> Degree</label>
+        <label><input type="checkbox" data-col-toggle="progress"> Submission Progress</label>
+        <label><input type="checkbox" data-col-toggle="syndates"> Synopsis Received</label>
+        <label><input type="checkbox" data-col-toggle="thesisdates"> Thesis Received Dates</label>
+        <label><input type="checkbox" data-col-toggle="coe"> Thesis Forward (COE)</label>
+        <label><input type="checkbox" data-col-toggle="status"> Status</label>
+        <button type="button" class="cols-reset" id="colsReset">Show all columns</button>
+      </span>
+    </span>
+    <button type="button" class="btn ghost sm" id="densityBtn">Compact</button>
     <a class="btn ghost sm" href="{{ export_url }}">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
       Export Excel
@@ -124,11 +138,11 @@
         <thead>
           <tr>
             <th class="cb"><input type="checkbox" id="selAll" title="Select all on this page"></th>
-            <th><a class="th-sort" href="{{ sort_url('name') }}">Name {% if sort == 'name' %}<span class="arr">{{ '▼' if direction == 'desc' else '▲' }}</span>{% endif %}</a></th><th><a class="th-sort" href="{{ sort_url('reg_no') }}">Reg.No {% if sort == 'reg_no' %}<span class="arr">{{ '▼' if direction == 'desc' else '▲' }}</span>{% endif %}</a></th><th>Degree</th>
-            <th>Submission Progress</th><th>Synopsis Received</th>
-            <th>Thesis Received Dates</th>
-            <th>Thesis Forward (COE)</th>
-            <th><a class="th-sort" href="{{ sort_url('status') }}">Status {% if sort == 'status' %}<span class="arr">{{ '▼' if direction == 'desc' else '▲' }}</span>{% endif %}</a></th><th></th>
+            <th><a class="th-sort" href="{{ sort_url('name') }}">Name {% if sort == 'name' %}<span class="arr">{{ '▼' if direction == 'desc' else '▲' }}</span>{% endif %}</a></th><th data-col="reg"><a class="th-sort" href="{{ sort_url('reg_no') }}">Reg.No {% if sort == 'reg_no' %}<span class="arr">{{ '▼' if direction == 'desc' else '▲' }}</span>{% endif %}</a></th><th data-col="degree">Degree</th>
+            <th data-col="progress">Submission Progress</th><th data-col="syndates">Synopsis Received</th>
+            <th data-col="thesisdates">Thesis Received Dates</th>
+            <th data-col="coe">Thesis Forward (COE)</th>
+            <th data-col="status"><a class="th-sort" href="{{ sort_url('status') }}">Status {% if sort == 'status' %}<span class="arr">{{ '▼' if direction == 'desc' else '▲' }}</span>{% endif %}</a></th><th></th>
           </tr>
         </thead>
         <tbody id="studentsBody">
@@ -136,24 +150,24 @@
           <tr data-dept="{{ s.department or '' }}">
             <td class="cb"><input type="checkbox" class="selBox" name="sel" value="{{ s.id }}"></td>
             <td><span class="row-avatar">{{ s.name[0] if s.name else '?' }}</span><span class="row-name">{{ s.name }}</span></td>
-            <td>{{ s.reg_no }}</td>
-            <td class="degree-cell">{{ s.degree or '—' }}</td>
+            <td data-col="reg">{{ s.reg_no }}</td>
+            <td class="degree-cell" data-col="degree">{{ s.degree or '—' }}</td>
             {% set steps = [('File', s.folder_file == 'Completed'), ('Synopsis', s.synopsis == 'Received'), ('Semi-Final', s.semi_final_thesis == 'Received'), ('Final', s.final_thesis == 'Received')] %}
             {% set done_count = steps | map(attribute=1) | sum %}
             {% set pending_names = {'File': 'Folder/File', 'Synopsis': 'Synopsis', 'Semi-Final': 'Semi-Final', 'Final': 'Final Thesis'} %}
             {% set ns = namespace(pending='') %}
             {% for lab, ok in steps %}{% if not ok and not ns.pending %}{% set ns.pending = lab %}{% endif %}{% endfor %}
-            <td class="prog-cell">
+            <td class="prog-cell" data-col="progress">
               <div class="prog-steps">{% for lab, ok in steps %}<span class="pstep {{ 'done' if ok else 'todo' }}"><span class="pdot">{{ '✓' if ok else '·' }}</span><span class="plab">{{ lab }}</span></span>{% if not loop.last %}<span class="pconn{{ ' done' if ok and steps[loop.index][1] }}"></span>{% endif %}{% endfor %}</div>
               <div class="prog-cap"><b>{{ done_count }} of 4 received</b> <span>· {% if done_count == 4 %}Complete{% elif done_count == 0 %}Nothing submitted yet{% else %}{{ pending_names[ns.pending] }} pending{% endif %}</span></div>
             </td>
-            <td class="dates-cell">{{ s.syn_at_disp }}</td>
-            <td class="dates-cell">
+            <td class="dates-cell" data-col="syndates">{{ s.syn_at_disp }}</td>
+            <td class="dates-cell" data-col="thesisdates">
               <div><span>Semi:</span> {{ s.semi_at_disp }}</div>
               <div><span>Final:</span> {{ s.final_at_disp }}</div>
             </td>
-            <td>{{ s.coe_display }}</td>
-            <td>
+            <td data-col="coe">{{ s.coe_display }}</td>
+            <td data-col="status">
               {% if s.status in ['Continue', 'Viva Done', 'Pass Out', 'Sent to COE'] %}<span class="status-plain sp-ok"><span class="dot"></span>{{ s.status }}</span>
               {% elif s.status in ['Viva Pending', 'Defense Pending'] %}<span class="status-plain sp-warn"><span class="dot"></span>{{ s.status }}</span>
               {% else %}<span class="status-plain sp-bad"><span class="dot"></span>{{ s.status }}</span>{% endif %}
@@ -438,7 +452,7 @@
       steps.forEach(function (st) {
         if (st[1]) { done++; } else if (!pending) { pending = st[2]; }
       });
-      var html = '<td class="prog-cell"><div class="prog-steps">';
+      var html = '<td class="prog-cell" data-col="progress"><div class="prog-steps">';
       steps.forEach(function (st, i) {
         html += '<span class="pstep ' + (st[1] ? 'done' : 'todo') + '"><span class="pdot">'
           + (st[1] ? '\u2713' : '\u00B7') + '</span><span class="plab">' + st[0] + '</span></span>';
@@ -460,14 +474,14 @@
       return '<tr data-dept="' + esc(s.department) + '">'
         + '<td class="cb"><input type="checkbox" class="selBox" name="sel" value="' + s.id + '"></td>'
         + '<td><span class="row-avatar">' + esc(s.name.charAt(0) || '?') + '</span><span class="row-name">' + esc(s.name) + '</span></td>'
-        + '<td>' + esc(s.reg_no) + '</td>'
-        + '<td class="degree-cell">' + esc(s.degree || '\u2014') + '</td>'
+        + '<td data-col="reg">' + esc(s.reg_no) + '</td>'
+        + '<td class="degree-cell" data-col="degree">' + esc(s.degree || '\u2014') + '</td>'
         + progTd(s)
-        + '<td class="dates-cell">' + esc(s.syn_at) + '</td>'
-        + '<td class="dates-cell"><div><span>Semi:</span> ' + esc(s.semi_at) +
+        + '<td class="dates-cell" data-col="syndates">' + esc(s.syn_at) + '</td>'
+        + '<td class="dates-cell" data-col="thesisdates"><div><span>Semi:</span> ' + esc(s.semi_at) +
           '</div><div><span>Final:</span> ' + esc(s.final_at) + '</div></td>'
-        + '<td>' + esc(s.coe_display) + '</td>'
-        + '<td>' + statusChip(s.status, s.pill) + '</td>'
+        + '<td data-col="coe">' + esc(s.coe_display) + '</td>'
+        + '<td data-col="status">' + statusChip(s.status, s.pill) + '</td>'
         + '<td><button type="button" class="btn ghost sm profile-btn" data-sid="' + s.id + '">Profile</button></td>'
         + '</tr>';
     }
@@ -603,6 +617,63 @@
         if (v.length >= 2 && qfDrop.hidden) qfFetch(v);
       });
     }
+    /* ---- Columns show/hide + compact density (remembered in this browser) ---- */
+    var listTable = document.querySelector('.wide-table');
+    var COL_KEYS = ['reg', 'degree', 'progress', 'syndates', 'thesisdates', 'coe', 'status'];
+    function hiddenCols() {
+      try { return JSON.parse(localStorage.getItem('das-cols-hidden')) || []; }
+      catch (e) { return []; }
+    }
+    function applyCols() {
+      var hidden = hiddenCols();
+      COL_KEYS.forEach(function (cName) {
+        if (listTable) listTable.classList.toggle('hide-col-' + cName, hidden.indexOf(cName) >= 0);
+        var cbx = document.querySelector('[data-col-toggle="' + cName + '"]');
+        if (cbx) cbx.checked = hidden.indexOf(cName) < 0;
+      });
+    }
+    function applyDensity() {
+      var compact = false;
+      try { compact = localStorage.getItem('das-density') === 'compact'; } catch (e) {}
+      if (listTable) listTable.classList.toggle('compact', compact);
+      var db = document.getElementById('densityBtn');
+      if (db) db.classList.toggle('toggle-on', compact);
+    }
+    var colsBtn = document.getElementById('colsBtn');
+    var colsPanel = document.getElementById('colsPanel');
+    if (colsBtn && colsPanel) {
+      colsBtn.addEventListener('click', function () { colsPanel.hidden = !colsPanel.hidden; });
+      document.addEventListener('click', function (e) {
+        if (!colsPanel.hidden && !e.target.closest('.cols-wrap')) colsPanel.hidden = true;
+      });
+      colsPanel.addEventListener('change', function (e) {
+        var tgl = e.target.closest('[data-col-toggle]');
+        if (!tgl) return;
+        var hidden = hiddenCols();
+        var cName = tgl.getAttribute('data-col-toggle');
+        if (tgl.checked) { hidden = hidden.filter(function (x) { return x !== cName; }); }
+        else if (hidden.indexOf(cName) < 0) { hidden.push(cName); }
+        try { localStorage.setItem('das-cols-hidden', JSON.stringify(hidden)); } catch (err) {}
+        applyCols();
+      });
+      var colsReset = document.getElementById('colsReset');
+      if (colsReset) {
+        colsReset.addEventListener('click', function () {
+          try { localStorage.removeItem('das-cols-hidden'); } catch (e) {}
+          applyCols();
+        });
+      }
+    }
+    var densityBtn = document.getElementById('densityBtn');
+    if (densityBtn) {
+      densityBtn.addEventListener('click', function () {
+        var now = !!(listTable && listTable.classList.contains('compact'));
+        try { localStorage.setItem('das-density', now ? 'comfortable' : 'compact'); } catch (e) {}
+        applyDensity();
+      });
+    }
+    applyCols();
+    applyDensity();
   })();
 </script>
 {% endblock %}
