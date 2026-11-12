@@ -85,3 +85,5 @@ Excel (.xlsx). Column headers are matched flexibly ("Registration No.", "Reg No"
 - `/` — home with both portal links.
 - `/admin` — admin login (direct link only; not linked from student pages).
 - `/student` — student login.
+
+Department names are auto-derived from the degree (e.g. MPhil Zoology -> Department of Zoology) across add/edit/import/restore, and the student-list PDF export generates the official synopsis & thesis submission record.
