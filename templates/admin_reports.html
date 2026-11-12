@@ -4,7 +4,7 @@
 <div class="page-head">
   <div>
     <h2>Reports</h2>
-    <p>Filter the student list, then download it as Excel or PDF</p>
+    <p>Download a filtered export, or pick a ready-made report below — one click, no filters to set</p>
   </div>
 </div>
 
@@ -69,4 +69,34 @@
   </form>
   <p class="hint">The Excel and PDF exports respect the filters above — leave everything blank for the complete list.</p>
 </div>
+
+{% for sec in report_sections %}
+<div style="margin-top:26px">
+  <div class="section-head">
+    <span class="section-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">{{ sec.icon | safe }}</svg></span>
+    <h3>{{ sec.title }}</h3>
+  </div>
+  <div class="report-grid">
+    {% for card in sec.cards %}
+    <div class="report-card">
+      <div class="rc-top">
+        <h4>{{ card.title }}</h4>
+        <span class="rc-count">{{ card.count }} {{ card.count_label }}</span>
+      </div>
+      <p>{{ card.desc }}</p>
+      <div class="rc-btns">
+        <a class="btn primary sm" href="{{ card.pdf_url }}">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+          PDF
+        </a>
+        <a class="btn ghost sm" href="{{ card.excel_url }}">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          Excel
+        </a>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+{% endfor %}
 {% endblock %}

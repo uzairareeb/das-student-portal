@@ -252,6 +252,13 @@
   .ext-badge { @apply shrink-0 rounded-full bg-[#eaf2ff] px-2.5 py-1 text-[11px] font-bold text-primary; }
   .ext-main { @apply text-sm text-ink; }
   .ext-meta { @apply mt-0.5 text-[13px] text-muted; }
+  .report-grid { @apply grid grid-cols-1 gap-3.5 sm:grid-cols-2 xl:grid-cols-3; }
+  .report-card { @apply flex flex-col rounded-xl border border-line bg-white p-4 shadow-sm; }
+  .report-card h4 { @apply text-[15px] font-bold text-navy; }
+  .rc-top { @apply flex items-start justify-between gap-2; }
+  .rc-count { @apply shrink-0 rounded-full bg-[#eaf2ff] px-2.5 py-1 text-xs font-bold whitespace-nowrap text-primary; }
+  .report-card p { @apply mt-1 flex-1 text-[13px] leading-relaxed text-muted; }
+  .rc-btns { @apply mt-3.5 flex gap-2; }
   .saved-row { @apply flex flex-wrap items-center gap-3 border-b border-line py-3.5; }
   .saved-row:last-child { border-bottom: 0; }
   .saved-row .s-title { @apply text-[15px] font-bold text-navy; }

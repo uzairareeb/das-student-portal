@@ -773,6 +773,16 @@ def _student_where(args):
         if v:
             where.append(f"{key}=?")
             params.append(v)
+    for key in ("synopsis", "semi_final_thesis", "final_thesis"):
+        v = (args.get(key) or "").strip()
+        if v in ("Received", "Not Received"):
+            where.append(f"{key}=?")
+            params.append(v)
+    level = (args.get("level") or "").strip()
+    if level in ("MPhil", "PhD"):
+        op = "ILIKE" if USE_PG else "LIKE"
+        where.append(f"degree {op} ?")
+        params.append(level + "%")
     dept = (args.get("department") or "").strip()
     if dept == "__unassigned":
         where.append("(department IS NULL OR department='')")
@@ -1335,7 +1345,11 @@ def admin_export_pdf():
     bits = []
     for key, label in (("status", "Status"), ("session", "Session"),
                        ("degree", "Degree"), ("gender", "Gender"),
-                       ("folder_file", "Folder/File")):
+                       ("folder_file", "Folder/File"),
+                       ("synopsis", "Synopsis"),
+                       ("semi_final_thesis", "Semi-Final Thesis"),
+                       ("final_thesis", "Final Thesis"),
+                       ("level", "Level")):
         v = (a.get(key) or "").strip()
         if v:
             bits.append(f"{label}: {v}")
@@ -2221,6 +2235,8 @@ TASK_LABELS = {
     "schedule_generate": "Academic schedule generated",
     "schedule_save": "Academic schedule saved",
     "schedule_extend": "Final Thesis date extended",
+    "report_summary": "Summary report downloaded",
+    "report_viva": "Viva report downloaded",
     "schedule_delete": "Saved schedule deleted",
     "student_add": "Student added", "student_edit": "Student record updated",
     "student_delete": "Student deleted", "student_bulk_delete": "Students deleted (bulk)",
@@ -2282,15 +2298,469 @@ def admin_viva_card_pdf(vid):
                      download_name=f"Viva_Result_Card_{card['reg_no']}.pdf")
 
 
+_ICON_FLAG = ('<path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/>'
+              '<line x1="4" y1="22" x2="4" y2="15"/>')
+_ICON_FILE = ('<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>'
+              '<polyline points="14 2 14 8 20 8"/>'
+              '<polyline points="9 15 11 17 15 13"/>')
+_ICON_CLOCK = ('<circle cx="12" cy="12" r="10"/>'
+               '<polyline points="12 6 12 12 16 14"/>')
+_ICON_CAP = ('<path d="M22 9L12 4 2 9l10 5 10-5z"/>'
+             '<path d="M6 11.5V16c0 1.7 2.7 3 6 3s6-1.3 6-3v-4.5"/>'
+             '<line x1="22" y1="9" x2="22" y2="14"/>')
+_ICON_CHART = ('<line x1="12" y1="20" x2="12" y2="10"/>'
+               '<line x1="18" y1="20" x2="18" y2="4"/>'
+               '<line x1="6" y1="20" x2="6" y2="16"/>')
+_ICON_MIC = ('<path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>'
+             '<path d="M19 10v2a7 7 0 0 1-14 0v-2"/>'
+             '<line x1="12" y1="19" x2="12" y2="23"/>')
+
+
+def _summary_groups(by):
+    """Aggregate student counts per group for the summary reports.
+    Returns [(group_name, [total, synopsis_rec, semi_rec, final_rec,
+    sent_to_coe, pass_out]), ...] sorted by total desc, then name."""
+    col = {"department": "department", "session": "session",
+           "degree": "degree", "status": "status"}[by]
+    rows = get_db().fetchall(
+        f"SELECT {col} AS g, synopsis, semi_final_thesis, final_thesis,"
+        " status FROM students")
+    groups = {}
+    for r in rows:
+        r = dict(r)
+        g = (r.get("g") or "").strip() or "— Unassigned —"
+        a = groups.setdefault(g, [0, 0, 0, 0, 0, 0])
+        a[0] += 1
+        if r.get("synopsis") == "Received":
+            a[1] += 1
+        if r.get("semi_final_thesis") == "Received":
+            a[2] += 1
+        if r.get("final_thesis") == "Received":
+            a[3] += 1
+        if r.get("status") == "Sent to COE":
+            a[4] += 1
+        if r.get("status") == "Pass Out":
+            a[5] += 1
+    return sorted(groups.items(), key=lambda kv: (-kv[1][0], kv[0].lower()))
+
+
+def _report_catalog():
+    """One-click report cards for the Reports page, with live counts."""
+    def stu(title, desc, args):
+        return {"title": title, "desc": desc,
+                "count": count_students(args), "count_label": "students",
+                "pdf_url": url_for("admin_export_pdf", **args),
+                "excel_url": url_for("admin_export", **args)}
+
+    def summ(title, desc, by, label):
+        return {"title": title, "desc": desc,
+                "count": len(_summary_groups(by)), "count_label": label,
+                "pdf_url": url_for("admin_report_summary", by=by,
+                                   format="pdf"),
+                "excel_url": url_for("admin_report_summary", by=by,
+                                     format="excel")}
+
+    def viva(title, desc, result):
+        db = get_db()
+        if result:
+            row = db.fetchone(
+                "SELECT COUNT(*) AS n FROM viva_records WHERE result=?",
+                (result,))
+        else:
+            row = db.fetchone("SELECT COUNT(*) AS n FROM viva_records")
+        n = (row["n"] if isinstance(row, dict) else row[0]) if row else 0
+        kw = {"result": result} if result else {}
+        return {"title": title, "desc": desc, "count": n,
+                "count_label": "records",
+                "pdf_url": url_for("admin_report_viva", format="pdf", **kw),
+                "excel_url": url_for("admin_report_viva", format="excel",
+                                     **kw)}
+
+    sum_desc = ("Totals with Synopsis, Semi-Final and Final Thesis "
+                "received, Sent to COE and Pass Out — per group.")
+    return [
+        {"title": "Student Lists by Status", "icon": _ICON_FLAG, "cards": [
+            stu("Complete Student List",
+                "Every student in the system, with the full submission "
+                "record.", {}),
+            stu("Continue Students", "Students currently in progress.",
+                {"status": "Continue"}),
+            stu("Viva Pending", "Students whose viva is still pending.",
+                {"status": "Viva Pending"}),
+            stu("Defense Pending", "Students awaiting their defense.",
+                {"status": "Defense Pending"}),
+            stu("Viva Done", "Students whose viva has been conducted.",
+                {"status": "Viva Done"}),
+            stu("Sent to COE", "Files forwarded to the Controller of "
+                "Examinations.", {"status": "Sent to COE"}),
+            stu("Pass Out Students", "Students who have completed their "
+                "degree.", {"status": "Pass Out"}),
+            stu("Freeze Students", "Students whose studies are frozen.",
+                {"status": "Freeze"}),
+            stu("Left Students", "Students who left the programme.",
+                {"status": "Left"}),
+            stu("Admission Cancelled", "Students whose admission was "
+                "cancelled.", {"status": "Admission Cancelled"}),
+        ]},
+        {"title": "Submission Reports", "icon": _ICON_FILE, "cards": [
+            stu("Synopsis Received", "Synopsis submitted and received.",
+                {"synopsis": "Received"}),
+            stu("Synopsis Not Received", "Synopsis still outstanding.",
+                {"synopsis": "Not Received"}),
+            stu("Semi-Final Thesis Received", "Semi-final thesis "
+                "submitted and received.",
+                {"semi_final_thesis": "Received"}),
+            stu("Semi-Final Thesis Not Received", "Semi-final thesis "
+                "still outstanding.",
+                {"semi_final_thesis": "Not Received"}),
+            stu("Final Thesis Received", "Final thesis submitted and "
+                "received.", {"final_thesis": "Received"}),
+            stu("Final Thesis Not Received", "Final thesis still "
+                "outstanding.", {"final_thesis": "Not Received"}),
+            stu("Folder / File Completed", "Student folder and file "
+                "complete.", {"folder_file": "Completed"}),
+            stu("Folder / File Not Completed", "Student folder or file "
+                "incomplete.", {"folder_file": "Not Completed"}),
+        ]},
+        {"title": "Pending & Attention", "icon": _ICON_CLOCK, "cards": [
+            stu("Synopsis Overdue", "Synopsis received 6+ months ago and "
+                "the Semi-Final Thesis is still pending.",
+                {"overdue": "1"}),
+            stu("Needs COE", "Final Thesis received but the COE date is "
+                "still missing.", {"needs_coe": "1"}),
+        ]},
+        {"title": "Programme & Gender", "icon": _ICON_CAP, "cards": [
+            stu("MPhil Students", "All MPhil students, every department.",
+                {"level": "MPhil"}),
+            stu("PhD Students", "All PhD students, every department.",
+                {"level": "PhD"}),
+            stu("Male Students", "All male students.", {"gender": "Male"}),
+            stu("Female Students", "All female students.",
+                {"gender": "Female"}),
+        ]},
+        {"title": "Summary Reports", "icon": _ICON_CHART, "cards": [
+            summ("Department-wise Summary", sum_desc, "department",
+                 "departments"),
+            summ("Session-wise Summary", sum_desc, "session", "sessions"),
+            summ("Degree-wise Summary", sum_desc, "degree", "degrees"),
+            summ("Status-wise Summary", sum_desc, "status", "statuses"),
+        ]},
+        {"title": "Viva Reports", "icon": _ICON_MIC, "cards": [
+            viva("All Viva Records", "Every viva voce record in the "
+                 "system.", ""),
+            viva("Viva Passed", "Students who passed their viva.", "Pass"),
+            viva("Viva Failed", "Students who failed their viva.", "Fail"),
+            viva("Viva Pending", "Vivas scheduled, result awaited.",
+                 "Pending"),
+            viva("Viva Rescheduled", "Vivas that were rescheduled.",
+                 "Rescheduled"),
+        ]},
+    ]
+
+
 @app.route("/admin/reports")
 @admin_required
 def admin_reports():
-    """Filter the student list and export it as Excel or PDF."""
+    """Filter the student list and export it, plus one-click report
+    cards for every standard criteria."""
     return render_template(
         "admin_reports.html", uni=UNI_NAME, title=PORTAL_TITLE,
         status_list=STATUS_LIST, sessions=distinct_values("session"),
         degrees=distinct_values("degree"), genders=GENDER_OPTS,
-        folders=FOLDER_OPTS)
+        folders=FOLDER_OPTS, report_sections=_report_catalog())
+
+
+def _report_pdf(title, meta_bits, headers, widths, rows, fname,
+                bold_rows=(), color_cells=None):
+    """Clean, elegant one-table PDF in the portal's report style.
+    rows = list of list of str; color_cells = {(row, col): '#hex'}."""
+    from xml.sax.saxutils import escape as _esc
+    from reportlab.lib import colors
+    from reportlab.lib.pagesizes import A4, landscape
+    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+    from reportlab.lib.units import mm
+    from reportlab.pdfgen import canvas as _pdfcanvas
+    from reportlab.platypus import (BaseDocTemplate, Frame, Image,
+                                    PageTemplate, Paragraph, Spacer, Table,
+                                    TableStyle)
+
+    BLACK = colors.HexColor("#111111")
+    BLUE = colors.HexColor("#1769E8")
+    INK = colors.HexColor("#1F2A37")
+    GREY = colors.HexColor("#667085")
+    LINE = colors.HexColor("#D6DEE9")
+    PAGE_W, PAGE_H = landscape(A4)
+    gen_str = _pkt_now().strftime("%d %b %Y, %I:%M %p") + " (PKT)"
+
+    styles = getSampleStyleSheet()
+    uni_style = ParagraphStyle("runi", parent=styles["Normal"],
+                               fontSize=13.5, leading=16,
+                               fontName="Helvetica-Bold", textColor=BLACK,
+                               alignment=1)
+    das_style = ParagraphStyle("rdas", parent=styles["Normal"],
+                               fontSize=10.5, leading=13,
+                               fontName="Helvetica-Bold", textColor=BLACK,
+                               alignment=1)
+    title_style = ParagraphStyle("rtitle", parent=styles["Normal"],
+                                 fontSize=15, leading=18,
+                                 fontName="Helvetica-Bold", textColor=BLACK)
+    meta_style = ParagraphStyle("rmeta", parent=styles["Normal"],
+                                fontSize=8.5, leading=12, textColor=GREY)
+    cell = ParagraphStyle("rcell", parent=styles["Normal"], fontSize=9,
+                          leading=12, textColor=INK)
+    cell_b = ParagraphStyle("rcellb", parent=cell,
+                            fontName="Helvetica-Bold")
+    head_cell = ParagraphStyle("rhcell", parent=styles["Normal"],
+                               fontSize=8, leading=10,
+                               textColor=colors.HexColor("#344054"),
+                               fontName="Helvetica-Bold")
+
+    class NumberedCanvas(_pdfcanvas.Canvas):
+        def __init__(self, *args, **kwargs):
+            super().__init__(*args, **kwargs)
+            self._saved = []
+
+        def showPage(self):
+            self._saved.append(dict(self.__dict__))
+            self._startPage()
+
+        def save(self):
+            total = len(self._saved)
+            for state in self._saved:
+                self.__dict__.update(state)
+                self._draw_footer(total)
+                super().showPage()
+            super().save()
+
+        def _draw_footer(self, total):
+            self.saveState()
+            self.setStrokeColor(LINE)
+            self.setLineWidth(0.6)
+            self.line(10 * mm, 11 * mm, PAGE_W - 10 * mm, 11 * mm)
+            self.setFont("Helvetica", 6.5)
+            self.setFillColor(GREY)
+            self.drawString(10 * mm, 7 * mm,
+                            "Directorate of Advanced Studies - CUVAS, "
+                            "Bahawalpur")
+            self.drawCentredString(PAGE_W / 2.0, 7 * mm, title)
+            self.drawRightString(PAGE_W - 10 * mm, 7 * mm,
+                                 f"Page {self._pageNumber} of {total}")
+            self.restoreState()
+
+    buf = io.BytesIO()
+    doc = BaseDocTemplate(
+        buf, pagesize=landscape(A4), leftMargin=10 * mm,
+        rightMargin=10 * mm, topMargin=9 * mm, bottomMargin=14 * mm,
+        title=title, author="Directorate of Advanced Studies, CUVAS")
+    frame = Frame(doc.leftMargin, doc.bottomMargin, doc.width, doc.height,
+                  id="main")
+    doc.addPageTemplates([PageTemplate(id="page", frames=[frame])])
+    story = []
+    logo_path = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                             "static", "img", "cuvas-logo.png")
+    logo_flow = (Image(logo_path, width=37 * mm, height=14.8 * mm)
+                 if os.path.exists(logo_path) else Paragraph("", meta_style))
+    hdr = Table([[logo_flow,
+                  [Paragraph("CHOLISTAN UNIVERSITY OF VETERINARY AND "
+                             "ANIMAL SCIENCES, BAHAWALPUR", uni_style),
+                   Paragraph("Directorate of Advanced Studies",
+                             das_style)]]],
+                colWidths=[42 * mm, 235 * mm])
+    hdr.setStyle(TableStyle([
+        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+        ("LEFTPADDING", (0, 0), (-1, -1), 0),
+        ("RIGHTPADDING", (0, 0), (-1, -1), 0),
+        ("TOPPADDING", (0, 0), (-1, -1), 0),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 2)]))
+    story.append(hdr)
+    rule = Table([[""]], colWidths=[277 * mm], rowHeights=[0.9 * mm])
+    rule.setStyle(TableStyle([
+        ("BACKGROUND", (0, 0), (-1, -1), BLUE),
+        ("LEFTPADDING", (0, 0), (-1, -1), 0),
+        ("RIGHTPADDING", (0, 0), (-1, -1), 0),
+        ("TOPPADDING", (0, 0), (-1, -1), 0),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 0)]))
+    story.append(rule)
+    story.append(Spacer(1, 4 * mm))
+    story.append(Paragraph(_esc(title.upper()), title_style))
+    story.append(Spacer(1, 1.5 * mm))
+    meta_line = " &nbsp;·&nbsp; ".join(
+        _esc(b) for b in meta_bits + [f"Generated on: {gen_str}"])
+    story.append(Paragraph(meta_line, meta_style))
+    story.append(Spacer(1, 3.5 * mm))
+
+    color_cells = color_cells or {}
+    data = [[Paragraph(_esc(h.upper()), head_cell) for h in headers]]
+    for ri, row in enumerate(rows):
+        line = []
+        for ci, val in enumerate(row):
+            txt = _esc(str(val))
+            hexcol = color_cells.get((ri, ci))
+            if hexcol:
+                txt = f'<b><font color="{hexcol}">{txt}</font></b>'
+            st = cell_b if (ri in bold_rows or ci == 1) else cell
+            line.append(Paragraph(txt, st))
+        data.append(line)
+    tbl = Table(data, colWidths=[w * mm for w in widths], repeatRows=1)
+    tbl.setStyle(TableStyle([
+        ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#F7F9FC")),
+        ("LINEBELOW", (0, 0), (-1, 0), 1.1,
+         colors.HexColor("#C9D4E4")),
+        ("LINEBELOW", (0, 1), (-1, -2), 0.4, LINE),
+        ("LINEBELOW", (0, -1), (-1, -1), 0.7, LINE),
+        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+        ("TOPPADDING", (0, 0), (-1, -1), 6),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
+        ("LEFTPADDING", (0, 0), (-1, -1), 6),
+        ("RIGHTPADDING", (0, 0), (-1, -1), 6)]))
+    story.append(tbl)
+    doc.build(story, canvasmaker=NumberedCanvas)
+    buf.seek(0)
+    resp = Response(buf.getvalue(), mimetype="application/pdf")
+    resp.headers["Content-Disposition"] = f"attachment; filename={fname}"
+    return resp
+
+
+def _report_excel(title, meta_bits, headers, widths, rows, fname):
+    """Excel twin of _report_pdf: same title, meta and table."""
+    from openpyxl import Workbook
+    from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
+
+    gen_str = _pkt_now().strftime("%d %b %Y, %I:%M %p") + " (PKT)"
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Report"
+    ncol = len(headers)
+    ws.merge_cells(start_row=1, start_column=1, end_row=1, end_column=ncol)
+    c = ws.cell(row=1, column=1,
+                value="CHOLISTAN UNIVERSITY OF VETERINARY AND ANIMAL "
+                      "SCIENCES, BAHAWALPUR")
+    c.font = Font(bold=True, size=13, color="111111")
+    ws.merge_cells(start_row=2, start_column=1, end_row=2, end_column=ncol)
+    c = ws.cell(row=2, column=1, value="Directorate of Advanced Studies")
+    c.font = Font(bold=True, size=11, color="111111")
+    ws.merge_cells(start_row=3, start_column=1, end_row=3, end_column=ncol)
+    c = ws.cell(row=3, column=1, value=title)
+    c.font = Font(bold=True, size=12, color="1769E8")
+    ws.merge_cells(start_row=4, start_column=1, end_row=4, end_column=ncol)
+    c = ws.cell(row=4, column=1,
+                value="  ·  ".join(meta_bits + [f"Generated on: {gen_str}"]))
+    c.font = Font(size=10, color="667085")
+    hdr_row = 6
+    thin = Side(style="thin", color="C9D4E4")
+    for ci, h in enumerate(headers, start=1):
+        cell = ws.cell(row=hdr_row, column=ci, value=h)
+        cell.font = Font(bold=True, color="FFFFFF")
+        cell.fill = PatternFill("solid", fgColor="1769E8")
+        cell.alignment = Alignment(horizontal="center", vertical="center")
+        cell.border = Border(bottom=thin)
+    for ri, row in enumerate(rows, start=hdr_row + 1):
+        for ci, val in enumerate(row, start=1):
+            ws.cell(row=ri, column=ci, value=val)
+    for ci, w in enumerate(widths, start=1):
+        from openpyxl.utils import get_column_letter
+        ws.column_dimensions[get_column_letter(ci)].width = w
+    ws.freeze_panes = ws.cell(row=hdr_row + 1, column=1)
+    buf = io.BytesIO()
+    wb.save(buf)
+    buf.seek(0)
+    resp = Response(
+        buf.getvalue(),
+        mimetype="application/vnd.openxmlformats-officedocument."
+                 "spreadsheetml.sheet")
+    resp.headers["Content-Disposition"] = f"attachment; filename={fname}"
+    return resp
+
+
+@app.route("/admin/report-summary")
+@admin_required
+def admin_report_summary():
+    """One-click summary report grouped by department / session /
+    degree / status, as PDF or Excel."""
+    by = (request.args.get("by") or "department").strip()
+    if by not in ("department", "session", "degree", "status"):
+        by = "department"
+    fmt = (request.args.get("format") or "pdf").strip().lower()
+    label = {"department": "Department", "session": "Session",
+             "degree": "Degree", "status": "Status"}[by]
+    title = f"{label}-wise Summary Report"
+    groups = _summary_groups(by)
+    rows = [[name] + [str(v) for v in vals] for name, vals in groups]
+    totals = [sum(vals[i] for _n, vals in groups) for i in range(6)]
+    rows.append(["Total"] + [str(v) for v in totals])
+    headers = [label, "Total Students", "Synopsis Received",
+               "Semi-Final Received", "Final Thesis Received",
+               "Sent to COE", "Pass Out"]
+    meta = [f"{len(groups)} {label.lower()}s", f"{totals[0]} students"]
+    tag = f"Summary_By_{label}_" + _pkt_now().strftime("%Y-%m-%d")
+    log_activity("admin", "report_summary", by)
+    if fmt == "excel":
+        return _report_excel(title, meta, headers,
+                             [38, 15, 18, 18, 19, 13, 11],
+                             [[r[0]] + [int(v) for v in r[1:]]
+                              for r in rows], f"{tag}.xlsx")
+    return _report_pdf(title, meta, headers,
+                       [67, 30, 38, 38, 42, 30, 32], rows,
+                       f"{tag}.pdf", bold_rows={len(rows) - 1})
+
+
+@app.route("/admin/report-viva")
+@admin_required
+def admin_report_viva():
+    """One-click viva voce report (all records, or one result), as
+    PDF or Excel."""
+    result = (request.args.get("result") or "").strip()
+    if result not in VIVA_RESULTS:
+        result = ""
+    fmt = (request.args.get("format") or "pdf").strip().lower()
+    sql = ("SELECT v.viva_date, v.examiner_name, v.examiner_affiliation,"
+           " v.result, v.obtained_marks, v.total_marks, v.next_viva_date,"
+           " v.remarks, s.name, s.reg_no, s.degree, s.department"
+           " FROM viva_records v JOIN students s ON s.id = v.student_id")
+    params = []
+    if result:
+        sql += " WHERE v.result=?"
+        params.append(result)
+    sql += " ORDER BY v.viva_date DESC, s.name"
+    recs = [dict(r) for r in get_db().fetchall(sql, params)]
+
+    def dstr(s):
+        try:
+            return sched_fmt(datetime.strptime(s, "%Y-%m-%d").date())
+        except (TypeError, ValueError):
+            return s or "—"
+
+    rows, colors = [], {}
+    for i, r in enumerate(recs):
+        marks = ("—" if r.get("obtained_marks") is None else
+                 f"{r['obtained_marks']} / {r.get('total_marks') or 120}")
+        exam = r.get("examiner_name") or "—"
+        if r.get("examiner_affiliation"):
+            exam += f" ({r['examiner_affiliation']})"
+        res = r.get("result") or "Pending"
+        rows.append([str(i + 1), r.get("name") or "", r.get("reg_no") or "",
+                     r.get("degree") or "", r.get("department") or "",
+                     dstr(r.get("viva_date")), exam, res, marks,
+                     dstr(r.get("next_viva_date")), r.get("remarks") or ""])
+        if res == "Pass":
+            colors[(i, 7)] = "#067647"
+        elif res == "Fail":
+            colors[(i, 7)] = "#B42318"
+    title = "Viva Voce Report" + (f" — {result}" if result else " — All")
+    headers = ["#", "Student", "Reg. No", "Degree", "Department",
+               "Viva Date", "Examiner", "Result", "Marks", "Next Viva",
+               "Remarks"]
+    meta = [f"{len(rows)} records"]
+    tag = ("Viva_Report_" + (result or "All") + "_"
+           + _pkt_now().strftime("%Y-%m-%d"))
+    log_activity("admin", "report_viva", result or "All")
+    if fmt == "excel":
+        return _report_excel(title, meta, headers,
+                             [5, 24, 15, 20, 24, 13, 30, 11, 11, 13, 30],
+                             rows, f"{tag}.xlsx")
+    return _report_pdf(title, meta, headers,
+                       [9, 32, 23, 28, 32, 20, 36, 16, 15, 20, 46],
+                       rows, f"{tag}.pdf", color_cells=colors)
 
 
 def _pkt_now():
