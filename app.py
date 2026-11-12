@@ -2572,16 +2572,17 @@ def admin_schedule_pdf():
                                  fontName="Helvetica-Bold", textColor=BLACK)
     pill_style = ParagraphStyle("spill", parent=styles["Normal"], fontSize=10,
                                 leading=13, fontName="Helvetica-Bold",
-                                textColor=colors.white, alignment=1)
+                                textColor=BLUE, alignment=1)
     meta_style = ParagraphStyle("smeta", parent=styles["Normal"], fontSize=8.5,
                                 leading=12, textColor=INK)
     meta_r = ParagraphStyle("smetar", parent=meta_style, alignment=2)
-    cell = ParagraphStyle("scell", parent=styles["Normal"], fontSize=8.5,
-                          leading=11, textColor=INK)
+    cell = ParagraphStyle("scell", parent=styles["Normal"], fontSize=9,
+                          leading=12, textColor=INK)
     cell_b = ParagraphStyle("scellb", parent=cell, fontName="Helvetica-Bold")
     head_cell = ParagraphStyle("shcell", parent=styles["Normal"], fontSize=8,
-                               leading=10, textColor=colors.white,
-                               fontName="Helvetica-Bold", alignment=1)
+                               leading=10,
+                               textColor=colors.HexColor("#344054"),
+                               fontName="Helvetica-Bold", alignment=0)
 
     class NumberedCanvas(_pdfcanvas.Canvas):
         """Footer on every page, with a true 'Page X of Y' count."""
@@ -2647,11 +2648,9 @@ def admin_schedule_pdf():
     ]))
     story.append(hdr)
 
-    accent = Table([["", ""]], colWidths=[200 * mm, 77 * mm],
-                   rowHeights=[1.6 * mm])
+    accent = Table([[""]], colWidths=[277 * mm], rowHeights=[0.9 * mm])
     accent.setStyle(TableStyle([
-        ("BACKGROUND", (0, 0), (0, 0), BLUE),
-        ("BACKGROUND", (1, 0), (1, 0), SKY),
+        ("BACKGROUND", (0, 0), (-1, -1), BLUE),
         ("LEFTPADDING", (0, 0), (-1, -1), 0),
         ("RIGHTPADDING", (0, 0), (-1, -1), 0),
         ("TOPPADDING", (0, 0), (-1, -1), 0),
@@ -2663,7 +2662,7 @@ def admin_schedule_pdf():
     pill = Table([[Paragraph(_esc(session.upper()), pill_style)]],
                  colWidths=[92 * mm])
     pill.setStyle(TableStyle([
-        ("BACKGROUND", (0, 0), (-1, -1), BLUE),
+        ("BACKGROUND", (0, 0), (-1, -1), colors.HexColor("#EAF2FF")),
         ("ROUNDEDCORNERS", [6, 6, 6, 6]),
         ("TOPPADDING", (0, 0), (-1, -1), 5),
         ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
@@ -2692,14 +2691,13 @@ def admin_schedule_pdf():
          Paragraph(f"<b>Generated on:</b> {_esc(gen_str)}", meta_r)],
     ], colWidths=[150 * mm, 123 * mm])
     meta.setStyle(TableStyle([
-        ("BACKGROUND", (0, 0), (-1, -1), BOX),
-        ("BOX", (0, 0), (-1, -1), 0.6, LINE),
-        ("ROUNDEDCORNERS", [4, 4, 4, 4]),
+        ("LINEABOVE", (0, 0), (-1, 0), 0.8, BLUE),
+        ("LINEBELOW", (0, -1), (-1, -1), 0.5, LINE),
         ("VALIGN", (0, 0), (-1, -1), "TOP"),
-        ("LEFTPADDING", (0, 0), (-1, -1), 8),
+        ("LEFTPADDING", (0, 0), (0, -1), 0),
         ("RIGHTPADDING", (0, 0), (-1, -1), 8),
-        ("TOPPADDING", (0, 0), (-1, -1), 3),
-        ("BOTTOMPADDING", (0, 0), (-1, -1), 3),
+        ("TOPPADDING", (0, 0), (-1, -1), 4),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
     ]))
     story.append(meta)
     story.append(Spacer(1, 4 * mm))
@@ -2713,7 +2711,7 @@ def admin_schedule_pdf():
     headers = ["#", "Document", "Scheduled Last Date", "Day",
                "Adjusted Date (Weekend Shift Applied)", "Adjusted Day"]
     widths = [10 * mm, 68 * mm, 50 * mm, 38 * mm, 58 * mm, 53 * mm]
-    data = [[Paragraph(h, head_cell) for h in headers]]
+    data = [[Paragraph(h.upper(), head_cell) for h in headers]]
     for i, r in enumerate(rows, start=1):
         data.append([
             Paragraph(str(i), cell),
@@ -2725,15 +2723,15 @@ def admin_schedule_pdf():
         ])
     tbl = Table(data, colWidths=widths, repeatRows=1)
     tbl.setStyle(TableStyle([
-        ("BACKGROUND", (0, 0), (-1, 0), BLUE),
-        ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
-        ("VALIGN", (0, 0), (-1, -1), "TOP"),
-        ("GRID", (0, 0), (-1, -1), 0.4, LINE),
-        ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, ZEBRA]),
-        ("TOPPADDING", (0, 0), (-1, -1), 5),
-        ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
-        ("LEFTPADDING", (0, 0), (-1, -1), 5),
-        ("RIGHTPADDING", (0, 0), (-1, -1), 5),
+        ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#F7F9FC")),
+        ("LINEBELOW", (0, 0), (-1, 0), 1.1, colors.HexColor("#C9D4E4")),
+        ("LINEBELOW", (0, 1), (-1, -2), 0.4, LINE),
+        ("LINEBELOW", (0, -1), (-1, -1), 0.7, LINE),
+        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+        ("TOPPADDING", (0, 0), (-1, -1), 6),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
+        ("LEFTPADDING", (0, 0), (-1, -1), 6),
+        ("RIGHTPADDING", (0, 0), (-1, -1), 6),
     ]))
     story.append(tbl)
     story.append(Spacer(1, 4 * mm))
