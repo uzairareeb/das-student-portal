@@ -2347,14 +2347,17 @@ def _summary_groups(by):
 def _report_catalog():
     """One-click report cards for the Reports page, with live counts."""
     def stu(title, desc, args):
-        return {"title": title, "desc": desc,
-                "count": count_students(args), "count_label": "students",
+        n = count_students(args)
+        return {"title": title, "desc": desc, "count": n,
+                "count_label": "student" if n == 1 else "students",
                 "pdf_url": url_for("admin_export_pdf", **args),
                 "excel_url": url_for("admin_export", **args)}
 
     def summ(title, desc, by, label):
-        return {"title": title, "desc": desc,
-                "count": len(_summary_groups(by)), "count_label": label,
+        n = len(_summary_groups(by))
+        return {"title": title, "desc": desc, "count": n,
+                "count_label": label if n == 1 else
+                {"status": "statuses"}.get(label, label + "s"),
                 "pdf_url": url_for("admin_report_summary", by=by,
                                    format="pdf"),
                 "excel_url": url_for("admin_report_summary", by=by,
@@ -2371,7 +2374,7 @@ def _report_catalog():
         n = (row["n"] if isinstance(row, dict) else row[0]) if row else 0
         kw = {"result": result} if result else {}
         return {"title": title, "desc": desc, "count": n,
-                "count_label": "records",
+                "count_label": "record" if n == 1 else "records",
                 "pdf_url": url_for("admin_report_viva", format="pdf", **kw),
                 "excel_url": url_for("admin_report_viva", format="excel",
                                      **kw)}
@@ -2440,10 +2443,10 @@ def _report_catalog():
         ]},
         {"title": "Summary Reports", "icon": _ICON_CHART, "cards": [
             summ("Department-wise Summary", sum_desc, "department",
-                 "departments"),
-            summ("Session-wise Summary", sum_desc, "session", "sessions"),
-            summ("Degree-wise Summary", sum_desc, "degree", "degrees"),
-            summ("Status-wise Summary", sum_desc, "status", "statuses"),
+                 "department"),
+            summ("Session-wise Summary", sum_desc, "session", "session"),
+            summ("Degree-wise Summary", sum_desc, "degree", "degree"),
+            summ("Status-wise Summary", sum_desc, "status", "status"),
         ]},
         {"title": "Viva Reports", "icon": _ICON_MIC, "cards": [
             viva("All Viva Records", "Every viva voce record in the "
