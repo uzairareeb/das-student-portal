@@ -340,6 +340,7 @@ def init_db():
     _migrate_add_thesis_dates(db)
     _migrate_add_doc_status(db)
     _fix_passout_rows(db)
+    _fix_department_rows(db)
     # Admin password comes from the env var (source of truth), stored hashed.
     pw_hash = generate_password_hash(
         os.environ.get("ADMIN_PASSWORD", "admin123") or "admin123")
@@ -505,6 +506,32 @@ def _fix_passout_rows(db):
             final_thesis='Received' WHERE status='Pass Out'
             AND (folder_file<>'Completed' OR synopsis<>'Received'
             OR semi_final_thesis<>'Received' OR final_thesis<>'Received')""")
+        db.commit()
+    except Exception:
+        try:
+            db.conn.rollback()
+        except Exception:
+            pass
+
+
+def _fix_department_rows(db):
+    """Auto-set students.department from the degree ('MPhil Zoology' ->
+    'Department of Zoology') wherever it is missing or still the bare
+    subject name. Safe to rerun; never overwrites a different department."""
+    try:
+        rows = db.fetchall("SELECT id, degree, department FROM students")
+        for r in rows:
+            r = dict(r)
+            derived = dept_from_degree(r.get("degree"))
+            if not derived:
+                continue
+            cur = (r.get("department") or "").strip()
+            subject = degree_subject(r.get("degree")) or ""
+            if cur != derived and (not cur
+                                   or cur.lower() == subject.lower()
+                                   or cur.lower() == derived.lower()):
+                db.execute("UPDATE students SET department=? WHERE id=?",
+                           (derived, r["id"]))
         db.commit()
     except Exception:
         try:
@@ -715,7 +742,7 @@ def _student_where(args):
     if dept == "__unassigned":
         where.append("(department IS NULL OR department='')")
     elif dept:
-        where.append("department=?")
+        where.append("REPLACE(LOWER(department), 'department of ', '')=REPLACE(LOWER(?), 'department of ', '')")
         params.append(dept)
     if (args.get("overdue") or "") == "1":
         # Synopsis 6+ months old, Semi-Final still pending (pending group 3)
@@ -846,10 +873,49 @@ def distinct_values(col):
 
 
 def dept_names():
-    """Department names from the departments table (exact match matters:
-    the dept portal filters students with department=<name>)."""
+    """Department names from the departments table. Student rows may carry
+    either this name or the degree-derived 'Department of X' form; all
+    department matching below accepts both forms."""
     rows = get_db().fetchall("SELECT name FROM departments ORDER BY name")
     return [(r["name"] if isinstance(r, dict) else r[0]) for r in rows]
+
+
+_DEGREE_PREFIX_RE = re.compile(r"^\s*(?:M\.?Phil|Ph\.?D)\b[\s:\-.]*",
+                               re.IGNORECASE)
+
+
+def degree_subject(degree):
+    """'MPhil Zoology' / 'PhD Zoology' -> 'Zoology'; None when the degree
+    carries no subject part."""
+    d = (degree or "").strip()
+    m = _DEGREE_PREFIX_RE.match(d)
+    if not m:
+        return None
+    subject = d[m.end():].strip(" -:.").strip()
+    return subject or None
+
+
+def dept_from_degree(degree):
+    """Auto department name for a degree: 'MPhil Zoology' ->
+    'Department of Zoology'. None when it cannot be derived."""
+    subject = degree_subject(degree)
+    if not subject:
+        return None
+    if subject.lower().startswith("department of "):
+        subject = subject[len("department of "):].strip()
+    return "Department of " + subject
+
+
+def dept_aliases(name):
+    """Both name forms a department's students may carry: the department
+    login name itself and the degree-derived 'Department of X' form."""
+    n = (name or "").strip()
+    if not n:
+        return [""]
+    if n.lower().startswith("department of "):
+        bare = n[len("department of "):].strip()
+        return [n, bare] if bare else [n]
+    return [n, "Department of " + n]
 
 
 # ---------------- public ----------------
@@ -962,7 +1028,7 @@ def admin_dashboard():
         dept_rows.append({
             "name": d,
             "students": _cnt(
-                "SELECT COUNT(*) AS n FROM students WHERE department=?", (d,)),
+                "SELECT COUNT(*) AS n FROM students WHERE REPLACE(LOWER(department), 'department of ', '')=REPLACE(LOWER(?), 'department of ', '')", (d,)),
             "uploads_pending": _cnt(
                 "SELECT COUNT(*) AS n FROM dept_uploads u"
                 " JOIN departments dep ON dep.id=u.department_id"
@@ -970,7 +1036,7 @@ def admin_dashboard():
             "viva_pending": _cnt(
                 "SELECT COUNT(*) AS n FROM viva_records v"
                 " JOIN students s ON s.id=v.student_id"
-                " WHERE s.department=? AND v.result='Pending'", (d,)),
+                " WHERE REPLACE(LOWER(s.department), 'department of ', '')=REPLACE(LOWER(?), 'department of ', '') AND v.result='Pending'", (d,)),
         })
     unassigned = _cnt(
         "SELECT COUNT(*) AS n FROM students"
@@ -1196,89 +1262,274 @@ def admin_export():
 @app.route("/admin/export-pdf")
 @admin_required
 def admin_export_pdf():
-    """Landscape PDF of the (filtered) student list."""
+    """Modern professional PDF of the (filtered) student list: university
+    header with logo, title band, scope + generation date (PKT), summary
+    counts, and a clear synopsis / thesis submission record per student."""
+    from xml.sax.saxutils import escape as _esc
     from reportlab.lib import colors
     from reportlab.lib.pagesizes import A4, landscape
     from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
     from reportlab.lib.units import mm
-    from reportlab.platypus import (SimpleDocTemplate, Table, TableStyle,
-                                    Paragraph, Spacer)
+    from reportlab.pdfgen import canvas as _pdfcanvas
+    from reportlab.platypus import (BaseDocTemplate, Frame, Image,
+                                    PageTemplate, Paragraph, Spacer, Table,
+                                    TableStyle)
+
     students = query_students(request.args)
-    buf = io.BytesIO()
-    doc = SimpleDocTemplate(
-        buf, pagesize=landscape(A4),
-        leftMargin=10 * mm, rightMargin=10 * mm,
-        topMargin=12 * mm, bottomMargin=12 * mm,
-        title="DAS Students Export",
-        author="Advanced Studies Office")
+    try:
+        from zoneinfo import ZoneInfo
+        now_pkt = datetime.now(ZoneInfo("Asia/Karachi"))
+    except Exception:
+        now_pkt = datetime.now(timezone.utc) + timedelta(hours=5)
+    gen_str = now_pkt.strftime("%d %b %Y, %I:%M %p") + " (PKT)"
+    date_tag = now_pkt.strftime("%Y-%m-%d")
+
+    NAVY = colors.HexColor("#17365D")
+    BLUE = colors.HexColor("#1769E8")
+    INK = colors.HexColor("#1F2A37")
+    GREY = colors.HexColor("#667085")
+    LINE = colors.HexColor("#D6DEE9")
+    ZEBRA = colors.HexColor("#F2F7FE")
+    SOFT = colors.HexColor("#EAF2FF")
+    GREEN = "#067647"
+    RED = "#B42318"
+    PAGE_W, PAGE_H = landscape(A4)
+
+    # ---- scope: which students this file covers ----
+    a = request.args
+    bits = []
+    for key, label in (("status", "Status"), ("session", "Session"),
+                       ("degree", "Degree"), ("gender", "Gender"),
+                       ("folder_file", "Folder/File")):
+        v = (a.get(key) or "").strip()
+        if v:
+            bits.append(f"{label}: {v}")
+    if (a.get("q") or "").strip():
+        bits.append("Search: " + a.get("q").strip())
+    if a.get("overdue"):
+        bits.append("Smart filter: Synopsis Overdue")
+    if a.get("needs_coe"):
+        bits.append("Smart filter: Needs COE")
+    scope = " &middot; ".join(_esc(b) for b in bits) if bits else "All students"
+
+    # ---- summary counts over the exported rows ----
+    n_total = len(students)
+    n_syn = sum(1 for s in students if s.get("synopsis") == "Received")
+    n_semi = sum(1 for s in students
+                 if s.get("semi_final_thesis") == "Received")
+    n_fin = sum(1 for s in students if s.get("final_thesis") == "Received")
+    n_coe = sum(1 for s in students if s.get("status") == "Sent to COE")
+    n_pass = sum(1 for s in students if s.get("status") == "Pass Out")
+
     styles = getSampleStyleSheet()
-    title_style = ParagraphStyle("Title2", parent=styles["Title"],
-                                 fontSize=16, textColor=colors.HexColor("#2d3290"),
-                                 spaceAfter=4)
-    sub_style = ParagraphStyle("Sub", parent=styles["Normal"], fontSize=9,
-                               textColor=colors.HexColor("#667085"), spaceAfter=10)
+    uni_style = ParagraphStyle("uni", parent=styles["Normal"], fontSize=13,
+                               leading=16, fontName="Helvetica-Bold",
+                               textColor=NAVY, alignment=1)
+    das_style = ParagraphStyle("das", parent=styles["Normal"], fontSize=10.5,
+                               leading=13, fontName="Helvetica-Bold",
+                               textColor=BLUE, alignment=1)
+    band_style = ParagraphStyle("band", parent=styles["Normal"], fontSize=11,
+                                leading=14, fontName="Helvetica-Bold",
+                                textColor=colors.white, alignment=1)
+    meta_style = ParagraphStyle("meta", parent=styles["Normal"], fontSize=8,
+                                leading=11, textColor=INK)
+    meta_r = ParagraphStyle("metar", parent=meta_style, alignment=2)
+    sum_style = ParagraphStyle("sum", parent=styles["Normal"], fontSize=8,
+                               leading=11, alignment=1, textColor=INK)
     cell = ParagraphStyle("cell", parent=styles["Normal"], fontSize=7,
-                          leading=8.5)
+                          leading=8.5, textColor=INK)
+    cell_b = ParagraphStyle("cellb", parent=cell, fontName="Helvetica-Bold")
     head_cell = ParagraphStyle("hcell", parent=styles["Normal"], fontSize=7,
                                leading=8.5, textColor=colors.white,
-                               fontName="Helvetica-Bold")
-    story = [Paragraph("Student Records — Advanced Studies Office", title_style),
-             Paragraph(f"{len(students)} student(s) &middot; generated "
-                       f"{datetime.now().strftime('%d %b %Y, %H:%M')}", sub_style)]
-    headers = ["Name", "Reg.No", "Gender", "Degree", "Session", "Folder/File",
-               "Synopsis", "Semi-Final", "Final Thesis", "COE Date", "Status",
-               "Comments"]
-    widths = [32 * mm, 26 * mm, 14 * mm, 34 * mm, 20 * mm, 22 * mm,
-              18 * mm, 18 * mm, 18 * mm, 20 * mm, 21 * mm, 34 * mm]
+                               fontName="Helvetica-Bold", alignment=1)
+
+    class NumberedCanvas(_pdfcanvas.Canvas):
+        """Footer on every page, with a true 'Page X of Y' count."""
+        def __init__(self, *args, **kwargs):
+            super().__init__(*args, **kwargs)
+            self._saved = []
+
+        def showPage(self):
+            self._saved.append(dict(self.__dict__))
+            self._startPage()
+
+        def save(self):
+            total = len(self._saved)
+            for state in self._saved:
+                self.__dict__.update(state)
+                self._draw_footer(total)
+                super().showPage()
+            super().save()
+
+        def _draw_footer(self, total):
+            self.saveState()
+            self.setStrokeColor(LINE)
+            self.setLineWidth(0.6)
+            self.line(9 * mm, 11 * mm, PAGE_W - 9 * mm, 11 * mm)
+            self.setFont("Helvetica", 6.5)
+            self.setFillColor(GREY)
+            self.drawString(9 * mm, 7 * mm,
+                            "Directorate of Advanced Studies - CUVAS, "
+                            "Bahawalpur")
+            self.drawCentredString(PAGE_W / 2.0, 7 * mm,
+                                   "Student Synopsis & Thesis Submission "
+                                   "Record")
+            self.drawRightString(PAGE_W - 9 * mm, 7 * mm,
+                                 f"Page {self._pageNumber} of {total}")
+            self.restoreState()
+
+    buf = io.BytesIO()
+    doc = BaseDocTemplate(
+        buf, pagesize=landscape(A4),
+        leftMargin=9 * mm, rightMargin=9 * mm,
+        topMargin=9 * mm, bottomMargin=14 * mm,
+        title="Student Synopsis & Thesis Submission Record",
+        author="Directorate of Advanced Studies, CUVAS")
+    frame = Frame(doc.leftMargin, doc.bottomMargin, doc.width, doc.height,
+                  id="main")
+    doc.addPageTemplates([PageTemplate(id="page", frames=[frame])])
+
+    story = []
+    logo_path = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                             "static", "img", "cuvas-logo.png")
+    logo_flow = (Image(logo_path, width=37 * mm, height=14.8 * mm)
+                 if os.path.exists(logo_path) else Paragraph("", meta_style))
+    hdr = Table([[logo_flow,
+                  [Paragraph("CHOLISTAN UNIVERSITY OF VETERINARY AND ANIMAL "
+                             "SCIENCES, BAHAWALPUR", uni_style),
+                   Paragraph("Directorate of Advanced Studies", das_style)]]],
+                colWidths=[42 * mm, 237 * mm])
+    hdr.setStyle(TableStyle([
+        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+        ("LEFTPADDING", (0, 0), (-1, -1), 0),
+        ("RIGHTPADDING", (0, 0), (-1, -1), 0),
+        ("TOPPADDING", (0, 0), (-1, -1), 0),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 2),
+    ]))
+    story.append(hdr)
+    band = Table([[Paragraph("STUDENT SYNOPSIS &amp; THESIS SUBMISSION RECORD",
+                             band_style)]],
+                 colWidths=[279 * mm])
+    band.setStyle(TableStyle([
+        ("BACKGROUND", (0, 0), (-1, -1), NAVY),
+        ("TOPPADDING", (0, 0), (-1, -1), 6),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
+        ("LEFTPADDING", (0, 0), (-1, -1), 0),
+        ("RIGHTPADDING", (0, 0), (-1, -1), 0),
+        ("ROUNDEDCORNERS", [3, 3, 3, 3]),
+    ]))
+    story.append(band)
+    story.append(Spacer(1, 3 * mm))
+    meta = Table([
+        [Paragraph(f"<b>Generated on:</b> {_esc(gen_str)}", meta_style),
+         Paragraph(f"<b>Total students:</b> {n_total}", meta_r)],
+        [Paragraph(f"<b>Scope:</b> {scope}", meta_style),
+         Paragraph("<b>Prepared by:</b> Advanced Studies Office", meta_r)],
+    ], colWidths=[200 * mm, 79 * mm])
+    meta.setStyle(TableStyle([
+        ("VALIGN", (0, 0), (-1, -1), "TOP"),
+        ("LEFTPADDING", (0, 0), (-1, -1), 0),
+        ("RIGHTPADDING", (0, 0), (-1, -1), 0),
+        ("TOPPADDING", (0, 0), (-1, -1), 1),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 1),
+    ]))
+    story.append(meta)
+    story.append(Spacer(1, 2.5 * mm))
+    sums = [("Total Students", n_total), ("Synopsis Received", n_syn),
+            ("Semi-Final Received", n_semi),
+            ("Final Thesis Received", n_fin),
+            ("Sent to COE", n_coe), ("Pass Out", n_pass)]
+    sum_tbl = Table(
+        [[Paragraph(f"<b>{v}</b><br/>{_esc(k)}", sum_style) for k, v in sums]],
+        colWidths=[46.5 * mm] * 6)
+    sum_tbl.setStyle(TableStyle([
+        ("BACKGROUND", (0, 0), (-1, -1), SOFT),
+        ("BOX", (0, 0), (-1, -1), 0.6, LINE),
+        ("INNERGRID", (0, 0), (-1, -1), 0.4, LINE),
+        ("TOPPADDING", (0, 0), (-1, -1), 5),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
+        ("ROUNDEDCORNERS", [3, 3, 3, 3]),
+    ]))
+    story.append(sum_tbl)
+    story.append(Spacer(1, 3 * mm))
+
+    def sub_cell(status_val, stamp_val):
+        st = (status_val or "").strip()
+        if st == "Received":
+            head = f'<b><font color="{GREEN}">Received</font></b>'
+        elif st:
+            head = f'<font color="{RED}">{_esc(st)}</font>'
+        else:
+            head = "—"
+        stamp = fmt_stamp(stamp_val)
+        if stamp and stamp != "—":
+            return Paragraph(
+                head + f'<br/><font size="6" color="#667085">'
+                       f'{_esc(stamp)}</font>', cell)
+        return Paragraph(head, cell)
+
+    def folder_cell(val):
+        v = (val or "").strip()
+        if v == "Completed":
+            return Paragraph(
+                f'<b><font color="{GREEN}">Completed</font></b>', cell)
+        if v:
+            return Paragraph(f'<font color="{RED}">{_esc(v)}</font>', cell)
+        return Paragraph("—", cell)
+
+    headers = ["#", "Name", "Reg. No", "Degree", "Department", "Session",
+               "Folder / File", "Synopsis", "Semi-Final Thesis",
+               "Final Thesis", "COE Date", "Status", "Comments (Missing)"]
+    widths = [8 * mm, 28 * mm, 23 * mm, 24 * mm, 27 * mm, 15 * mm, 17 * mm,
+              23 * mm, 23 * mm, 23 * mm, 17 * mm, 20 * mm, 31 * mm]
     data = [[Paragraph(h, head_cell) for h in headers]]
-    for s in students:
+    for i, s in enumerate(students, start=1):
+        dept_disp = (s.get("department")
+                     or dept_from_degree(s.get("degree")) or "—")
         data.append([
-            Paragraph(s.get("name") or "—", cell),
-            Paragraph(s.get("reg_no") or "—", cell),
-            Paragraph(s.get("gender") or "—", cell),
-            Paragraph(s.get("degree") or "—", cell),
-            Paragraph(s.get("session") or "—", cell),
-            Paragraph(s.get("folder_file") or "—", cell),
-            Paragraph((s.get("synopsis") or "—") + (
-                "<br/>" + fmt_stamp(s.get("synopsis_at"))
-                if s.get("synopsis_at") else ""), cell),
-            Paragraph((s.get("semi_final_thesis") or "—") + (
-                "<br/>" + fmt_stamp(s.get("semi_final_thesis_at"))
-                if s.get("semi_final_thesis_at") else ""), cell),
-            Paragraph((s.get("final_thesis") or "—") + (
-                "<br/>" + fmt_stamp(s.get("final_thesis_at"))
-                if s.get("final_thesis_at") else ""), cell),
-            Paragraph(fmt_coe(s.get("thesis_forward_coe")), cell),
-            Paragraph(s.get("status") or "—", cell),
-            Paragraph(s.get("comments_missing") or "—", cell),
+            Paragraph(str(i), cell),
+            Paragraph(_esc(s.get("name") or "—"), cell_b),
+            Paragraph(_esc(s.get("reg_no") or "—"), cell),
+            Paragraph(_esc(s.get("degree") or "—"), cell),
+            Paragraph(_esc(dept_disp), cell),
+            Paragraph(_esc(s.get("session") or "—"), cell),
+            folder_cell(s.get("folder_file")),
+            sub_cell(s.get("synopsis"), s.get("synopsis_at")),
+            sub_cell(s.get("semi_final_thesis"),
+                     s.get("semi_final_thesis_at")),
+            sub_cell(s.get("final_thesis"), s.get("final_thesis_at")),
+            Paragraph(_esc(fmt_coe(s.get("thesis_forward_coe"))), cell),
+            Paragraph(f"<b>{_esc(s.get('status') or '—')}</b>", cell),
+            Paragraph(_esc(s.get("comments_missing") or "—"), cell),
         ])
     tbl = Table(data, colWidths=widths, repeatRows=1)
     tbl.setStyle(TableStyle([
-        ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#2d3290")),
+        ("BACKGROUND", (0, 0), (-1, 0), NAVY),
         ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
-        ("FONTSIZE", (0, 0), (-1, -1), 7),
-        ("ALIGN", (0, 0), (-1, 0), "CENTER"),
         ("VALIGN", (0, 0), (-1, -1), "TOP"),
-        ("GRID", (0, 0), (-1, -1), 0.4, colors.HexColor("#d5d9e8")),
-        ("ROWBACKGROUNDS", (0, 1), (-1, -1),
-         [colors.white, colors.HexColor("#f4f5fb")]),
+        ("GRID", (0, 0), (-1, -1), 0.4, LINE),
+        ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, ZEBRA]),
         ("TOPPADDING", (0, 0), (-1, -1), 3),
         ("BOTTOMPADDING", (0, 0), (-1, -1), 3),
-        ("LEFTPADDING", (0, 0), (-1, -1), 4),
-        ("RIGHTPADDING", (0, 0), (-1, -1), 4),
+        ("LEFTPADDING", (0, 0), (-1, -1), 3.5),
+        ("RIGHTPADDING", (0, 0), (-1, -1), 3.5),
     ]))
     story.append(tbl)
-    story.append(Spacer(1, 8))
+    if not students:
+        story.append(Spacer(1, 4 * mm))
+        story.append(Paragraph("No students match the selected scope.",
+                               meta_style))
+    story.append(Spacer(1, 3 * mm))
     story.append(Paragraph(
-        f"Page <page> &middot; Advanced Studies Office — Student Data Management System",
-        ParagraphStyle("foot", parent=styles["Normal"], fontSize=7,
-                       textColor=colors.HexColor("#667085"),
-                       alignment=1)))
-    doc.build(story)
+        "Note: The date under Synopsis / Semi-Final Thesis / Final Thesis is "
+        "the date and time that document was received by the Directorate of "
+        "Advanced Studies. This record is generated from the DAS Student Data "
+        "Management System and is for official use only.", meta_style))
+    doc.build(story, canvasmaker=NumberedCanvas)
     buf.seek(0)
     resp = Response(buf.getvalue(), mimetype="application/pdf")
     resp.headers["Content-Disposition"] = \
-        "attachment; filename=das_students_export.pdf"
+        f"attachment; filename=Student_Submission_Record_{date_tag}.pdf"
     return resp
 
 
@@ -1424,7 +1675,7 @@ def parse_import_rows(file_storage):
         cm = rec.get("comments_missing", "").strip()
         rec["comments_missing"] = cm if cm else "N/A"
         rec["thesis_forward_coe"] = parse_coe(rec.get("thesis_forward_coe")) or None
-        rec["department"] = None
+        rec["department"] = dept_from_degree(rec.get("degree"))
         # password_hash stays NULL: it is created lazily on the student's
         # first portal login (default password = CNIC digits). Hashing every
         # row up-front would take minutes for large files.
@@ -1444,8 +1695,10 @@ def insert_student_records(db, records, department=None):
     cols = STUDENT_INSERT_COLS
     dep_idx = cols.index("department")
     if department is not None:
-        records = [(rn, rg, tuple(department if j == dep_idx else v
-                                  for j, v in enumerate(vals)))
+        # The explicit department (a department-portal upload approval) only
+        # fills rows whose department could not be derived from the degree.
+        records = [(rn, rg, tuple(department if (j == dep_idx and not v)
+                                  else v for j, v in enumerate(vals)))
                    for rn, rg, vals in records]
     one_ph = ", ".join(["?"] * len(cols))
     one_insert = f"INSERT INTO students ({', '.join(cols)}) VALUES ({one_ph})"
@@ -1748,7 +2001,7 @@ def query_vivas(args):
     where, params = [], []
     dept = (args.get("department") or "").strip()
     if dept:
-        where.append("s.department=?")
+        where.append("REPLACE(LOWER(s.department), 'department of ', '')=REPLACE(LOWER(?), 'department of ', '')")
         params.append(dept)
     degree = (args.get("degree") or "").strip()
     if degree:
@@ -2108,15 +2361,15 @@ def dept_dashboard():
         row = db.fetchone(sql, params)
         return (row["n"] if isinstance(row, dict) else row[0]) if row else 0
     stats = {
-        "students": _n("SELECT COUNT(*) AS n FROM students WHERE department=?",
+        "students": _n("SELECT COUNT(*) AS n FROM students WHERE REPLACE(LOWER(department), 'department of ', '')=REPLACE(LOWER(?), 'department of ', '')",
                        (dept["name"],)),
         "viva_done": _n("SELECT COUNT(*) AS n FROM viva_records v"
                         " JOIN students s ON s.id=v.student_id"
-                        " WHERE s.department=? AND v.result='Pass'",
+                        " WHERE REPLACE(LOWER(s.department), 'department of ', '')=REPLACE(LOWER(?), 'department of ', '') AND v.result='Pass'",
                         (dept["name"],)),
         "viva_pending": _n("SELECT COUNT(*) AS n FROM viva_records v"
                            " JOIN students s ON s.id=v.student_id"
-                           " WHERE s.department=? AND v.result='Pending'",
+                           " WHERE REPLACE(LOWER(s.department), 'department of ', '')=REPLACE(LOWER(?), 'department of ', '') AND v.result='Pending'",
                            (dept["name"],)),
         "uploads_pending": _n("SELECT COUNT(*) AS n FROM dept_uploads"
                               " WHERE department_id=? AND status='pending'",
@@ -2137,7 +2390,7 @@ def dept_students():
     per = 15
     q = (request.args.get("q") or "").strip()
     op = "ILIKE" if USE_PG else "LIKE"
-    where = "department=?"
+    where = "REPLACE(LOWER(department), 'department of ', '')=REPLACE(LOWER(?), 'department of ', '')"
     params = [dept["name"]]
     if q:
         where += f" AND (name {op} ? OR reg_no {op} ?)"
@@ -2169,7 +2422,7 @@ def dept_students_delete_selected():
     ph = ", ".join(["?"] * len(ids))
     # scope to this department's students only
     rows = db.fetchall(
-        f"SELECT id FROM students WHERE department=? AND id IN ({ph})",
+        f"SELECT id FROM students WHERE REPLACE(LOWER(department), 'department of ', '')=REPLACE(LOWER(?), 'department of ', '') AND id IN ({ph})",
         (dept["name"],) + tuple(ids))
     scoped = [r["id"] if isinstance(r, dict) else r[0] for r in rows]
     if not scoped:
@@ -2193,7 +2446,7 @@ def dept_students_delete_all():
     dept = current_dept()
     db = get_db()
     ids = [r["id"] if isinstance(r, dict) else r[0] for r in db.fetchall(
-        "SELECT id FROM students WHERE department=?", (dept["name"],))]
+        "SELECT id FROM students WHERE REPLACE(LOWER(department), 'department of ', '')=REPLACE(LOWER(?), 'department of ', '')", (dept["name"],))]
     if ids:
         ph = ", ".join(["?"] * len(ids))
         db.execute(f"DELETE FROM viva_records WHERE student_id IN ({ph})", ids)
@@ -2213,7 +2466,7 @@ def dept_student_profile(sid):
     shows the uploaded data plus every update made by the DAS office."""
     dept = current_dept()
     s = get_student(sid)
-    if not s or s.get("department") != dept["name"]:
+    if not s or (s.get("department") or "").strip() not in dept_aliases(dept["name"]):
         flash("Student not found.")
         return redirect(url_for("dept_students"))
     s["coe_display"] = fmt_coe(s.get("thesis_forward_coe"))
@@ -2322,7 +2575,7 @@ def dept_viva_calendar():
     vivas = [dict(r) for r in get_db().fetchall(
         "SELECT v.viva_date, s.name, s.reg_no, v.result FROM viva_records v"
         " JOIN students s ON s.id=v.student_id"
-        " WHERE s.department=? AND v.viva_date IS NOT NULL"
+        " WHERE REPLACE(LOWER(s.department), 'department of ', '')=REPLACE(LOWER(?), 'department of ', '') AND v.viva_date IS NOT NULL"
         " AND v.viva_date LIKE ? ORDER BY v.viva_date",
         (dept["name"], f"{year}-{month:02d}%"))]
     by_day = {}
@@ -2338,7 +2591,7 @@ def dept_viva_calendar():
     upcoming = [dict(r) for r in get_db().fetchall(
         "SELECT v.viva_date, s.name, s.reg_no, v.result, v.examiner_name"
         " FROM viva_records v JOIN students s ON s.id=v.student_id"
-        " WHERE s.department=? AND v.viva_date >= ?"
+        " WHERE REPLACE(LOWER(s.department), 'department of ', '')=REPLACE(LOWER(?), 'department of ', '') AND v.viva_date >= ?"
         " ORDER BY v.viva_date LIMIT 10",
         (dept["name"], today.strftime("%Y-%m-%d")))]
     return render_template("dept_viva_calendar.html", uni=UNI_NAME,
@@ -2358,7 +2611,7 @@ def dept_students_export():
     from openpyxl.styles import Font, PatternFill, Alignment
     dept = current_dept()
     students = [dict(r) for r in get_db().fetchall(
-        "SELECT * FROM students WHERE department=? ORDER BY name",
+        "SELECT * FROM students WHERE REPLACE(LOWER(department), 'department of ', '')=REPLACE(LOWER(?), 'department of ', '') ORDER BY name",
         (dept["name"],))]
     wb = Workbook()
     ws = wb.active
@@ -2429,7 +2682,7 @@ def dept_viva_bulk():
         added, skipped = 0, []
         for sid in ids:
             st = db.fetchone(
-                "SELECT * FROM students WHERE id=? AND department=?",
+                "SELECT * FROM students WHERE id=? AND REPLACE(LOWER(department), 'department of ', '')=REPLACE(LOWER(?), 'department of ', '')",
                 (sid, dept["name"]))
             if not st:
                 continue
@@ -2475,7 +2728,7 @@ def dept_viva_bulk():
     students = [dict(r) for r in db.fetchall(
         "SELECT s.id, s.name, s.reg_no, s.degree FROM students s"
         " LEFT JOIN viva_records v ON v.student_id=s.id"
-        " WHERE s.department=? AND v.id IS NULL ORDER BY s.name",
+        " WHERE REPLACE(LOWER(s.department), 'department of ', '')=REPLACE(LOWER(?), 'department of ', '') AND v.id IS NULL ORDER BY s.name",
         (dept["name"],))]
     return render_template("dept_viva_bulk.html", uni=UNI_NAME,
                            title=PORTAL_TITLE, dept=dept, students=students,
@@ -2489,7 +2742,7 @@ def dept_viva_card(vid):
     dept = current_dept()
     row = get_db().fetchone(
         "SELECT v.id FROM viva_records v JOIN students s ON s.id=v.student_id"
-        " WHERE v.id=? AND s.department=?", (vid, dept["name"]))
+        " WHERE v.id=? AND REPLACE(LOWER(s.department), 'department of ', '')=REPLACE(LOWER(?), 'department of ', '')", (vid, dept["name"]))
     if not row:
         flash("Viva record not found.")
         return redirect(url_for("dept_viva"))
@@ -2510,7 +2763,7 @@ def dept_viva_card_pdf(vid):
     dept = current_dept()
     row = get_db().fetchone(
         "SELECT v.id FROM viva_records v JOIN students s ON s.id=v.student_id"
-        " WHERE v.id=? AND s.department=?", (vid, dept["name"]))
+        " WHERE v.id=? AND REPLACE(LOWER(s.department), 'department of ', '')=REPLACE(LOWER(?), 'department of ', '')", (vid, dept["name"]))
     if not row:
         flash("Viva record not found.")
         return redirect(url_for("dept_viva"))
@@ -2571,7 +2824,7 @@ def dept_viva():
         obtained_raw = request.form.get("obtained_marks", "").strip()
         next_viva_date = request.form.get("next_viva_date", "").strip()
         st = db.fetchone(
-            "SELECT * FROM students WHERE id=? AND department=?",
+            "SELECT * FROM students WHERE id=? AND REPLACE(LOWER(department), 'department of ', '')=REPLACE(LOWER(?), 'department of ', '')",
             (sid, dept["name"]))
         if not st or not examiner:
             flash("Select one of your department's students and enter the"
@@ -2626,12 +2879,12 @@ def dept_viva():
         flash("Viva record saved.")
         return redirect(url_for("dept_viva"))
     students = [dict(r) for r in db.fetchall(
-        "SELECT id, name, reg_no FROM students WHERE department=?"
+        "SELECT id, name, reg_no FROM students WHERE REPLACE(LOWER(department), 'department of ', '')=REPLACE(LOWER(?), 'department of ', '')"
         " ORDER BY name", (dept["name"],))]
     vivas = [dict(r) for r in db.fetchall(
         "SELECT v.*, s.name AS student_name, s.reg_no FROM viva_records v"
         " JOIN students s ON s.id=v.student_id"
-        " WHERE s.department=? ORDER BY v.id DESC", (dept["name"],))]
+        " WHERE REPLACE(LOWER(s.department), 'department of ', '')=REPLACE(LOWER(?), 'department of ', '') ORDER BY v.id DESC", (dept["name"],))]
     return render_template("dept_viva.html", uni=UNI_NAME, title=PORTAL_TITLE,
                            dept=dept, students=students, vivas=vivas,
                            results=VIVA_RESULTS)
@@ -2644,7 +2897,7 @@ def dept_viva_delete(vid):
     db = get_db()
     row = db.fetchone(
         "SELECT v.id FROM viva_records v JOIN students s ON s.id=v.student_id"
-        " WHERE v.id=? AND s.department=?", (vid, dept["name"]))
+        " WHERE v.id=? AND REPLACE(LOWER(s.department), 'department of ', '')=REPLACE(LOWER(?), 'department of ', '')", (vid, dept["name"]))
     if row:
         vrow = db.fetchone(
             "SELECT v.student_id, s.name FROM viva_records v"
@@ -2672,7 +2925,7 @@ def dept_viva_edit(vid):
     row = db.fetchone(
         "SELECT v.*, s.name AS student_name, s.reg_no FROM viva_records v"
         " JOIN students s ON s.id=v.student_id"
-        " WHERE v.id=? AND s.department=?", (vid, dept["name"]))
+        " WHERE v.id=? AND REPLACE(LOWER(s.department), 'department of ', '')=REPLACE(LOWER(?), 'department of ', '')", (vid, dept["name"]))
     if not row:
         flash("Viva record not found.")
         return redirect(url_for("dept_viva"))
@@ -2848,8 +3101,8 @@ def admin_student_new():
                 """INSERT INTO students (cnic, name, father_name, reg_no, gender,
                    degree, session, folder_file, comments_missing, synopsis,
                    semi_final_thesis, final_thesis, thesis_forward_coe, status,
-                   password_hash, created_at, updated_at)
-                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                   department, password_hash, created_at, updated_at)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                 (cnic, name, f.get("father_name", "").strip(), reg_no,
                  f.get("gender", "").strip(), f.get("degree", "").strip(),
                  f.get("session", "").strip(),
@@ -2860,6 +3113,7 @@ def admin_student_new():
                  pick(f.get("final_thesis"), RECEIVED_OPTS, "Not Received"),
                  parse_coe(f.get("thesis_forward_coe")) or None,
                  pick(f.get("status"), STATUS_LIST, "Continue"),
+                 dept_from_degree(f.get("degree")),
                  generate_password_hash(cnic), now, now))
             db.commit()
         except Exception as e:
@@ -2946,9 +3200,11 @@ def admin_student_save(sid):
                                      s.get("final_thesis_at"))
         f = dict(f)
         f["folder_file"] = "Completed"
-    dept = (f.get("department") or "").strip()
-    if dept and dept not in set(dept_names()):
-        dept = (s.get("department") or "").strip()  # ignore tampered values
+    dept = dept_from_degree(f.get("degree")) or ""
+    if not dept:
+        dept = (f.get("department") or "").strip()
+        if dept and dept not in set(dept_names()):
+            dept = (s.get("department") or "").strip()  # ignore tampered values
     try:
         db.execute(
             """UPDATE students SET cnic=?, name=?, father_name=?, reg_no=?,
@@ -2977,7 +3233,7 @@ def admin_student_save(sid):
         _dept_name = (_dep_row["department"] if isinstance(_dep_row, dict)
                       else _dep_row[0]) if _dep_row else None
         if _dept_name:
-            _d = db.fetchone("SELECT id FROM departments WHERE name=?",
+            _d = db.fetchone("SELECT id FROM departments WHERE REPLACE(LOWER(name), 'department of ', '')=REPLACE(LOWER(?), 'department of ', '')",
                              (_dept_name,))
             if _d:
                 _did = _d["id"] if isinstance(_d, dict) else _d[0]
@@ -3046,6 +3302,10 @@ def _restore_trash_row(db, trash):
     payload = _json.loads(trash["data_json"])
     student = _row_unjsonable(payload.get("student") or {})
     orig_id = student.pop("id", None)
+    if not (student.get("department") or "").strip():
+        _derived = dept_from_degree(student.get("degree"))
+        if _derived:
+            student["department"] = _derived
     if orig_id is not None:
         exists = db.fetchone("SELECT id FROM students WHERE id=?", (orig_id,))
     else:
