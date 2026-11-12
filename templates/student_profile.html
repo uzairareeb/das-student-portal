@@ -137,6 +137,7 @@
         <label class="f-label" for="department">Department</label>
         <select class="no-icon" id="department" name="department">
           <option value="">— Unassigned —</option>
+          {% if s.department and s.department not in departments %}<option value="{{ s.department }}" selected>{{ s.department }}</option>{% endif %}
           {% for v in departments %}<option value="{{ v }}" {% if s.department==v %}selected{% endif %}>{{ v }}</option>{% endfor %}
         </select>
       </div>

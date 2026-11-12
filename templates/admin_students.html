@@ -338,6 +338,7 @@
     var modal = document.getElementById('editModal');
     var form = document.getElementById('editForm');
     function setVal(id, v) { var el = document.getElementById(id); if (el) el.value = v || ''; }
+    function setDept(id, v) { var el = document.getElementById(id); if (!el) return; v = v || ''; if (v && !Array.prototype.some.call(el.options, function (o) { return o.value === v; })) { var op = document.createElement('option'); op.value = v; op.textContent = v; el.appendChild(op); } el.value = v; }
     function openModal() {
       modal.hidden = false;
       document.body.style.overflow = 'hidden';
@@ -363,7 +364,7 @@
           setVal('e_gender', d.gender);
           setVal('e_degree', d.degree);
           setVal('e_session', d.session);
-          setVal('e_department', d.department);
+          setDept('e_department', d.department);
           setVal('e_status', d.status);
           setVal('e_folder_file', d.folder_file);
           setVal('e_comments_missing', d.comments_missing);
