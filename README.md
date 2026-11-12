@@ -87,3 +87,5 @@ Excel (.xlsx). Column headers are matched flexibly ("Registration No.", "Reg No"
 - `/student` — student login.
 
 Department names are auto-derived from the degree (e.g. MPhil Zoology -> Department of Zoology) across add/edit/import/restore, and the student-list PDF export generates the official synopsis & thesis submission record.
+
+<!-- deploy trigger: reports catalogue (fe01e982) -->
