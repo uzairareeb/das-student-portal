@@ -118,8 +118,8 @@
           <tr>
             <th class="cb"><input type="checkbox" id="selAll" title="Select all on this page"></th>
             <th><a class="th-sort" href="{{ sort_url('name') }}">Name {% if sort == 'name' %}<span class="arr">{{ '▼' if direction == 'desc' else '▲' }}</span>{% endif %}</a></th><th><a class="th-sort" href="{{ sort_url('reg_no') }}">Reg.No {% if sort == 'reg_no' %}<span class="arr">{{ '▼' if direction == 'desc' else '▲' }}</span>{% endif %}</a></th><th>Degree</th>
-            <th>Folder/File</th><th>Synopsis</th><th>Synopsis Received</th>
-            <th>Semi-Final</th><th>Final Thesis</th><th>Thesis Received Dates</th>
+            <th>Submission Progress</th><th>Synopsis Received</th>
+            <th>Thesis Received Dates</th>
             <th>Thesis Forward (COE)</th>
             <th><a class="th-sort" href="{{ sort_url('status') }}">Status {% if sort == 'status' %}<span class="arr">{{ '▼' if direction == 'desc' else '▲' }}</span>{% endif %}</a></th><th></th>
           </tr>
@@ -131,11 +131,16 @@
             <td><span class="row-avatar">{{ s.name[0] if s.name else '?' }}</span><span class="row-name">{{ s.name }}</span></td>
             <td>{{ s.reg_no }}</td>
             <td class="degree-cell">{{ s.degree or '—' }}</td>
-            <td class="{% if s.folder_file == 'Completed' %}yn-ok{% else %}yn-no{% endif %}">{{ 'Completed' if s.folder_file == 'Completed' else 'Not Completed' }}</td>
-            <td class="{% if s.synopsis == 'Received' %}yn-ok{% else %}yn-no{% endif %}">{{ 'Received' if s.synopsis == 'Received' else 'Not Received' }}</td>
+            {% set steps = [('File', s.folder_file == 'Completed'), ('Synopsis', s.synopsis == 'Received'), ('Semi-Final', s.semi_final_thesis == 'Received'), ('Final', s.final_thesis == 'Received')] %}
+            {% set done_count = steps | map(attribute=1) | sum %}
+            {% set pending_names = {'File': 'Folder/File', 'Synopsis': 'Synopsis', 'Semi-Final': 'Semi-Final', 'Final': 'Final Thesis'} %}
+            {% set ns = namespace(pending='') %}
+            {% for lab, ok in steps %}{% if not ok and not ns.pending %}{% set ns.pending = lab %}{% endif %}{% endfor %}
+            <td class="prog-cell">
+              <div class="prog-steps">{% for lab, ok in steps %}<span class="pstep {{ 'done' if ok else 'todo' }}"><span class="pdot">{{ '✓' if ok else '·' }}</span><span class="plab">{{ lab }}</span></span>{% if not loop.last %}<span class="pconn{{ ' done' if ok and steps[loop.index][1] }}"></span>{% endif %}{% endfor %}</div>
+              <div class="prog-cap"><b>{{ done_count }} of 4 received</b> <span>· {% if done_count == 4 %}Complete{% elif done_count == 0 %}Nothing submitted yet{% else %}{{ pending_names[ns.pending] }} pending{% endif %}</span></div>
+            </td>
             <td class="dates-cell">{{ s.syn_at_disp }}</td>
-            <td class="{% if s.semi_final_thesis == 'Received' %}yn-ok{% else %}yn-no{% endif %}">{{ 'Received' if s.semi_final_thesis == 'Received' else 'Not Received' }}</td>
-            <td class="{% if s.final_thesis == 'Received' %}yn-ok{% else %}yn-no{% endif %}">{{ 'Received' if s.final_thesis == 'Received' else 'Not Received' }}</td>
             <td class="dates-cell">
               <div><span>Semi:</span> {{ s.semi_at_disp }}</div>
               <div><span>Final:</span> {{ s.final_at_disp }}</div>
@@ -415,10 +420,30 @@
         return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[m];
       });
     }
-    function ynTd(v, yesText, noText) {
-      return v === yesText
-        ? '<td class="yn-ok">' + yesText + '</td>'
-        : '<td class="yn-no">' + noText + '</td>';
+    function progTd(s) {
+      var steps = [
+        ['File', s.folder_file === 'Completed', 'Folder/File'],
+        ['Synopsis', s.synopsis === 'Received', 'Synopsis'],
+        ['Semi-Final', s.semi_final_thesis === 'Received', 'Semi-Final'],
+        ['Final', s.final_thesis === 'Received', 'Final Thesis']
+      ];
+      var done = 0, pending = '';
+      steps.forEach(function (st) {
+        if (st[1]) { done++; } else if (!pending) { pending = st[2]; }
+      });
+      var html = '<td class="prog-cell"><div class="prog-steps">';
+      steps.forEach(function (st, i) {
+        html += '<span class="pstep ' + (st[1] ? 'done' : 'todo') + '"><span class="pdot">'
+          + (st[1] ? '\u2713' : '\u00B7') + '</span><span class="plab">' + st[0] + '</span></span>';
+        if (i < 3) {
+          html += '<span class="pconn' + ((st[1] && steps[i + 1][1]) ? ' done' : '') + '"></span>';
+        }
+      });
+      var cap = done === 4 ? 'Complete'
+        : (done === 0 ? 'Nothing submitted yet' : pending + ' pending');
+      html += '</div><div class="prog-cap"><b>' + done + ' of 4 received</b> <span>\u00B7 '
+        + cap + '</span></div></td>';
+      return html;
     }
     function statusChip(st, pill) {
       var cls = pill === 'q' ? 'sc-ok' : (pill === 'warn' ? 'sc-warn' : 'sc-bad');
@@ -430,11 +455,8 @@
         + '<td><span class="row-avatar">' + esc(s.name.charAt(0) || '?') + '</span><span class="row-name">' + esc(s.name) + '</span></td>'
         + '<td>' + esc(s.reg_no) + '</td>'
         + '<td class="degree-cell">' + esc(s.degree || '\u2014') + '</td>'
-        + ynTd(s.folder_file, 'Completed', 'Not Completed')
-        + ynTd(s.synopsis, 'Received', 'Not Received')
+        + progTd(s)
         + '<td class="dates-cell">' + esc(s.syn_at) + '</td>'
-        + ynTd(s.semi_final_thesis, 'Received', 'Not Received')
-        + ynTd(s.final_thesis, 'Received', 'Not Received')
         + '<td class="dates-cell"><div><span>Semi:</span> ' + esc(s.semi_at) +
           '</div><div><span>Final:</span> ' + esc(s.final_at) + '</div></td>'
         + '<td>' + esc(s.coe_display) + '</td>'
@@ -467,7 +489,7 @@
           searchMode = true;
           tbody.innerHTML = d.students.length
             ? d.students.map(rowHTML).join('')
-            : '<tr><td colspan="13" style="text-align:center;padding:26px;color:var(--muted)">No students match &quot;' + esc(v) + '&quot;.</td></tr>';
+            : '<tr><td colspan="10" style="text-align:center;padding:26px;color:var(--muted)">No students match &quot;' + esc(v) + '&quot;.</td></tr>';
           if (pagination) pagination.style.display = 'none';
           if (countLine) countLine.textContent = d.total + ' live result(s) for "' + v + '"';
           if (rangeText) rangeText.textContent = d.total + ' result(s) for "' + v + '"';
