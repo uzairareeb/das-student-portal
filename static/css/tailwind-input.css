@@ -443,35 +443,42 @@
   .pager-perpage { @apply flex items-center gap-2 text-[13.5px] font-semibold text-muted; }
   .per-page-sel { @apply h-9 w-auto rounded-lg border-[1.5px] border-line bg-white px-2.5 py-1 text-[13.5px] font-semibold text-ink; }
 
-  /* ---------- admin login: white page, diagonal purple geometric panel ---------- */
-  .ref2-page { @apply flex min-h-screen items-center justify-center bg-white p-4 font-sans text-ink sm:p-6; }
-  .ref2-card { @apply relative flex w-full max-w-[1120px] flex-col overflow-hidden rounded-[20px] bg-white shadow-[0_24px_60px_-12px_rgba(23,54,93,0.28)] lg:min-h-[620px] lg:flex-row; animation: loginIn .45s ease both; }
-  .ref2-left { @apply relative z-10 flex flex-1 items-center px-8 py-12 sm:px-12 lg:py-14; }
-  .ref2-form { @apply w-full max-w-[420px]; animation: loginUp .5s ease both; }
-  .ref2-form h2 { @apply text-[30px] font-extrabold text-[#1F2937]; }
-  .ref2-sub { @apply mt-1 mb-7 text-[13px] text-muted; }
-  .ref2-input { @apply w-full rounded-[10px] border border-[#E5E7EB] bg-white py-4 pr-12 pl-11 text-[15px] outline-none transition placeholder:text-slate-400 focus:border-primary focus:ring-4 focus:ring-blue-100; }
-  .ref2-pw { @apply relative mb-4; }
-  .ref2-input { @apply mb-0; }
-  .ref2-lock { @apply pointer-events-none absolute top-1/2 left-3.5 h-5 w-5 -translate-y-1/2 text-slate-400; }
-  .ref2-show { @apply absolute top-1/2 right-2 -translate-y-1/2 cursor-pointer rounded-md p-1.5 text-slate-500 hover:bg-slate-100 hover:text-primary; }
-  .ref2-show svg { @apply h-5 w-5; }
-  .ref2-row { @apply mt-1 mb-6 flex items-center justify-between text-[13px]; }
-  .ref2-remember { @apply flex cursor-pointer items-center gap-2 font-medium text-slate-600; }
-  .ref2-remember input { @apply h-4 w-4 accent-[#1769E8]; }
-  .ref2-home { @apply font-semibold text-primary hover:text-navy; }
-  .ref2-submit { @apply w-full cursor-pointer rounded-[10px] py-4 text-[15px] font-bold tracking-wide text-white transition hover:opacity-90 disabled:cursor-wait disabled:opacity-70; background: linear-gradient(90deg, #1769E8 0%, #0B5ED7 100%); }
-  .ref2-note { @apply mt-5 text-center text-xs text-muted; }
-  .ref2-right { @apply relative order-first h-[240px] overflow-hidden lg:order-none lg:absolute lg:inset-0 lg:h-auto; background: linear-gradient(140deg, #17365D 0%, #1769E8 45%, #2563EB 75%, #38BDF8 100%); clip-path: polygon(0 0, 100% 0, 100% 100%, 0 84%); }
-  @media (min-width: 1024px) {
-    .ref2-right { clip-path: polygon(44% 0, 100% 0, 100% 100%, 64% 100%); }
-  }
-  .ref2-poly { @apply pointer-events-none absolute inset-0 h-full w-full; }
-  .ref2-welcome { @apply absolute inset-0 flex flex-col items-center justify-center px-6 text-center text-white lg:inset-auto lg:top-1/2 lg:right-12 lg:w-[340px] lg:-translate-y-1/2 lg:px-0; }
-  .ref2-logo { @apply mb-4 flex h-16 w-16 items-center justify-center overflow-hidden rounded-full bg-white p-1 shadow-lg ring-4 ring-white/25 lg:mb-5 lg:h-32 lg:w-32; }
-  .ref2-logo img { @apply h-full w-full rounded-full object-cover; }
-  .ref2-welcome h1 { @apply text-[30px] leading-tight font-extrabold lg:text-[40px]; }
-  .ref2-welcome p { @apply mt-3 hidden text-[12.5px] leading-relaxed text-blue-100 sm:block lg:text-[13.5px]; }
+  /* ---------- admin login: split welcome panel (Diprella-style, blue theme) ---------- */
+  @keyframes loginIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+  @keyframes loginUp { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
+  .dip-page { @apply relative flex min-h-screen items-center justify-center overflow-hidden bg-[#f2f7fd] p-4 font-sans text-ink sm:p-6; }
+  .dip-tri { @apply pointer-events-none absolute top-0 right-0 h-[300px] w-[300px] bg-[#38bdf8] opacity-80; clip-path: polygon(100% 0, 0 0, 100% 100%); }
+  .dip-circle-lg { @apply pointer-events-none absolute -bottom-[190px] -left-[130px] h-[430px] w-[430px] rounded-full bg-[#dbeafe]; }
+  .dip-circle-sm { @apply pointer-events-none absolute -bottom-[70px] left-[110px] h-[190px] w-[190px] rounded-full bg-[#38bdf8] opacity-50; }
+  .dip-card { @apply relative z-10 flex w-full max-w-[980px] flex-col overflow-hidden rounded-[16px] bg-white shadow-[0_30px_70px_-18px_rgba(23,54,93,0.35)] lg:min-h-[560px] lg:flex-row; animation: loginIn .45s ease both; }
+  .dip-panel { @apply relative flex w-full flex-col overflow-hidden px-9 py-8 text-white lg:w-[42%] lg:py-10; background: linear-gradient(155deg, #17365d 0%, #1769e8 58%, #38bdf8 135%); }
+  .dip-deco { @apply pointer-events-none absolute rounded-[6px] bg-white/10; transform: rotate(45deg); }
+  .dip-deco-1 { @apply top-[16%] right-[14%] h-16 w-16; }
+  .dip-deco-2 { @apply bottom-[20%] left-[8%] h-9 w-9 bg-white/15; }
+  .dip-deco-3 { @apply -bottom-[90px] -left-[50px] h-[210px] w-[210px] rounded-full bg-white/10; transform: none; }
+  .dip-brand { @apply relative z-10 flex items-center gap-2.5; }
+  .dip-brand-logo { @apply flex h-9 w-9 items-center justify-center overflow-hidden rounded-full bg-white p-0.5 shadow ring-2 ring-white/40; }
+  .dip-brand-logo img { @apply h-full w-full rounded-full object-cover; }
+  .dip-brand-name { @apply text-[15px] font-bold tracking-[0.18em]; }
+  .dip-panel-mid { @apply relative z-10 my-auto px-1 py-10 text-center; }
+  .dip-panel-mid h1 { @apply text-[32px] leading-tight font-extrabold lg:text-[34px]; }
+  .dip-panel-mid p { @apply mx-auto mt-4 max-w-[290px] text-[13.5px] leading-relaxed text-blue-100; }
+  .dip-outline-btn { @apply mt-8 inline-block rounded-full border-2 border-white/90 px-9 py-2.5 text-[12.5px] font-bold tracking-[0.14em] text-white transition hover:bg-white hover:text-primary; }
+  .dip-form-side { @apply flex flex-1 items-center justify-center px-8 py-10 sm:px-12; }
+  .dip-form { @apply w-full max-w-[330px] text-center; animation: loginUp .5s ease both; }
+  .dip-form h2 { @apply text-[30px] font-extrabold text-primary; }
+  .dip-sub { @apply mt-2.5 mb-6 text-[13px] text-muted; }
+  .dip-pw { @apply relative mb-4 text-left; }
+  .dip-input { @apply w-full rounded-md border-0 bg-[#f2f7fd] py-3.5 pr-12 pl-11 text-[14.5px] outline-none transition placeholder:text-slate-400 focus:bg-[#eaf2ff] focus:ring-2 focus:ring-primary/60; }
+  .dip-lock { @apply pointer-events-none absolute top-1/2 left-3.5 h-5 w-5 -translate-y-1/2 text-slate-400; }
+  .dip-show { @apply absolute top-1/2 right-2 -translate-y-1/2 cursor-pointer rounded-md p-1.5 text-slate-500 hover:bg-white hover:text-primary; }
+  .dip-show svg { @apply h-5 w-5; }
+  .dip-row { @apply mb-6 flex items-center justify-start text-[13px]; }
+  .dip-remember { @apply flex cursor-pointer items-center gap-2 font-medium text-slate-600; }
+  .dip-remember input { @apply h-4 w-4 accent-[#1769E8]; }
+  .dip-submit { @apply inline-block min-w-[190px] cursor-pointer rounded-full bg-primary px-10 py-3.5 text-[13.5px] font-bold tracking-[0.14em] text-white shadow-[0_10px_22px_-8px_rgba(23,105,232,0.65)] transition hover:bg-navy disabled:cursor-wait disabled:opacity-70; }
+  .dip-note { @apply mt-7 text-xs text-muted; }
+  .dip-office { @apply mt-1.5 text-xs font-semibold text-slate-500; }
   /* ---------- list table: tick/cross + legend + status chips ---------- */
   .status-chip { @apply inline-flex items-center gap-1.5 rounded-full border px-3 py-[5px] text-xs font-bold whitespace-nowrap; }
   .status-chip .dot { @apply h-2 w-2 shrink-0 rounded-full; }
