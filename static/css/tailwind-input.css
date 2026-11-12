@@ -219,7 +219,7 @@
   .sched-notice { @apply mb-4 rounded-[10px] border border-line bg-[#eaf2ff] px-4 py-3 text-sm text-slate-700; }
   .sched-info { @apply mb-5 rounded-xl border border-line bg-white p-5 shadow-sm; }
   .si-head { @apply flex flex-wrap items-center gap-3.5; }
-  .si-icon { @apply flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-white; background: linear-gradient(135deg, #1769e8, #38bdf8); }
+  .si-icon { @apply flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-primary text-white; }
   .si-icon svg { @apply h-[22px] w-[22px]; }
   .si-head h3 { @apply text-[17px] font-extrabold text-navy; }
   .si-head p { @apply mt-0.5 text-[13px] text-muted; }
@@ -229,9 +229,8 @@
   .info-tile .it-label { @apply text-[11px] font-bold tracking-wider text-muted uppercase; }
   .info-tile .it-value { @apply mt-1 text-[15px] font-extrabold text-navy; }
   .sched-table { @apply min-w-[960px]; }
-  .sched-table thead th { @apply text-[13px] normal-case tracking-normal text-white; background: linear-gradient(90deg, #1769e8, #38bdf8); }
-  .sched-table td { @apply px-3.5 py-4 align-middle whitespace-normal; }
-  .sched-table tbody tr:nth-child(even) { background: #f8fbff; }
+  .sched-table thead th { @apply border-b-2 border-line bg-[#f7f9fc] text-xs font-bold tracking-wider text-slate-700 uppercase; }
+  .sched-table td { @apply px-3.5 py-3.5 align-middle whitespace-normal; }
   .sched-table tbody tr.shifted td:first-child { box-shadow: inset 3px 0 0 #1769e8; }
   .sched-table td.num { @apply w-10 text-center font-bold text-muted; }
   .sched-table td.doc { @apply min-w-[170px] text-[15px] font-bold text-navy; }

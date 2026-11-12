@@ -55,8 +55,6 @@
     --text-sm--line-height: calc(1.25 / 0.875);
     --text-base: 1rem;
     --text-base--line-height: calc(1.5 / 1);
-    --text-lg: 1.125rem;
-    --text-lg--line-height: calc(1.75 / 1.125);
     --text-xl: 1.25rem;
     --text-xl--line-height: calc(1.75 / 1.25);
     --text-2xl: 1.5rem;
@@ -1783,8 +1781,8 @@
     align-items: center;
     justify-content: center;
     border-radius: var(--radius-xl);
+    background-color: var(--color-primary);
     color: var(--color-white);
-    background: linear-gradient(135deg, #1769e8, #38bdf8);
   }
   .si-icon svg {
     height: 22px;
@@ -1850,21 +1848,24 @@
     min-width: 960px;
   }
   .sched-table thead th {
-    font-size: 13px;
-    --tw-tracking: var(--tracking-normal);
-    letter-spacing: var(--tracking-normal);
-    color: var(--color-white);
-    text-transform: none;
-    background: linear-gradient(90deg, #1769e8, #38bdf8);
+    border-bottom-style: var(--tw-border-style);
+    border-bottom-width: 2px;
+    border-color: var(--color-line);
+    background-color: #f7f9fc;
+    font-size: var(--text-xs);
+    line-height: var(--tw-leading, var(--text-xs--line-height));
+    --tw-font-weight: var(--font-weight-bold);
+    font-weight: var(--font-weight-bold);
+    --tw-tracking: var(--tracking-wider);
+    letter-spacing: var(--tracking-wider);
+    color: var(--color-slate-700);
+    text-transform: uppercase;
   }
   .sched-table td {
     padding-inline: calc(var(--spacing) * 3.5);
-    padding-block: calc(var(--spacing) * 4);
+    padding-block: calc(var(--spacing) * 3.5);
     vertical-align: middle;
     white-space: normal;
-  }
-  .sched-table tbody tr:nth-child(even) {
-    background: #f8fbff;
   }
   .sched-table tbody tr.shifted td:first-child {
     box-shadow: inset 3px 0 0 #1769e8;
