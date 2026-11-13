@@ -104,8 +104,8 @@
         <label><input type="checkbox" data-col-toggle="degree"> Degree</label>
         <label><input type="checkbox" data-col-toggle="progress"> Submission Progress</label>
         <label><input type="checkbox" data-col-toggle="syndates"> Synopsis Received</label>
-        <label><input type="checkbox" data-col-toggle="thesisdates"> Thesis Received Dates</label>
-        <label><input type="checkbox" data-col-toggle="coe"> Thesis Forward (COE)</label>
+        <label><input type="checkbox" data-col-toggle="semidates"> Semi-Final Thesis Received</label>
+        <label><input type="checkbox" data-col-toggle="finaldates"> Final Thesis Received</label>
         <label><input type="checkbox" data-col-toggle="status"> Status</label>
         <button type="button" class="cols-reset" id="colsReset">Show all columns</button>
       </span>
@@ -140,8 +140,8 @@
             <th class="cb"><input type="checkbox" id="selAll" title="Select all on this page"></th>
             <th><a class="th-sort" href="{{ sort_url('name') }}">Name {% if sort == 'name' %}<span class="arr">{{ '▼' if direction == 'desc' else '▲' }}</span>{% endif %}</a></th><th data-col="degree">Degree</th>
             <th data-col="progress">Submission Progress</th><th data-col="syndates">Synopsis Received</th>
-            <th data-col="thesisdates">Thesis Received Dates</th>
-            <th data-col="coe">Thesis Forward (COE)</th>
+            <th data-col="semidates">Semi-Final Thesis Received</th>
+            <th data-col="finaldates">Final Thesis Received</th>
             <th data-col="status"><a class="th-sort" href="{{ sort_url('status') }}">Status {% if sort == 'status' %}<span class="arr">{{ '▼' if direction == 'desc' else '▲' }}</span>{% endif %}</a></th><th></th>
           </tr>
         </thead>
@@ -158,14 +158,11 @@
             {% for lab, ok in steps %}{% if not ok and not ns.pending %}{% set ns.pending = lab %}{% endif %}{% endfor %}
             <td class="prog-cell" data-col="progress">
               {% set pct = done_count * 25 %}
-              <div class="ring-cell"><span class="ring"><svg width="46" height="46" viewBox="0 0 36 36"><circle cx="18" cy="18" r="15.9" fill="none" stroke="#e5eaf2" stroke-width="3.4"/><circle cx="18" cy="18" r="15.9" fill="none" stroke="{{ '#059669' if done_count == 4 else '#1769e8' }}" stroke-width="3.4" stroke-linecap="round" stroke-dasharray="{{ pct }} 100"/></svg><span class="pct">{{ pct }}%</span></span><span class="ring-cap"><b>{{ done_count }} of 4 received</b><span>{% if done_count == 4 %}Complete{% elif done_count == 0 %}Nothing submitted yet{% else %}{{ pending_names[ns.pending] }} pending{% endif %}</span></span></div>
+              <div class="ring-cell"><span class="ring"><svg width="46" height="46" viewBox="0 0 36 36"><circle cx="18" cy="18" r="15.9" fill="none" stroke="{{ '#059669' if done_count == 4 else '#1769e8' }}" stroke-width="3.4" stroke-linecap="round" stroke-dasharray="{{ pct }} 100"/></svg><span class="pct">{{ pct }}%</span></span><span class="ring-cap"><b>{{ done_count }} of 4 received</b><span>{% if done_count == 4 %}Complete{% elif done_count == 0 %}Nothing submitted yet{% else %}{{ pending_names[ns.pending] }} pending{% endif %}</span></span></div>
             </td>
-            <td class="dates-cell" data-col="syndates">{{ s.syn_at_disp }}</td>
-            <td class="dates-cell" data-col="thesisdates">
-              <div><span>Semi:</span> {{ s.semi_at_disp }}</div>
-              <div><span>Final:</span> {{ s.final_at_disp }}</div>
-            </td>
-            <td data-col="coe">{{ s.coe_display }}</td>
+            <td class="dates-cell" data-col="syndates"><div class="dt-stack"><span class="dt-date">{{ s.syn_date }}</span>{% if s.syn_time %}<span class="dt-time">{{ s.syn_time }}</span>{% endif %}</div></td>
+            <td class="dates-cell" data-col="semidates"><div class="dt-stack"><span class="dt-date">{{ s.semi_date }}</span>{% if s.semi_time %}<span class="dt-time">{{ s.semi_time }}</span>{% endif %}</div></td>
+            <td class="dates-cell" data-col="finaldates"><div class="dt-stack"><span class="dt-date">{{ s.final_date }}</span>{% if s.final_time %}<span class="dt-time">{{ s.final_time }}</span>{% endif %}</div></td>
             <td data-col="status">
               {% if s.status in ['Continue', 'Viva Done', 'Pass Out', 'Sent to COE'] %}<span class="status-plain sp-ok"><span class="dot"></span>{{ s.status }}</span>
               {% elif s.status in ['Viva Pending', 'Defense Pending'] %}<span class="status-plain sp-warn"><span class="dot"></span>{{ s.status }}</span>
@@ -456,7 +453,7 @@
       var cap = done === 4 ? 'Complete'
         : (done === 0 ? 'Nothing submitted yet' : pending + ' pending');
       return '<td class="prog-cell" data-col="progress"><div class="ring-cell"><span class="ring">'
-        + '<svg width="46" height="46" viewBox="0 0 36 36"><circle cx="18" cy="18" r="15.9" fill="none" stroke="#e5eaf2" stroke-width="3.4"/>'
+        + '<svg width="46" height="46" viewBox="0 0 36 36">'
         + '<circle cx="18" cy="18" r="15.9" fill="none" stroke="' + color + '" stroke-width="3.4" stroke-linecap="round" stroke-dasharray="' + pct + ' 100"/></svg>'
         + '<span class="pct">' + pct + '%</span></span>'
         + '<span class="ring-cap"><b>' + done + ' of 4 received</b><span>' + cap + '</span></span></div></td>';
@@ -471,10 +468,9 @@
         + '<td><div class="name-cell"><span class="row-avatar">' + esc(s.name.charAt(0) || '?') + '</span><span class="name-stack"><span class="row-name">' + esc(s.name) + '</span><span class="name-sub" data-col="reg">' + esc(s.reg_no) + '</span></span></div></td>'
         + '<td class="degree-cell" data-col="degree">' + esc(s.degree || '\u2014') + '</td>'
         + progTd(s)
-        + '<td class="dates-cell" data-col="syndates">' + esc(s.syn_at) + '</td>'
-        + '<td class="dates-cell" data-col="thesisdates"><div><span>Semi:</span> ' + esc(s.semi_at) +
-          '</div><div><span>Final:</span> ' + esc(s.final_at) + '</div></td>'
-        + '<td data-col="coe">' + esc(s.coe_display) + '</td>'
+        + '<td class="dates-cell" data-col="syndates"><div class="dt-stack"><span class="dt-date">' + esc(s.syn_date) + '</span>' + (s.syn_time ? '<span class="dt-time">' + esc(s.syn_time) + '</span>' : '') + '</div></td>'
+        + '<td class="dates-cell" data-col="semidates"><div class="dt-stack"><span class="dt-date">' + esc(s.semi_date) + '</span>' + (s.semi_time ? '<span class="dt-time">' + esc(s.semi_time) + '</span>' : '') + '</div></td>'
+        + '<td class="dates-cell" data-col="finaldates"><div class="dt-stack"><span class="dt-date">' + esc(s.final_date) + '</span>' + (s.final_time ? '<span class="dt-time">' + esc(s.final_time) + '</span>' : '') + '</div></td>'
         + '<td data-col="status">' + statusChip(s.status, s.pill) + '</td>'
         + '<td><button type="button" class="btn ghost sm profile-btn" data-sid="' + s.id + '">Profile</button></td>'
         + '</tr>';
@@ -613,7 +609,7 @@
     }
     /* ---- Columns show/hide + compact density (remembered in this browser) ---- */
     var listTable = document.querySelector('.wide-table');
-    var COL_KEYS = ['reg', 'degree', 'progress', 'syndates', 'thesisdates', 'coe', 'status'];
+    var COL_KEYS = ['reg', 'degree', 'progress', 'syndates', 'semidates', 'finaldates', 'status'];
     function hiddenCols() {
       try { return JSON.parse(localStorage.getItem('das-cols-hidden')) || []; }
       catch (e) { return []; }

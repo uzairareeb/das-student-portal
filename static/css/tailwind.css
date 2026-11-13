@@ -2129,6 +2129,7 @@
     line-height: var(--leading-relaxed);
     white-space: nowrap;
     color: var(--color-muted);
+    min-width: 126px;
   }
   .dates-cell span {
     --tw-font-weight: var(--font-weight-bold);
@@ -2286,6 +2287,23 @@
     color: #17365d;
     font-size: 13px;
   }
+  .dt-stack {
+    display: flex;
+    flex-direction: column;
+    line-height: 1.35;
+  }
+  .dt-stack .dt-date {
+    font-size: 12.5px;
+    font-weight: 600;
+    color: #17365d;
+    white-space: nowrap;
+  }
+  .dt-stack .dt-time {
+    font-size: 11px;
+    font-weight: 500;
+    color: #94a3b8;
+    white-space: nowrap;
+  }
   .status-plain {
     display: inline-flex;
     align-items: center;
@@ -2424,7 +2442,7 @@
     border-top: 1px solid #eef2f7;
     margin-top: 4px;
   }
-  .wide-table.hide-col-reg [data-col="reg"], .wide-table.hide-col-degree [data-col="degree"], .wide-table.hide-col-progress [data-col="progress"], .wide-table.hide-col-syndates [data-col="syndates"], .wide-table.hide-col-thesisdates [data-col="thesisdates"], .wide-table.hide-col-coe [data-col="coe"], .wide-table.hide-col-status [data-col="status"] {
+  .wide-table.hide-col-reg [data-col="reg"], .wide-table.hide-col-degree [data-col="degree"], .wide-table.hide-col-progress [data-col="progress"], .wide-table.hide-col-syndates [data-col="syndates"], .wide-table.hide-col-semidates [data-col="semidates"], .wide-table.hide-col-finaldates [data-col="finaldates"], .wide-table.hide-col-status [data-col="status"] {
     display: none;
   }
   .cols-wrap {
@@ -2509,6 +2527,12 @@
   }
   table.wide-table.compact .ring-cap b {
     font-size: 12px;
+  }
+  table.wide-table.compact .dt-stack .dt-date {
+    font-size: 11.5px;
+  }
+  table.wide-table.compact .dt-stack .dt-time {
+    font-size: 10px;
   }
   .flash {
     margin-bottom: 18px;

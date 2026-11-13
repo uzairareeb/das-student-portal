@@ -698,6 +698,15 @@ def fmt_stamp(val):
     return datetime.strptime(iso, "%Y-%m-%d %H:%M").strftime("%d %b %Y, %I:%M %p")
 
 
+def fmt_stamp_parts(val):
+    """DB datetime -> ('22 Oct 2026', '09:41 AM') or (em dash, '')."""
+    iso = parse_dt(val)
+    if not iso:
+        return ("\u2014", "")
+    dt = datetime.strptime(iso, "%Y-%m-%d %H:%M")
+    return (dt.strftime("%d %b %Y"), dt.strftime("%I:%M %p"))
+
+
 def dt_local(val):
     """DB datetime -> value for an <input type=datetime-local>."""
     iso = parse_dt(val)
@@ -1200,6 +1209,9 @@ def admin_students():
         s["syn_at_disp"] = fmt_stamp(s.get("synopsis_at"))
         s["semi_at_disp"] = fmt_stamp(s.get("semi_final_thesis_at"))
         s["final_at_disp"] = fmt_stamp(s.get("final_thesis_at"))
+        s["syn_date"], s["syn_time"] = fmt_stamp_parts(s.get("synopsis_at"))
+        s["semi_date"], s["semi_time"] = fmt_stamp_parts(s.get("semi_final_thesis_at"))
+        s["final_date"], s["final_time"] = fmt_stamp_parts(s.get("final_thesis_at"))
     total = count_students({})
     base_args = {k: v for k, v in request.args.items() if k != "page"}
     export_url = url_for("admin_export")
@@ -4632,6 +4644,12 @@ def admin_students_search():
             "syn_at": fmt_stamp(s.get("synopsis_at")),
             "semi_at": fmt_stamp(s.get("semi_final_thesis_at")),
             "final_at": fmt_stamp(s.get("final_thesis_at")),
+            "syn_date": fmt_stamp_parts(s.get("synopsis_at"))[0],
+            "syn_time": fmt_stamp_parts(s.get("synopsis_at"))[1],
+            "semi_date": fmt_stamp_parts(s.get("semi_final_thesis_at"))[0],
+            "semi_time": fmt_stamp_parts(s.get("semi_final_thesis_at"))[1],
+            "final_date": fmt_stamp_parts(s.get("final_thesis_at"))[0],
+            "final_time": fmt_stamp_parts(s.get("final_thesis_at"))[1],
             "status": st, "pill": status_pill_class(st),
         })
     return {"ok": True, "total": len(rows), "students": out}
