@@ -158,7 +158,7 @@
             {% for lab, ok in steps %}{% if not ok and not ns.pending %}{% set ns.pending = lab %}{% endif %}{% endfor %}
             <td class="prog-cell" data-col="progress">
               {% set pct = done_count * 25 %}
-              <div class="ring-cell"><span class="ring"><svg width="46" height="46" viewBox="0 0 36 36"><circle cx="18" cy="18" r="15.9" fill="none" stroke="{{ '#059669' if done_count == 4 else '#1769e8' }}" stroke-width="3.4" stroke-linecap="round" stroke-dasharray="{{ pct }} 100"/></svg><span class="pct">{{ pct }}%</span></span><span class="ring-cap"><b>{{ done_count }} of 4 received</b><span>{% if done_count == 4 %}Complete{% elif done_count == 0 %}Nothing submitted yet{% else %}{{ pending_names[ns.pending] }} pending{% endif %}</span></span></div>
+              <div class="ring-cell"><span class="progring"><svg width="46" height="46" viewBox="0 0 36 36"><circle cx="18" cy="18" r="15.9" fill="none" stroke="{{ '#059669' if done_count == 4 else '#1769e8' }}" stroke-width="3.4" stroke-linecap="round" stroke-dasharray="{{ pct }} 100"/></svg><span class="pct">{{ pct }}%</span></span><span class="ring-cap"><b>{{ done_count }} of 4 received</b><span>{% if done_count == 4 %}Complete{% elif done_count == 0 %}Nothing submitted yet{% else %}{{ pending_names[ns.pending] }} pending{% endif %}</span></span></div>
             </td>
             <td class="dates-cell" data-col="syndates"><div class="dt-stack"><span class="dt-date">{{ s.syn_date }}</span>{% if s.syn_time %}<span class="dt-time">{{ s.syn_time }}</span>{% endif %}</div></td>
             <td class="dates-cell" data-col="semidates"><div class="dt-stack"><span class="dt-date">{{ s.semi_date }}</span>{% if s.semi_time %}<span class="dt-time">{{ s.semi_time }}</span>{% endif %}</div></td>
@@ -452,7 +452,7 @@
       var color = done === 4 ? '#059669' : '#1769e8';
       var cap = done === 4 ? 'Complete'
         : (done === 0 ? 'Nothing submitted yet' : pending + ' pending');
-      return '<td class="prog-cell" data-col="progress"><div class="ring-cell"><span class="ring">'
+      return '<td class="prog-cell" data-col="progress"><div class="ring-cell"><span class="progring">'
         + '<svg width="46" height="46" viewBox="0 0 36 36">'
         + '<circle cx="18" cy="18" r="15.9" fill="none" stroke="' + color + '" stroke-width="3.4" stroke-linecap="round" stroke-dasharray="' + pct + ' 100"/></svg>'
         + '<span class="pct">' + pct + '%</span></span>'

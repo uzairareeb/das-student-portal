@@ -297,9 +297,9 @@
   .name-stack { display: flex; flex-direction: column; line-height: 1.3; min-width: 0; }
   .name-sub { font-size: 11.5px; color: #94a3b8; font-weight: 500; white-space: nowrap; }
   .ring-cell { display: flex; align-items: center; gap: 12px; }
-  .ring { position: relative; width: 46px; height: 46px; flex: none; display: inline-block; }
-  .ring svg { transform: rotate(-90deg); display: block; }
-  .ring .pct { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 800; color: #17365d; }
+  .progring { position: relative; width: 46px; height: 46px; flex: none; display: inline-block; }
+  .progring svg { transform: rotate(-90deg); display: block; }
+  .progring .pct { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 800; color: #17365d; }
   .ring-cap { display: flex; flex-direction: column; line-height: 1.35; font-size: 12px; color: #94a3b8; white-space: nowrap; }
   .ring-cap b { color: #17365d; font-size: 13px; }
   .dt-stack { display: flex; flex-direction: column; line-height: 1.35; }
@@ -337,8 +337,8 @@
   table.wide-table.compact .pconn { margin-top: 8px; }
   table.wide-table.compact .plab { font-size: 9px; margin-top: 3px; }
   table.wide-table.compact .prog-cap { font-size: 10.5px; margin-top: 4px; }
-  table.wide-table.compact .ring, table.wide-table.compact .ring svg { width: 38px; height: 38px; }
-  table.wide-table.compact .ring .pct { font-size: 10px; }
+  table.wide-table.compact .progring, table.wide-table.compact .progring svg { width: 38px; height: 38px; }
+  table.wide-table.compact .progring .pct { font-size: 10px; }
   table.wide-table.compact .ring-cap { font-size: 11px; }
   table.wide-table.compact .ring-cap b { font-size: 12px; }
   table.wide-table.compact .dt-stack .dt-date { font-size: 11.5px; }

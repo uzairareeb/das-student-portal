@@ -2254,18 +2254,18 @@
     align-items: center;
     gap: 12px;
   }
-  .ring {
+  .progring {
     position: relative;
     width: 46px;
     height: 46px;
     flex: none;
     display: inline-block;
   }
-  .ring svg {
+  .progring svg {
     transform: rotate(-90deg);
     display: block;
   }
-  .ring .pct {
+  .progring .pct {
     position: absolute;
     inset: 0;
     display: flex;
@@ -2515,11 +2515,11 @@
     font-size: 10.5px;
     margin-top: 4px;
   }
-  table.wide-table.compact .ring, table.wide-table.compact .ring svg {
+  table.wide-table.compact .progring, table.wide-table.compact .progring svg {
     width: 38px;
     height: 38px;
   }
-  table.wide-table.compact .ring .pct {
+  table.wide-table.compact .progring .pct {
     font-size: 10px;
   }
   table.wide-table.compact .ring-cap {
