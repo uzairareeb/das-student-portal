@@ -2421,6 +2421,28 @@
     color: #1769e8;
     border-color: #bfd9fb;
   }
+  .row-actions {
+    white-space: nowrap;
+  }
+  .row-actions .qa {
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity .15s ease;
+    margin-left: 6px;
+  }
+  .wide-table tbody tr:hover .row-actions .qa, .wide-table tbody tr:focus-within .row-actions .qa {
+    opacity: 1;
+    pointer-events: auto;
+  }
+  @media (hover: none) {
+    .row-actions .qa {
+      opacity: 1;
+      pointer-events: auto;
+    }
+  }
+  #viva {
+    scroll-margin-top: 90px;
+  }
   table.wide-table.compact td {
     padding-top: 4px;
     padding-bottom: 4px;
