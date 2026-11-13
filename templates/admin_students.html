@@ -172,7 +172,7 @@
               {% elif s.status in ['Viva Pending', 'Defense Pending'] %}<span class="status-plain sp-warn"><span class="dot"></span>{{ s.status }}</span>
               {% else %}<span class="status-plain sp-bad"><span class="dot"></span>{{ s.status }}</span>{% endif %}
             </td>
-            <td class="row-actions"><button type="button" class="btn ghost sm profile-btn" data-sid="{{ s.id }}">Profile</button><a class="btn ghost sm qa" href="{{ url_for('admin_student_profile', sid=s.id) }}">Full Profile</a><a class="btn ghost sm qa" href="{{ url_for('admin_student_profile', sid=s.id) }}#viva">Viva</a></td>
+            <td><button type="button" class="btn ghost sm profile-btn" data-sid="{{ s.id }}">Profile</button></td>
           </tr>
           {% endfor %}
         </tbody>
@@ -482,7 +482,7 @@
           '</div><div><span>Final:</span> ' + esc(s.final_at) + '</div></td>'
         + '<td data-col="coe">' + esc(s.coe_display) + '</td>'
         + '<td data-col="status">' + statusChip(s.status, s.pill) + '</td>'
-        + '<td class="row-actions"><button type="button" class="btn ghost sm profile-btn" data-sid="' + s.id + '">Profile</button><a class="btn ghost sm qa" href="/admin/student/' + s.id + '">Full Profile</a><a class="btn ghost sm qa" href="/admin/student/' + s.id + '#viva">Viva</a></td>'
+        + '<td><button type="button" class="btn ghost sm profile-btn" data-sid="' + s.id + '">Profile</button></td>'
         + '</tr>';
     }
     function restoreList() {
