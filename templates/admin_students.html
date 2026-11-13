@@ -138,7 +138,7 @@
         <thead>
           <tr>
             <th class="cb"><input type="checkbox" id="selAll" title="Select all on this page"></th>
-            <th><a class="th-sort" href="{{ sort_url('name') }}">Name {% if sort == 'name' %}<span class="arr">{{ '▼' if direction == 'desc' else '▲' }}</span>{% endif %}</a></th><th data-col="reg"><a class="th-sort" href="{{ sort_url('reg_no') }}">Reg.No {% if sort == 'reg_no' %}<span class="arr">{{ '▼' if direction == 'desc' else '▲' }}</span>{% endif %}</a></th><th data-col="degree">Degree</th>
+            <th><a class="th-sort" href="{{ sort_url('name') }}">Name {% if sort == 'name' %}<span class="arr">{{ '▼' if direction == 'desc' else '▲' }}</span>{% endif %}</a></th><th data-col="degree">Degree</th>
             <th data-col="progress">Submission Progress</th><th data-col="syndates">Synopsis Received</th>
             <th data-col="thesisdates">Thesis Received Dates</th>
             <th data-col="coe">Thesis Forward (COE)</th>
@@ -149,8 +149,7 @@
           {% for s in students %}
           <tr data-dept="{{ s.department or '' }}">
             <td class="cb"><input type="checkbox" class="selBox" name="sel" value="{{ s.id }}"></td>
-            <td><span class="row-avatar">{{ s.name[0] if s.name else '?' }}</span><span class="row-name">{{ s.name }}</span></td>
-            <td data-col="reg">{{ s.reg_no }}</td>
+            <td><div class="name-cell"><span class="row-avatar">{{ s.name[0] if s.name else '?' }}</span><span class="name-stack"><span class="row-name">{{ s.name }}</span><span class="name-sub" data-col="reg">{{ s.reg_no }}</span></span></div></td>
             <td class="degree-cell" data-col="degree">{{ s.degree or '—' }}</td>
             {% set steps = [('File', s.folder_file == 'Completed'), ('Synopsis', s.synopsis == 'Received'), ('Semi-Final', s.semi_final_thesis == 'Received'), ('Final', s.final_thesis == 'Received')] %}
             {% set done_count = steps | map(attribute=1) | sum %}
@@ -158,8 +157,8 @@
             {% set ns = namespace(pending='') %}
             {% for lab, ok in steps %}{% if not ok and not ns.pending %}{% set ns.pending = lab %}{% endif %}{% endfor %}
             <td class="prog-cell" data-col="progress">
-              <div class="prog-steps">{% for lab, ok in steps %}<span class="pstep {{ 'done' if ok else 'todo' }}"><span class="pdot">{{ '✓' if ok else '·' }}</span><span class="plab">{{ lab }}</span></span>{% if not loop.last %}<span class="pconn{{ ' done' if ok and steps[loop.index][1] }}"></span>{% endif %}{% endfor %}</div>
-              <div class="prog-cap"><b>{{ done_count }} of 4 received</b> <span>· {% if done_count == 4 %}Complete{% elif done_count == 0 %}Nothing submitted yet{% else %}{{ pending_names[ns.pending] }} pending{% endif %}</span></div>
+              {% set pct = done_count * 25 %}
+              <div class="ring-cell"><span class="ring"><svg width="46" height="46" viewBox="0 0 36 36"><circle cx="18" cy="18" r="15.9" fill="none" stroke="#e5eaf2" stroke-width="3.4"/><circle cx="18" cy="18" r="15.9" fill="none" stroke="{{ '#059669' if done_count == 4 else '#1769e8' }}" stroke-width="3.4" stroke-linecap="round" stroke-dasharray="{{ pct }} 100"/></svg><span class="pct">{{ pct }}%</span></span><span class="ring-cap"><b>{{ done_count }} of 4 received</b><span>{% if done_count == 4 %}Complete{% elif done_count == 0 %}Nothing submitted yet{% else %}{{ pending_names[ns.pending] }} pending{% endif %}</span></span></div>
             </td>
             <td class="dates-cell" data-col="syndates">{{ s.syn_at_disp }}</td>
             <td class="dates-cell" data-col="thesisdates">
@@ -452,19 +451,15 @@
       steps.forEach(function (st) {
         if (st[1]) { done++; } else if (!pending) { pending = st[2]; }
       });
-      var html = '<td class="prog-cell" data-col="progress"><div class="prog-steps">';
-      steps.forEach(function (st, i) {
-        html += '<span class="pstep ' + (st[1] ? 'done' : 'todo') + '"><span class="pdot">'
-          + (st[1] ? '\u2713' : '\u00B7') + '</span><span class="plab">' + st[0] + '</span></span>';
-        if (i < 3) {
-          html += '<span class="pconn' + ((st[1] && steps[i + 1][1]) ? ' done' : '') + '"></span>';
-        }
-      });
+      var pct = done * 25;
+      var color = done === 4 ? '#059669' : '#1769e8';
       var cap = done === 4 ? 'Complete'
         : (done === 0 ? 'Nothing submitted yet' : pending + ' pending');
-      html += '</div><div class="prog-cap"><b>' + done + ' of 4 received</b> <span>\u00B7 '
-        + cap + '</span></div></td>';
-      return html;
+      return '<td class="prog-cell" data-col="progress"><div class="ring-cell"><span class="ring">'
+        + '<svg width="46" height="46" viewBox="0 0 36 36"><circle cx="18" cy="18" r="15.9" fill="none" stroke="#e5eaf2" stroke-width="3.4"/>'
+        + '<circle cx="18" cy="18" r="15.9" fill="none" stroke="' + color + '" stroke-width="3.4" stroke-linecap="round" stroke-dasharray="' + pct + ' 100"/></svg>'
+        + '<span class="pct">' + pct + '%</span></span>'
+        + '<span class="ring-cap"><b>' + done + ' of 4 received</b><span>' + cap + '</span></span></div></td>';
     }
     function statusChip(st, pill) {
       var cls = pill === 'q' ? 'sp-ok' : (pill === 'warn' ? 'sp-warn' : 'sp-bad');
@@ -473,8 +468,7 @@
     function rowHTML(s) {
       return '<tr data-dept="' + esc(s.department) + '">'
         + '<td class="cb"><input type="checkbox" class="selBox" name="sel" value="' + s.id + '"></td>'
-        + '<td><span class="row-avatar">' + esc(s.name.charAt(0) || '?') + '</span><span class="row-name">' + esc(s.name) + '</span></td>'
-        + '<td data-col="reg">' + esc(s.reg_no) + '</td>'
+        + '<td><div class="name-cell"><span class="row-avatar">' + esc(s.name.charAt(0) || '?') + '</span><span class="name-stack"><span class="row-name">' + esc(s.name) + '</span><span class="name-sub" data-col="reg">' + esc(s.reg_no) + '</span></span></div></td>'
         + '<td class="degree-cell" data-col="degree">' + esc(s.degree || '\u2014') + '</td>'
         + progTd(s)
         + '<td class="dates-cell" data-col="syndates">' + esc(s.syn_at) + '</td>'
@@ -510,7 +504,7 @@
           searchMode = true;
           tbody.innerHTML = d.students.length
             ? d.students.map(rowHTML).join('')
-            : '<tr><td colspan="10" style="text-align:center;padding:26px;color:var(--muted)">No students match &quot;' + esc(v) + '&quot;.</td></tr>';
+            : '<tr><td colspan="9" style="text-align:center;padding:26px;color:var(--muted)">No students match &quot;' + esc(v) + '&quot;.</td></tr>';
           if (pagination) pagination.style.display = 'none';
           if (countLine) countLine.textContent = d.total + ' live result(s) for "' + v + '"';
           if (rangeText) rangeText.textContent = d.total + ' result(s) for "' + v + '"';
