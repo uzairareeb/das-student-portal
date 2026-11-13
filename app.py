@@ -864,7 +864,7 @@ def journey_progress(s, viva_pass=False):
             n = 3
             if (s.get("final_thesis") or "") == "Received":
                 n = 4
-                coe = (s.get("thesis_forward_coe") or "").strip()
+                coe = parse_coe(s.get("thesis_forward_coe"))
                 if coe and coe.lower() not in (
                         "not forwarded", "not-forwarded", "-", "\u2014"):
                     n = 5
