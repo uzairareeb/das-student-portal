@@ -3,44 +3,138 @@
 <div class="page-head">
   <div>
     <h2>My Students</h2>
-    <p>{{ total }} approved student record(s) from {{ dept.name }} — read-only</p>
+    <p>{{ total }} student record(s) from {{ dept.name }} — read-only</p>
   </div>
-  <a class="btn ghost sm" href="{{ url_for('dept_students_export') }}">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-    Export Excel
-  </a>
+  <div class="row">
+    <a class="btn ghost sm" href="{{ url_for('dept_students_export') }}{% if export_qs %}?{{ export_qs }}{% endif %}">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+      Export Excel
+    </a>
+    <a class="btn ghost sm" href="{{ url_for('dept_students_export_pdf') }}{% if export_qs %}?{{ export_qs }}{% endif %}">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+      Export PDF
+    </a>
+  </div>
+</div>
+
+<div class="chip-row">
+  {% for label, url, active in chips %}
+  <a class="chip{% if active %} active{% endif %}" href="{{ url }}">{{ label }}</a>
+  {% endfor %}
 </div>
 
 <div class="card section" style="margin-bottom:16px">
-  <form method="get" class="row" style="gap:10px">
-    <input class="no-icon" type="text" name="q" value="{{ q }}" placeholder="Search by name or Reg.No" style="max-width:320px">
+  <form method="get" class="row" style="gap:10px; align-items:flex-end">
+    <label style="flex:1 1 220px; max-width:320px">Search
+      <input class="no-icon" type="text" name="q" value="{{ st.q }}" placeholder="Name, Reg.No or CNIC" style="margin-top:4px; width:100%">
+    </label>
+    <label>Status
+      <select class="no-icon" name="status" style="margin-top:4px">
+        <option value="">All Statuses</option>
+        {% for sname in status_list %}<option value="{{ sname }}"{% if st.status == sname %} selected{% endif %}>{{ sname }}</option>{% endfor %}
+      </select>
+    </label>
+    <label>Degree
+      <select class="no-icon" name="degree" style="margin-top:4px">
+        <option value="">All Degrees</option>
+        {% for d in degrees %}<option value="{{ d }}"{% if st.degree == d %} selected{% endif %}>{{ d }}</option>{% endfor %}
+      </select>
+    </label>
+    <label>Session
+      <select class="no-icon" name="session" style="margin-top:4px">
+        <option value="">All Sessions</option>
+        {% for sn in sessions %}<option value="{{ sn }}"{% if st.session == sn %} selected{% endif %}>{{ sn }}</option>{% endfor %}
+      </select>
+    </label>
+    <label>Gender
+      <select class="no-icon" name="gender" style="margin-top:4px">
+        <option value="">All</option>
+        <option value="Male"{% if st.gender == 'Male' %} selected{% endif %}>Male</option>
+        <option value="Female"{% if st.gender == 'Female' %} selected{% endif %}>Female</option>
+      </select>
+    </label>
+    <label>Per page
+      <select class="no-icon" name="per" style="margin-top:4px">
+        {% for n in [10, 25, 50, 100] %}<option value="{{ n }}"{% if per == n %} selected{% endif %}>{{ n }}</option>{% endfor %}
+      </select>
+    </label>
     <button type="submit" class="btn primary sm">Search</button>
-    {% if q %}<a class="btn ghost sm" href="{{ url_for('dept_students') }}">Clear</a>{% endif %}
+    {% if any_filter %}<a class="btn ghost sm" href="{{ url_for('dept_students') }}">Reset</a>{% endif %}
   </form>
+  {% if pills %}
+  <div class="fpills">
+    {% for label, url in pills %}<span class="fpill">{{ label }}<a href="{{ url }}" title="Remove filter">&times;</a></span>{% endfor %}
+    <a class="fpill-clear" href="{{ url_for('dept_students') }}">Clear all</a>
+  </div>
+  {% endif %}
 </div>
 
 <div class="card section table-card">
+  <div class="section-head">
+    <span class="section-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg></span>
+    <h3>Student List</h3>
+    <span class="hint">{% if total %}Showing {{ showing_from }}–{{ showing_to }} of {{ total }}{% else %}No records{% endif %}</span>
+    <span style="flex:1"></span>
+    <span class="cols-wrap">
+      <button type="button" class="btn ghost sm" id="colsBtn">Columns &#9662;</button>
+      <span class="cols-panel" id="colsPanel" hidden>
+        <label><input type="checkbox" data-col-toggle="cnic"> CNIC</label>
+        <label><input type="checkbox" data-col-toggle="degree"> Degree</label>
+        <label><input type="checkbox" data-col-toggle="session"> Session</label>
+        <label><input type="checkbox" data-col-toggle="folder"> Folder/File</label>
+        <label><input type="checkbox" data-col-toggle="progress"> Submission Progress</label>
+        <label><input type="checkbox" data-col-toggle="syndates"> Synopsis Received</label>
+        <label><input type="checkbox" data-col-toggle="semidates"> Semi-Final Received</label>
+        <label><input type="checkbox" data-col-toggle="finaldates"> Final Thesis Received</label>
+        <label><input type="checkbox" data-col-toggle="status"> Status</label>
+        <button type="button" class="cols-reset" id="colsReset">Show all columns</button>
+      </span>
+    </span>
+    <button type="button" class="btn ghost sm" id="densityBtn">Compact</button>
+  </div>
+
   {% if students %}
-  <form method="post" id="bulkForm" data-confirm-action="true">
+  <form method="post" id="bulkForm" action="{{ url_for('dept_students_delete_selected') }}" data-confirm-action="true">
   <div class="table-scroll">
-    <table class="data-table wide-table">
+    <table class="data-table wide-table dept-table">
       <thead>
         <tr>
-          <th class="cb"><input type="checkbox" id="selAll"></th>
-          <th>Name</th><th>Reg.No</th><th>Degree</th><th>Session</th>
-          <th>Folder/File</th><th>Status</th><th></th>
+          <th class="cb"><input type="checkbox" id="selAll" title="Select all on this page"></th>
+          <th><a class="th-sort" href="{{ sort_urls.name }}">Student {% if sort == 'name' %}<span class="arr">{{ '▼' if dir == 'desc' else '▲' }}</span>{% endif %}</a></th>
+          <th data-col="cnic">CNIC</th>
+          <th data-col="degree">Degree</th>
+          <th data-col="session"><a class="th-sort" href="{{ sort_urls.session }}">Session {% if sort == 'session' %}<span class="arr">{{ '▼' if dir == 'desc' else '▲' }}</span>{% endif %}</a></th>
+          <th data-col="folder">Folder/File</th>
+          <th data-col="progress">Submission Progress</th>
+          <th data-col="syndates">Synopsis Received</th>
+          <th data-col="semidates">Semi-Final Received</th>
+          <th data-col="finaldates">Final Thesis Received</th>
+          <th data-col="status"><a class="th-sort" href="{{ sort_urls.status }}">Status {% if sort == 'status' %}<span class="arr">{{ '▼' if dir == 'desc' else '▲' }}</span>{% endif %}</a></th>
+          <th></th>
         </tr>
       </thead>
       <tbody>
         {% for s in students %}
         <tr>
           <td class="cb"><input type="checkbox" name="sel" value="{{ s.id }}" class="selBox"></td>
-          <td><strong>{{ s.name }}</strong></td>
-          <td class="nowrap">{{ s.reg_no }}</td>
-          <td class="degree-cell">{{ s.degree or '—' }}</td>
-          <td class="nowrap">{{ s.session or '—' }}</td>
-          <td>{% if s.folder_file == 'Completed' %}<span class="pill q">Completed</span>{% else %}<span class="pill nq">Not Completed</span>{% endif %}</td>
-          <td>{{ s.status }}</td>
+          <td><div class="name-cell"><span class="row-avatar">{{ s.name[0] if s.name else '?' }}</span><span class="name-stack"><span class="row-name">{{ s.name }}</span><span class="name-sub">{{ s.reg_no }}</span></span></div></td>
+          <td class="nowrap" data-col="cnic">{{ s.cnic or '—' }}</td>
+          <td class="degree-cell" data-col="degree">{{ s.degree or '—' }}</td>
+          <td class="nowrap" data-col="session">{{ s.session or '—' }}</td>
+          <td data-col="folder">{% if s.folder_file == 'Completed' %}<span class="pill q">Completed</span>{% else %}<span class="pill nq">Not Completed</span>{% endif %}</td>
+          {% set steps = [('File', s.folder_file == 'Completed'), ('Synopsis', s.synopsis == 'Received'), ('Semi-Final', s.semi_final_thesis == 'Received'), ('Final', s.final_thesis == 'Received')] %}
+          {% set done_count = steps | map(attribute=1) | sum %}
+          {% set pending_names = {'File': 'Folder/File', 'Synopsis': 'Synopsis', 'Semi-Final': 'Semi-Final', 'Final': 'Final Thesis'} %}
+          {% set ns = namespace(pending='') %}
+          {% for lab, ok in steps %}{% if not ok and not ns.pending %}{% set ns.pending = lab %}{% endif %}{% endfor %}
+          <td class="prog-cell" data-col="progress">
+            {% set pct = done_count * 25 %}
+            <div class="ring-cell"><span class="progring"><svg width="46" height="46" viewBox="0 0 36 36"><circle cx="18" cy="18" r="15.9" fill="none" stroke="{{ '#059669' if done_count == 4 else '#1769e8' }}" stroke-width="3.4" stroke-linecap="round" stroke-dasharray="{{ pct }} 100"/></svg><span class="pct">{{ pct }}%</span></span><span class="ring-cap"><b>{{ done_count }} of 4 received</b><span>{% if done_count == 4 %}Complete{% elif done_count == 0 %}Nothing submitted yet{% else %}{{ pending_names[ns.pending] }} pending{% endif %}</span></span></div>
+          </td>
+          <td class="dates-cell" data-col="syndates"><div class="dt-stack"><span class="dt-date">{{ s.syn_date }}</span>{% if s.syn_time %}<span class="dt-time">{{ s.syn_time }}</span>{% endif %}</div></td>
+          <td class="dates-cell" data-col="semidates"><div class="dt-stack"><span class="dt-date">{{ s.semi_date }}</span>{% if s.semi_time %}<span class="dt-time">{{ s.semi_time }}</span>{% endif %}</div></td>
+          <td class="dates-cell" data-col="finaldates"><div class="dt-stack"><span class="dt-date">{{ s.fin_date }}</span>{% if s.fin_time %}<span class="dt-time">{{ s.fin_time }}</span>{% endif %}</div></td>
+          <td data-col="status"><span class="status-plain {% if s.status in ['Pass Out', 'Viva Done', 'Sent to COE', 'Continue'] %}sp-ok{% elif s.status in ['Viva Pending', 'Defense Pending', 'Freeze'] %}sp-warn{% elif s.status in ['Left', 'Admission Cancelled'] %}sp-bad{% endif %}"><span class="dot"></span>{{ s.status }}</span></td>
           <td class="nowrap"><a class="btn ghost sm" href="{{ url_for('dept_student_profile', sid=s.id) }}">Profile</a></td>
         </tr>
         {% endfor %}
@@ -48,8 +142,10 @@
     </table>
   </div>
   <div class="row" style="margin-top:14px">
-    <button type="submit" class="btn danger sm" formaction="{{ url_for('dept_students_delete_selected') }}"
-            data-confirm="Delete the selected student(s) and all their documents and viva records?">Delete Selected</button>
+    <span class="hint" id="selCount">0 selected</span>
+    <button type="submit" class="btn danger sm" id="delSelBtn" data-confirm="Delete the selected student(s) and all their documents and viva records?">Delete Selected</button>
+    <button type="submit" class="btn ghost sm" id="expSelXl" formaction="{{ url_for('dept_students_export') }}" formmethod="post">Export Selected — Excel</button>
+    <button type="submit" class="btn ghost sm" id="expSelPdf" formaction="{{ url_for('dept_students_export_pdf') }}" formmethod="post">Export Selected — PDF</button>
   </div>
   </form>
   <form method="post" action="{{ url_for('dept_students_delete_all') }}" style="margin:14px 0 0" data-confirm-action="true">
@@ -58,13 +154,85 @@
   </form>
   {% if pages > 1 %}
   <div class="pagination">
-    {% if page > 1 %}<a class="btn ghost sm" href="{{ url_for('dept_students', page=page-1, q=q) }}">&larr; Prev</a>{% endif %}
+    {% if page > 1 %}<a class="btn ghost sm" href="{{ url_for('dept_students') }}?{{ qs_base }}{% if qs_base %}&{% endif %}page={{ page-1 }}">&larr; Prev</a>{% endif %}
     <span class="hint">Page {{ page }} of {{ pages }}</span>
-    {% if page < pages %}<a class="btn ghost sm" href="{{ url_for('dept_students', page=page+1, q=q) }}">Next &rarr;</a>{% endif %}
+    {% if page < pages %}<a class="btn ghost sm" href="{{ url_for('dept_students') }}?{{ qs_base }}{% if qs_base %}&{% endif %}page={{ page+1 }}">Next &rarr;</a>{% endif %}
   </div>
   {% endif %}
+  {% elif any_filter %}
+  <div class="empty"><p>No students match the current filters.</p><p style="margin-top:10px"><a class="btn ghost sm" href="{{ url_for('dept_students') }}">Reset Filters</a></p></div>
   {% else %}
   <div class="empty"><p>No students yet — your approved uploads will appear here.</p></div>
   {% endif %}
 </div>
+{% endblock %}
+{% block page_scripts %}
+<script>
+  (function () {
+    /* ---- selection count + bulk buttons ---- */
+    var boxes = Array.prototype.slice.call(document.querySelectorAll('.selBox'));
+    var selAll = document.getElementById('selAll');
+    var count = document.getElementById('selCount');
+    var guarded = ['delSelBtn', 'expSelXl', 'expSelPdf'].map(function (id) { return document.getElementById(id); }).filter(Boolean);
+    function refresh() {
+      var n = boxes.filter(function (b) { return b.checked; }).length;
+      if (count) count.textContent = n + ' selected';
+      guarded.forEach(function (b) { b.disabled = n === 0; b.style.opacity = n === 0 ? '.55' : ''; });
+      if (selAll) selAll.checked = boxes.length > 0 && n === boxes.length;
+    }
+    boxes.forEach(function (b) { b.addEventListener('change', refresh); });
+    if (selAll) selAll.addEventListener('change', function () {
+      boxes.forEach(function (b) { b.checked = selAll.checked; }); refresh();
+    });
+    refresh();
+
+    /* ---- columns show/hide + compact (remembered in this browser) ---- */
+    var table = document.querySelector('.dept-table');
+    if (!table) return;
+    var COLS = ['cnic', 'degree', 'session', 'folder', 'progress', 'syndates', 'semidates', 'finaldates', 'status'];
+    var KEY = 'dept-cols-hidden';
+    function load() { try { return JSON.parse(localStorage.getItem(KEY) || '[]'); } catch (e) { return []; } }
+    function apply() {
+      var hidden = load();
+      COLS.forEach(function (k) {
+        table.classList.toggle('hide-col-' + k, hidden.indexOf(k) >= 0);
+        var cb = document.querySelector('[data-col-toggle="' + k + '"]');
+        if (cb) cb.checked = hidden.indexOf(k) < 0;
+      });
+    }
+    document.querySelectorAll('[data-col-toggle]').forEach(function (cb) {
+      cb.addEventListener('change', function () {
+        var hidden = load(), k = cb.getAttribute('data-col-toggle');
+        if (cb.checked) hidden = hidden.filter(function (x) { return x !== k; });
+        else if (hidden.indexOf(k) < 0) hidden.push(k);
+        try { localStorage.setItem(KEY, JSON.stringify(hidden)); } catch (e) {}
+        apply();
+      });
+    });
+    var reset = document.getElementById('colsReset');
+    if (reset) reset.addEventListener('click', function () {
+      try { localStorage.removeItem(KEY); } catch (e) {}
+      apply();
+    });
+    var btn = document.getElementById('colsBtn'), panel = document.getElementById('colsPanel');
+    if (btn && panel) {
+      btn.addEventListener('click', function (e) { e.stopPropagation(); panel.hidden = !panel.hidden; });
+      document.addEventListener('click', function (e) { if (!panel.contains(e.target)) panel.hidden = true; });
+    }
+    var dens = document.getElementById('densityBtn');
+    function applyDensity() {
+      var c = false;
+      try { c = localStorage.getItem('dept-density') === 'compact'; } catch (e) {}
+      table.classList.toggle('compact', c);
+      if (dens) dens.textContent = c ? 'Comfortable' : 'Compact';
+    }
+    if (dens) dens.addEventListener('click', function () {
+      var c = !table.classList.contains('compact');
+      try { localStorage.setItem('dept-density', c ? 'compact' : ''); } catch (e) {}
+      applyDensity();
+    });
+    apply();
+    applyDensity();
+  })();
+</script>
 {% endblock %}

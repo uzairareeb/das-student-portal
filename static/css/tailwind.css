@@ -2624,6 +2624,48 @@
     background: linear-gradient(135deg, #1769e8, #38bdf8);
     color: #fff;
   }
+  .dept-table.hide-col-cnic [data-col="cnic"], .dept-table.hide-col-degree [data-col="degree"], .dept-table.hide-col-session [data-col="session"], .dept-table.hide-col-folder [data-col="folder"], .dept-table.hide-col-progress [data-col="progress"], .dept-table.hide-col-syndates [data-col="syndates"], .dept-table.hide-col-semidates [data-col="semidates"], .dept-table.hide-col-finaldates [data-col="finaldates"], .dept-table.hide-col-status [data-col="status"] {
+    display: none;
+  }
+  .dept-table.compact td {
+    padding-top: 6px;
+    padding-bottom: 6px;
+  }
+  .dept-table.compact .progring svg {
+    width: 38px;
+    height: 38px;
+  }
+  .fpills {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+    margin-top: 14px;
+  }
+  .fpill {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    background: #eaf2ff;
+    color: #17365d;
+    border: 1px solid #c9ddff;
+    font-size: 12.5px;
+    font-weight: 600;
+    padding: 5px 8px 5px 11px;
+    border-radius: 999px;
+  }
+  .fpill a {
+    color: #1769e8;
+    font-weight: 800;
+    text-decoration: none;
+    font-size: 14px;
+    line-height: 1;
+  }
+  .fpill-clear {
+    font-size: 12.5px;
+    font-weight: 700;
+    color: #1769e8;
+  }
   .sched-table tr.sched-next td {
     background: #eaf2ff;
   }

@@ -3739,33 +3739,158 @@ def dept_dashboard():
                            recent_uploads=uploads[:5])
 
 
+_DEPT_MATCH = ("REPLACE(LOWER(department), 'department of ', '')"
+               "=REPLACE(LOWER(?), 'department of ', '')")
+
+
+def _dept_filter_args(dept, source):
+    """Shared filter state for the dept My Students list and its exports.
+    Returns (where_sql, params, state) — always scoped to the dept."""
+    op = "ILIKE" if USE_PG else "LIKE"
+    where = _DEPT_MATCH
+    params = [dept["name"]]
+    st = {"q": (source.get("q") or "").strip(),
+          "status": (source.get("status") or "").strip(),
+          "degree": (source.get("degree") or "").strip(),
+          "session": (source.get("session") or "").strip(),
+          "gender": (source.get("gender") or "").strip()}
+    if st["q"]:
+        where += f" AND (name {op} ? OR reg_no {op} ? OR cnic {op} ?)"
+        params += [f"%{st['q']}%"] * 3
+    if st["status"]:
+        where += " AND status=?"
+        params.append(st["status"])
+    if st["degree"]:
+        where += " AND degree=?"
+        params.append(st["degree"])
+    if st["session"]:
+        where += " AND session=?"
+        params.append(st["session"])
+    if st["gender"]:
+        where += " AND gender=?"
+        params.append(st["gender"])
+    return where, params, st
+
+
+def _dept_export_students(dept):
+    """Students for an export: the ticked rows on POST (form field
+    'sel'), otherwise every row matching the current GET filters.
+    Returns (students, scope_line)."""
+    db = get_db()
+    if request.method == "POST":
+        ids = [int(x) for x in request.form.getlist("sel") if x.isdigit()]
+        if ids:
+            ph = ", ".join(["?"] * len(ids))
+            rows = [dict(r) for r in db.fetchall(
+                f"SELECT * FROM students WHERE {_DEPT_MATCH}"
+                f" AND id IN ({ph}) ORDER BY name",
+                (dept["name"],) + tuple(ids))]
+            return rows, f"{len(rows)} selected student(s)"
+    where, params, st = _dept_filter_args(dept, request.args)
+    rows = [dict(r) for r in db.fetchall(
+        f"SELECT * FROM students WHERE {where} ORDER BY name",
+        tuple(params))]
+    _labels = {"q": "Search", "status": "Status", "degree": "Degree",
+               "session": "Session", "gender": "Gender"}
+    bits = [f"{_labels[k]}: {v}" for k, v in st.items() if v]
+    scope = ("All students" if not bits
+             else "Filtered — " + ", ".join(bits))
+    return rows, scope
+
+
 @app.route("/dept/students")
 @dept_required
 def dept_students():
-    """Read-only paginated list of the department's approved students."""
+    """The department's students — modern list with search, filters,
+    sorting, pagination and exports (read-only data)."""
+    from urllib.parse import urlencode
     dept = current_dept()
     db = get_db()
-    page = max(1, int(request.args.get("page", 1) or 1))
-    per = 15
-    q = (request.args.get("q") or "").strip()
-    op = "ILIKE" if USE_PG else "LIKE"
-    where = "REPLACE(LOWER(department), 'department of ', '')=REPLACE(LOWER(?), 'department of ', '')"
-    params = [dept["name"]]
-    if q:
-        where += f" AND (name {op} ? OR reg_no {op} ?)"
-        params += [f"%{q}%", f"%{q}%"]
+
+    def _distinct(col):
+        return [r["v"] if isinstance(r, dict) else r[0] for r in db.fetchall(
+            f"SELECT DISTINCT {col} AS v FROM students WHERE {_DEPT_MATCH}"
+            f" AND {col} IS NOT NULL AND {col}<>'' ORDER BY {col}",
+            (dept["name"],))]
+
+    degrees = _distinct("degree")
+    sessions = _distinct("session")
+    where, params, st = _dept_filter_args(dept, request.args)
+    sort_map = {"name": "name", "reg": "reg_no",
+                "session": "session", "status": "status"}
+    sort = request.args.get("sort")
+    if sort not in sort_map:
+        sort = "name"
+    direction = "desc" if request.args.get("dir") == "desc" else "asc"
+    try:
+        per = int(request.args.get("per") or 25)
+    except ValueError:
+        per = 25
+    if per not in (10, 25, 50, 100):
+        per = 25
     row = db.fetchone(f"SELECT COUNT(*) AS n FROM students WHERE {where}",
                       tuple(params))
     total = (row["n"] if isinstance(row, dict) else row[0]) if row else 0
     pages = max(1, (total + per - 1) // per)
-    page = min(page, pages)
+    try:
+        page = int(request.args.get("page") or 1)
+    except ValueError:
+        page = 1
+    page = min(max(1, page), pages)
     students = [dict(r) for r in db.fetchall(
-        f"SELECT id, name, reg_no, degree, session, status, folder_file"
-        f" FROM students WHERE {where} ORDER BY name LIMIT ? OFFSET ?",
+        "SELECT id, name, reg_no, cnic, gender, degree, session, status,"
+        " folder_file, synopsis, semi_final_thesis, final_thesis,"
+        " folder_file_at, synopsis_at, semi_final_thesis_at, final_thesis_at"
+        f" FROM students WHERE {where}"
+        f" ORDER BY {sort_map[sort]} {direction.upper()}, name"
+        " LIMIT ? OFFSET ?",
         tuple(params) + (per, (page - 1) * per))]
-    return render_template("dept_students.html", uni=UNI_NAME,
-                           title=PORTAL_TITLE, dept=dept, students=students,
-                           page=page, pages=pages, total=total, q=q)
+    for s in students:
+        for key, col in (("folder", "folder_file_at"), ("syn", "synopsis_at"),
+                         ("semi", "semi_final_thesis_at"),
+                         ("fin", "final_thesis_at")):
+            d, t = fmt_stamp_parts(s.get(col))
+            s[key + "_date"], s[key + "_time"] = d, t
+
+    def _qs(**over):
+        d = {k: v for k, v in st.items() if v}
+        if sort != "name":
+            d["sort"] = sort
+        if direction != "asc":
+            d["dir"] = direction
+        if per != 25:
+            d["per"] = per
+        for k, v in over.items():
+            if v in (None, ""):
+                d.pop(k, None)
+            else:
+                d[k] = v
+        return urlencode(d)
+
+    base = url_for("dept_students")
+    chip_defs = ["", "Continue", "Viva Pending", "Sent to COE",
+                 "Pass Out", "Freeze"]
+    chips = [("All Students" if not c else c,
+              f"{base}?{_qs(status=c)}", st["status"] == c)
+             for c in chip_defs]
+    pills = []
+    for k, label in (("q", "Search"), ("status", "Status"),
+                     ("degree", "Degree"), ("session", "Session"),
+                     ("gender", "Gender")):
+        if st[k]:
+            pills.append((f"{label}: {st[k]}", f"{base}?{_qs(**{k: ''})}"))
+    sort_urls = {k: f"{base}?{_qs(sort=k, dir=('desc' if (sort == k and direction == 'asc') else 'asc'))}"
+                 for k in sort_map}
+    export_qs = urlencode({k: v for k, v in st.items() if v})
+    return render_template(
+        "dept_students.html", uni=UNI_NAME, title=PORTAL_TITLE, dept=dept,
+        students=students, page=page, pages=pages, total=total, per=per,
+        st=st, degrees=degrees, sessions=sessions, status_list=STATUS_LIST,
+        sort=sort, dir=direction, qs_base=_qs(), chips=chips, pills=pills,
+        sort_urls=sort_urls, export_qs=export_qs,
+        showing_from=((page - 1) * per + 1 if total else 0),
+        showing_to=min(page * per, total),
+        any_filter=any(st.values()))
 
 
 @app.route("/dept/students/delete-selected", methods=["POST"])
@@ -3977,16 +4102,15 @@ def dept_viva_calendar():
                            upcoming=upcoming)
 
 
-@app.route("/dept/students/export")
+@app.route("/dept/students/export", methods=["GET", "POST"])
 @dept_required
 def dept_students_export():
-    """Excel export of own students."""
+    """Excel export of own students — the current filters on GET, or
+    the ticked rows on POST."""
     from openpyxl import Workbook
     from openpyxl.styles import Font, PatternFill, Alignment
     dept = current_dept()
-    students = [dict(r) for r in get_db().fetchall(
-        "SELECT * FROM students WHERE REPLACE(LOWER(department), 'department of ', '')=REPLACE(LOWER(?), 'department of ', '') ORDER BY name",
-        (dept["name"],))]
+    students, _scope = _dept_export_students(dept)
     wb = Workbook()
     ws = wb.active
     ws.title = "Students"
@@ -3997,7 +4121,7 @@ def dept_students_export():
     ws.append(headers)
     for cell in ws[1]:
         cell.font = Font(bold=True, color="FFFFFF")
-        cell.fill = PatternFill("solid", fgColor="2D3290")
+        cell.fill = PatternFill("solid", fgColor="1769E8")
         cell.alignment = Alignment(horizontal="center", vertical="center",
                                    wrap_text=True)
     for s in students:
@@ -4024,8 +4148,55 @@ def dept_students_export():
                     mimetype="application/vnd.openxmlformats-officedocument."
                              "spreadsheetml.sheet")
     resp.headers["Content-Disposition"] = \
-        "attachment; filename=my_students_export.xlsx"
+        "attachment; filename=" + (
+            dept["name"].replace(" ", "_") + "_Students_"
+            + _pkt_now().strftime("%Y-%m-%d") + ".xlsx")
     return resp
+
+
+@app.route("/dept/students/export-pdf", methods=["GET", "POST"])
+@dept_required
+def dept_students_export_pdf():
+    """PDF export of own students — same scope rules as the Excel
+    export (current filters on GET, ticked rows on POST), in the
+    portal's report style."""
+    dept = current_dept()
+    students, scope = _dept_export_students(dept)
+    headers = ["Name", "Reg.No", "CNIC", "Degree", "Session",
+               "Folder/File", "Synopsis", "Semi-Final", "Final Thesis",
+               "Status"]
+    widths = [44, 25, 29, 34, 20, 24, 34, 34, 34, 24]
+    rows = []
+    color_cells = {}
+    for i, s in enumerate(students):
+        def _recv(val, at):
+            if val == "Received":
+                d, _t = fmt_stamp_parts(at)
+                return f"Received ({d})" if d != "\u2014" else "Received"
+            return "Not Received"
+        rows.append([
+            s.get("name") or "", s.get("reg_no") or "",
+            s.get("cnic") or "", s.get("degree") or "",
+            s.get("session") or "",
+            "Completed" if s.get("folder_file") == "Completed"
+            else "Not Completed",
+            _recv(s.get("synopsis"), s.get("synopsis_at")),
+            _recv(s.get("semi_final_thesis"), s.get("semi_final_thesis_at")),
+            _recv(s.get("final_thesis"), s.get("final_thesis_at")),
+            s.get("status") or ""])
+        color_cells[(i, 5)] = ("#059669" if s.get("folder_file") == "Completed"
+                               else "#DC2626")
+        for col, key in ((6, "synopsis"), (7, "semi_final_thesis"),
+                         (8, "final_thesis")):
+            color_cells[(i, col)] = ("#059669" if s.get(key) == "Received"
+                                     else "#DC2626")
+    fname = (dept["name"].replace(" ", "_") + "_Students_"
+             + _pkt_now().strftime("%Y-%m-%d") + ".pdf")
+    return _report_pdf(
+        f"{dept['name']} \u2014 Student List",
+        [scope, f"Total students: {len(students)}",
+         "Prepared by: " + dept["name"]],
+        headers, widths, rows, fname, color_cells=color_cells)
 
 
 @app.route("/dept/viva/bulk", methods=["GET", "POST"])
