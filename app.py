@@ -2913,6 +2913,81 @@ def _saved_ctx_rows(rec):
             [display_row(r) for r in rows])
 
 
+
+def _portal_schedule(rec):
+    """Portal display model for a saved schedule: every milestone with
+    its effective (weekend-adjusted) last date, the next upcoming
+    deadline flagged. Used by the student and department dashboards."""
+    import json
+    from zoneinfo import ZoneInfo
+    try:
+        rows = deserialize_rows(json.loads(rec["rows_json"]))
+    except (TypeError, ValueError):
+        return None
+    today = datetime.now(ZoneInfo("Asia/Karachi")).date()
+    items = []
+    next_info = {"next_doc": "", "next_date_disp": "", "days_left": None}
+    for r in rows:
+        adj = r["adjusted"]
+        if not adj:
+            continue
+        last = adj[-1]
+        item = {
+            "document": r["document"],
+            "is_range": len(adj) == 2,
+            "range_disp": (sched_fmt(adj[0]) + " \u2013 " + sched_fmt(last))
+                          if len(adj) == 2 else "",
+            "date_disp": sched_fmt(last),
+            "day_disp": last.strftime("%A"),
+            "past": last < today,
+            "next": False,
+            "days_left": (last - today).days,
+        }
+        if not next_info["next_doc"] and last >= today:
+            item["next"] = True
+            next_info = {"next_doc": r["document"],
+                         "next_date_disp": sched_fmt(last),
+                         "days_left": (last - today).days}
+        items.append(item)
+    try:
+        head = {
+            "commencement_disp": sched_fmt(datetime.strptime(
+                rec["commencement"], "%Y-%m-%d").date()),
+            "termination_disp": sched_fmt(datetime.strptime(
+                rec["termination"], "%Y-%m-%d").date()),
+        }
+    except (TypeError, ValueError):
+        head = {"commencement_disp": "", "termination_disp": ""}
+    out = {"session": rec.get("session") or "", "rows": items}
+    out.update(head)
+    out.update(next_info)
+    return out
+
+
+def _saved_schedule_for_session(session_name):
+    """The saved schedule for a session: exact match first, then a
+    case/space-insensitive match. None when nothing is saved for it."""
+    if not session_name:
+        return None
+    try:
+        rows = get_db().fetchall("SELECT * FROM saved_schedules")
+    except Exception:
+        return None
+
+    def norm(v):
+        return " ".join(str(v or "").split()).casefold()
+
+    target = norm(session_name)
+    fallback = None
+    for r in rows:
+        rec = dict(r)
+        if rec.get("session") == session_name:
+            return rec
+        if fallback is None and norm(rec.get("session")) == target:
+            fallback = rec
+    return fallback
+
+
 def _final_thesis_date(rows):
     for r in rows:
         if r["document"] == "Final Thesis":
@@ -3557,9 +3632,16 @@ def dept_dashboard():
                               " WHERE department_id=? AND status='pending'",
                               (dept["id"],)),
     }
+    schedules = []
+    for _summ in _list_saved_schedules():
+        _rec = _get_saved_schedule(_summ["id"])
+        if _rec:
+            _model = _portal_schedule(_rec)
+            if _model:
+                schedules.append(_model)
     return render_template("dept_dashboard.html", uni=UNI_NAME,
                            title=PORTAL_TITLE, dept=dept, uploads=uploads,
-                           stats=stats)
+                           stats=stats, schedules=schedules)
 
 
 @app.route("/dept/students")
@@ -4885,9 +4967,11 @@ def student_dashboard():
         {"label": "Viva Passed",
          "done": any(v.get("result") == "Pass" for v in vivas)},
     ]
+    sched_rec = _saved_schedule_for_session(s.get("session"))
+    sched = _portal_schedule(sched_rec) if sched_rec else None
     return render_template("student_dashboard.html", uni=UNI_NAME,
                            title=PORTAL_TITLE, s=s, docs=docs, vivas=vivas,
-                           timeline=timeline)
+                           timeline=timeline, sched=sched)
 
 
 @app.route("/student/record")

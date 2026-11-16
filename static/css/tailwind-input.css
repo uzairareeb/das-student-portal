@@ -303,6 +303,10 @@
   .ring-cap { display: flex; flex-direction: column; line-height: 1.35; font-size: 12px; color: #94a3b8; white-space: nowrap; }
   .ring-cap b { color: #17365d; font-size: 13px; }
   .dt-stack { display: flex; flex-direction: column; line-height: 1.35; }
+  .sched-table tr.sched-next td { background: #eaf2ff; }
+  .sched-table tr.sched-past td { color: #94a3b8; }
+  .sched-session { font-size: 15px; font-weight: 700; color: #17365d; margin: 4px 0 2px; }
+  .sched-block + .sched-block { margin-top: 24px; }
   .dt-stack .dt-date { font-size: 12.5px; font-weight: 600; color: #17365d; white-space: nowrap; }
   .dt-stack .dt-time { font-size: 11px; font-weight: 500; color: #94a3b8; white-space: nowrap; }
   .status-plain { display: inline-flex; align-items: center; gap: 7px; font-weight: 700; color: #17365d; white-space: nowrap; }
