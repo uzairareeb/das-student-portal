@@ -37,19 +37,16 @@
   <div class="sched-block">
     <h4 class="sched-session">Session {{ sch.session }}</h4>
     <p class="hint" style="margin:0 0 8px">Commencement: <strong>{{ sch.commencement_disp }}</strong> &middot; Termination: <strong>{{ sch.termination_disp }}</strong></p>
-    <div class="table-scroll">
-      <table class="data-table sched-table">
-        <thead><tr><th>Document / Milestone</th><th>Last Date</th><th></th></tr></thead>
-      <tbody>
-        {% for it in sch.rows %}
-        <tr{% if it.next %} class="sched-next"{% elif it.past %} class="sched-past"{% endif %}>
-          <td>{{ it.document }}</td>
-          <td class="nowrap"><strong>{{ it.date_disp }}</strong> <span class="hint">({{ it.day_disp }})</span>{% if it.is_range %}<div class="hint">Window: {{ it.range_disp }}</div>{% endif %}</td>
-          <td class="nowrap">{% if it.next %}<span class="pill warn">Next Deadline</span>{% elif it.past %}<span class="hint">Passed</span>{% endif %}</td>
-        </tr>
-        {% endfor %}
-      </tbody>
-      </table>
+    <div class="sched-cards" style="margin-top:10px">
+      {% for it in sch.rows %}
+      <div class="dl-card{% if it.next %} next{% elif it.past %} passed{% endif %}">
+        {% if it.next %}<span class="next-pill">NEXT</span>{% endif %}
+        <span class="dl-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">{{ it.icon | safe }}</svg></span>
+        <div class="dl-nm">{{ it.short }}</div>
+        <div class="dl-dt">{{ it.date_disp }}</div>
+        <div class="dl-st">{{ it.status_disp }}</div>
+      </div>
+      {% endfor %}
     </div>
   </div>
   {% endfor %}
