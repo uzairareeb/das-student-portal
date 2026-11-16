@@ -103,6 +103,7 @@
         <label><input type="checkbox" data-col-toggle="reg"> Reg.No</label>
         <label><input type="checkbox" data-col-toggle="degree"> Degree</label>
         <label><input type="checkbox" data-col-toggle="progress"> Submission Progress</label>
+        <label><input type="checkbox" data-col-toggle="folderdates"> Folder/File (With GS-Forms)</label>
         <label><input type="checkbox" data-col-toggle="syndates"> Synopsis Received</label>
         <label><input type="checkbox" data-col-toggle="semidates"> Semi-Final Thesis Received</label>
         <label><input type="checkbox" data-col-toggle="finaldates"> Final Thesis Received</label>
@@ -139,7 +140,7 @@
           <tr>
             <th class="cb"><input type="checkbox" id="selAll" title="Select all on this page"></th>
             <th><a class="th-sort" href="{{ sort_url('name') }}">Name {% if sort == 'name' %}<span class="arr">{{ '▼' if direction == 'desc' else '▲' }}</span>{% endif %}</a></th><th data-col="degree">Degree</th>
-            <th data-col="progress">Submission Progress</th><th data-col="syndates">Synopsis Received</th>
+            <th data-col="progress">Submission Progress</th><th data-col="folderdates">Folder/File (With GS-Forms)</th><th data-col="syndates">Synopsis Received</th>
             <th data-col="semidates">Semi-Final Thesis Received</th>
             <th data-col="finaldates">Final Thesis Received</th>
             <th data-col="status"><a class="th-sort" href="{{ sort_url('status') }}">Status {% if sort == 'status' %}<span class="arr">{{ '▼' if direction == 'desc' else '▲' }}</span>{% endif %}</a></th><th></th>
@@ -160,6 +161,7 @@
               {% set pct = done_count * 25 %}
               <div class="ring-cell"><span class="progring"><svg width="46" height="46" viewBox="0 0 36 36"><circle cx="18" cy="18" r="15.9" fill="none" stroke="{{ '#059669' if done_count == 4 else '#1769e8' }}" stroke-width="3.4" stroke-linecap="round" stroke-dasharray="{{ pct }} 100"/></svg><span class="pct">{{ pct }}%</span></span><span class="ring-cap"><b>{{ done_count }} of 4 received</b><span>{% if done_count == 4 %}Complete{% elif done_count == 0 %}Nothing submitted yet{% else %}{{ pending_names[ns.pending] }} pending{% endif %}</span></span></div>
             </td>
+            <td class="dates-cell" data-col="folderdates"><div class="dt-stack"><span class="dt-date">{{ s.folder_date }}</span>{% if s.folder_time %}<span class="dt-time">{{ s.folder_time }}</span>{% endif %}</div></td>
             <td class="dates-cell" data-col="syndates"><div class="dt-stack"><span class="dt-date">{{ s.syn_date }}</span>{% if s.syn_time %}<span class="dt-time">{{ s.syn_time }}</span>{% endif %}</div></td>
             <td class="dates-cell" data-col="semidates"><div class="dt-stack"><span class="dt-date">{{ s.semi_date }}</span>{% if s.semi_time %}<span class="dt-time">{{ s.semi_time }}</span>{% endif %}</div></td>
             <td class="dates-cell" data-col="finaldates"><div class="dt-stack"><span class="dt-date">{{ s.final_date }}</span>{% if s.final_time %}<span class="dt-time">{{ s.final_time }}</span>{% endif %}</div></td>
@@ -278,6 +280,10 @@
             {% for v in folders %}<option value="{{ v }}">{{ v }}</option>{% endfor %}
           </select>
         </div>
+        <div>
+          <label class="f-label" for="e_folder_file_at">Folder/File Completed On</label>
+          <input class="no-icon" type="datetime-local" id="e_folder_file_at" name="folder_file_at">
+        </div>
         <div class="hl">
           <label class="f-label" for="e_synopsis">Synopsis</label>
           <select class="no-icon" id="e_synopsis" name="synopsis">
@@ -377,6 +383,7 @@
           setDept('e_department', d.department);
           setVal('e_status', d.status);
           setVal('e_folder_file', d.folder_file);
+          setVal('e_folder_file_at', d.folder_file_at);
           setVal('e_comments_missing', d.comments_missing);
           setVal('e_synopsis', d.synopsis);
           setVal('e_synopsis_at', d.synopsis_at);
@@ -401,14 +408,15 @@
       return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate()) +
              'T' + p(d.getHours()) + ':' + p(d.getMinutes());
     }
-    function wireThesis(selId, dtId) {
+    function wireThesis(selId, dtId, doneVal) {
       var sel = document.getElementById(selId), dt = document.getElementById(dtId);
       if (!sel || !dt) return;
       sel.addEventListener('change', function () {
-        if (sel.value === 'Received') { if (!dt.value) dt.value = nowLocal(); }
+        if (sel.value === (doneVal || 'Received')) { if (!dt.value) dt.value = nowLocal(); }
         else { dt.value = ''; }
       });
     }
+    wireThesis('e_folder_file', 'e_folder_file_at', 'Completed');
     wireThesis('e_synopsis', 'e_synopsis_at');
     wireThesis('e_semi_final_thesis', 'e_semi_final_thesis_at');
     wireThesis('e_final_thesis', 'e_final_thesis_at');
@@ -468,6 +476,7 @@
         + '<td><div class="name-cell"><span class="row-avatar">' + esc(s.name.charAt(0) || '?') + '</span><span class="name-stack"><span class="row-name">' + esc(s.name) + '</span><span class="name-sub" data-col="reg">' + esc(s.reg_no) + '</span></span></div></td>'
         + '<td class="degree-cell" data-col="degree">' + esc(s.degree || '\u2014') + '</td>'
         + progTd(s)
+        + '<td class="dates-cell" data-col="folderdates"><div class="dt-stack"><span class="dt-date">' + esc(s.folder_date) + '</span>' + (s.folder_time ? '<span class="dt-time">' + esc(s.folder_time) + '</span>' : '') + '</div></td>'
         + '<td class="dates-cell" data-col="syndates"><div class="dt-stack"><span class="dt-date">' + esc(s.syn_date) + '</span>' + (s.syn_time ? '<span class="dt-time">' + esc(s.syn_time) + '</span>' : '') + '</div></td>'
         + '<td class="dates-cell" data-col="semidates"><div class="dt-stack"><span class="dt-date">' + esc(s.semi_date) + '</span>' + (s.semi_time ? '<span class="dt-time">' + esc(s.semi_time) + '</span>' : '') + '</div></td>'
         + '<td class="dates-cell" data-col="finaldates"><div class="dt-stack"><span class="dt-date">' + esc(s.final_date) + '</span>' + (s.final_time ? '<span class="dt-time">' + esc(s.final_time) + '</span>' : '') + '</div></td>'
@@ -500,7 +509,7 @@
           searchMode = true;
           tbody.innerHTML = d.students.length
             ? d.students.map(rowHTML).join('')
-            : '<tr><td colspan="9" style="text-align:center;padding:26px;color:var(--muted)">No students match &quot;' + esc(v) + '&quot;.</td></tr>';
+            : '<tr><td colspan="10" style="text-align:center;padding:26px;color:var(--muted)">No students match &quot;' + esc(v) + '&quot;.</td></tr>';
           if (pagination) pagination.style.display = 'none';
           if (countLine) countLine.textContent = d.total + ' live result(s) for "' + v + '"';
           if (rangeText) rangeText.textContent = d.total + ' result(s) for "' + v + '"';
@@ -609,7 +618,7 @@
     }
     /* ---- Columns show/hide + compact density (remembered in this browser) ---- */
     var listTable = document.querySelector('.wide-table');
-    var COL_KEYS = ['reg', 'degree', 'progress', 'syndates', 'semidates', 'finaldates', 'status'];
+    var COL_KEYS = ['reg', 'degree', 'progress', 'folderdates', 'syndates', 'semidates', 'finaldates', 'status'];
     function hiddenCols() {
       try { return JSON.parse(localStorage.getItem('das-cols-hidden')) || []; }
       catch (e) { return []; }

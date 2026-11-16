@@ -57,6 +57,7 @@
   <div class="sp-stat">
     <div class="k">Folder / File</div>
     <div class="v">{% if s.folder_file == 'Completed' %}<span class="pill q">Completed</span>{% else %}<span class="pill nq">Not Completed</span>{% endif %}</div>
+    {% if s.folder_file_at %}<div class="hint" style="margin-top:4px">{{ s.folder_at_disp }}</div>{% endif %}
   </div>
 </div>
 
@@ -152,6 +153,10 @@
         <select class="no-icon" id="folder_file" name="folder_file">
           {% for v in folders %}<option value="{{ v }}" {% if s.folder_file==v %}selected{% endif %}>{{ v }}</option>{% endfor %}
         </select>
+      </div>
+      <div>
+        <label class="f-label" for="folder_file_at">Folder/File Completed On</label>
+        <input class="no-icon" type="datetime-local" id="folder_file_at" name="folder_file_at" value="{{ s.folder_at_local }}">
       </div>
       <div>
         <label class="f-label" for="synopsis">Synopsis</label>
@@ -277,14 +282,15 @@
       return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate()) +
              'T' + p(d.getHours()) + ':' + p(d.getMinutes());
     }
-    function wireThesis(selId, dtId) {
+    function wireThesis(selId, dtId, doneVal) {
       var sel = document.getElementById(selId), dt = document.getElementById(dtId);
       if (!sel || !dt) return;
       sel.addEventListener('change', function () {
-        if (sel.value === 'Received') { if (!dt.value) dt.value = nowLocal(); }
+        if (sel.value === (doneVal || 'Received')) { if (!dt.value) dt.value = nowLocal(); }
         else { dt.value = ''; }
       });
     }
+    wireThesis('folder_file', 'folder_file_at', 'Completed');
     wireThesis('synopsis', 'synopsis_at');
     wireThesis('semi_final_thesis', 'semi_final_thesis_at');
     wireThesis('final_thesis', 'final_thesis_at');

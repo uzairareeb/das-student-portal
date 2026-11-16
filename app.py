@@ -465,13 +465,13 @@ def _migrate_add_thesis_dates(db):
     try:
         if USE_PG:
             for col in ("synopsis_at", "semi_final_thesis_at",
-                        "final_thesis_at"):
+                        "final_thesis_at", "folder_file_at"):
                 db.execute("ALTER TABLE students ADD COLUMN IF NOT EXISTS"
                            f" {col} TEXT")
         else:
             cols = [r[1] for r in db.fetchall("PRAGMA table_info(students)")]
             for col in ("synopsis_at", "semi_final_thesis_at",
-                        "final_thesis_at"):
+                        "final_thesis_at", "folder_file_at"):
                 if col not in cols:
                     db.execute(f"ALTER TABLE students ADD COLUMN {col} TEXT")
         db.commit()
@@ -722,6 +722,19 @@ def _thesis_stamp(new_status, posted_raw, old_status, old_val):
     if posted:
         return posted
     if old_status == "Received" and old_val:
+        return parse_dt(old_val) or None
+    return datetime.now().strftime("%Y-%m-%d %H:%M")
+
+
+def _folder_stamp(new_status, posted_raw, old_status, old_val):
+    """Folder/File completed-on stamp: same rule as _thesis_stamp, but
+    the trigger value is 'Completed' instead of 'Received'."""
+    if new_status != "Completed":
+        return None
+    posted = parse_dt(posted_raw)
+    if posted:
+        return posted
+    if old_status == "Completed" and old_val:
         return parse_dt(old_val) or None
     return datetime.now().strftime("%Y-%m-%d %H:%M")
 
@@ -1209,6 +1222,7 @@ def admin_students():
         s["syn_at_disp"] = fmt_stamp(s.get("synopsis_at"))
         s["semi_at_disp"] = fmt_stamp(s.get("semi_final_thesis_at"))
         s["final_at_disp"] = fmt_stamp(s.get("final_thesis_at"))
+        s["folder_date"], s["folder_time"] = fmt_stamp_parts(s.get("folder_file_at"))
         s["syn_date"], s["syn_time"] = fmt_stamp_parts(s.get("synopsis_at"))
         s["semi_date"], s["semi_time"] = fmt_stamp_parts(s.get("semi_final_thesis_at"))
         s["final_date"], s["final_time"] = fmt_stamp_parts(s.get("final_thesis_at"))
@@ -4311,6 +4325,8 @@ def admin_student_profile(sid):
     s["coe_display"] = fmt_coe(s.get("thesis_forward_coe"))
     s["coe_iso"] = parse_coe(s.get("thesis_forward_coe"))
     s["syn_at_disp"] = fmt_stamp(s.get("synopsis_at"))
+    s["folder_at_disp"] = fmt_stamp(s.get("folder_file_at"))
+    s["folder_at_local"] = dt_local(s.get("folder_file_at"))
     s["syn_at_local"] = dt_local(s.get("synopsis_at"))
     s["semi_at_disp"] = fmt_stamp(s.get("semi_final_thesis_at"))
     s["final_at_disp"] = fmt_stamp(s.get("final_thesis_at"))
@@ -4361,11 +4377,15 @@ def admin_student_save(sid):
     final_at = _thesis_stamp(final_status, f.get("final_thesis_at"),
                              s.get("final_thesis"),
                              s.get("final_thesis_at"))
+    folder_status = pick(f.get("folder_file"), FOLDER_OPTS, "Not Completed")
+    folder_at = _folder_stamp(folder_status, f.get("folder_file_at"),
+                              s.get("folder_file"), s.get("folder_file_at"))
     if pick(f.get("status"), STATUS_LIST, "Continue") == "Pass Out":
         syn_status = semi_status = final_status = "Received"
         syn_at, semi_at, final_at = (s.get("synopsis_at"),
                                      s.get("semi_final_thesis_at"),
                                      s.get("final_thesis_at"))
+        folder_at = s.get("folder_file_at")
         f = dict(f)
         f["folder_file"] = "Completed"
     dept = dept_from_degree(f.get("degree")) or ""
@@ -4376,8 +4396,9 @@ def admin_student_save(sid):
     try:
         db.execute(
             """UPDATE students SET cnic=?, name=?, father_name=?, reg_no=?,
-               gender=?, degree=?, session=?, folder_file=?, comments_missing=?,
-               synopsis=?, synopsis_at=?, semi_final_thesis=?, final_thesis=?,
+               gender=?, degree=?, session=?, folder_file=?, folder_file_at=?,
+               comments_missing=?, synopsis=?, synopsis_at=?,
+               semi_final_thesis=?, final_thesis=?,
                semi_final_thesis_at=?, final_thesis_at=?,
                thesis_forward_coe=?, status=?, department=?, updated_at=?
                WHERE id=?""",
@@ -4385,6 +4406,7 @@ def admin_student_save(sid):
              f.get("gender", "").strip(), f.get("degree", "").strip(),
              f.get("session", "").strip(),
              pick(f.get("folder_file"), FOLDER_OPTS, "Not Completed"),
+             folder_at,
              f.get("comments_missing", "").strip() or "N/A",
              syn_status, syn_at,
              semi_status, final_status, semi_at, final_at,
@@ -4615,6 +4637,7 @@ def admin_student_json(sid):
             "final_thesis")
     out = {k: (s.get(k) or "") for k in keys}
     out["coe_iso"] = parse_coe(s.get("thesis_forward_coe"))
+    out["folder_file_at"] = dt_local(s.get("folder_file_at"))
     out["synopsis_at"] = dt_local(s.get("synopsis_at"))
     out["semi_final_thesis_at"] = dt_local(s.get("semi_final_thesis_at"))
     out["final_thesis_at"] = dt_local(s.get("final_thesis_at"))
@@ -4644,6 +4667,8 @@ def admin_students_search():
             "syn_at": fmt_stamp(s.get("synopsis_at")),
             "semi_at": fmt_stamp(s.get("semi_final_thesis_at")),
             "final_at": fmt_stamp(s.get("final_thesis_at")),
+            "folder_date": fmt_stamp_parts(s.get("folder_file_at"))[0],
+            "folder_time": fmt_stamp_parts(s.get("folder_file_at"))[1],
             "syn_date": fmt_stamp_parts(s.get("synopsis_at"))[0],
             "syn_time": fmt_stamp_parts(s.get("synopsis_at"))[1],
             "semi_date": fmt_stamp_parts(s.get("semi_final_thesis_at"))[0],

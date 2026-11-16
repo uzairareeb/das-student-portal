@@ -325,7 +325,7 @@
   .qf-sub { font-size: 12px; color: #64748b; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .qf-empty { padding: 14px 12px; color: #64748b; font-size: 13.5px; text-align: center; }
   .qf-more { padding: 8px 12px 6px; color: #94a3b8; font-size: 12px; border-top: 1px solid #eef2f7; margin-top: 4px; }
-  .wide-table.hide-col-reg [data-col="reg"], .wide-table.hide-col-degree [data-col="degree"], .wide-table.hide-col-progress [data-col="progress"], .wide-table.hide-col-syndates [data-col="syndates"], .wide-table.hide-col-semidates [data-col="semidates"], .wide-table.hide-col-finaldates [data-col="finaldates"], .wide-table.hide-col-status [data-col="status"] { display: none; }
+  .wide-table.hide-col-reg [data-col="reg"], .wide-table.hide-col-degree [data-col="degree"], .wide-table.hide-col-progress [data-col="progress"], .wide-table.hide-col-folderdates [data-col="folderdates"], .wide-table.hide-col-syndates [data-col="syndates"], .wide-table.hide-col-semidates [data-col="semidates"], .wide-table.hide-col-finaldates [data-col="finaldates"], .wide-table.hide-col-status [data-col="status"] { display: none; }
   .cols-wrap { position: relative; display: inline-flex; }
   .cols-panel { position: absolute; right: 0; top: calc(100% + 6px); background: #fff; border: 1px solid #e5eaf2; border-radius: 12px; box-shadow: 0 24px 48px -16px rgba(23,54,93,.28); padding: 12px 14px; z-index: 55; display: flex; flex-direction: column; gap: 8px; min-width: 205px; }
   .cols-panel[hidden] { display: none; }

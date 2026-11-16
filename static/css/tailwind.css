@@ -2442,7 +2442,7 @@
     border-top: 1px solid #eef2f7;
     margin-top: 4px;
   }
-  .wide-table.hide-col-reg [data-col="reg"], .wide-table.hide-col-degree [data-col="degree"], .wide-table.hide-col-progress [data-col="progress"], .wide-table.hide-col-syndates [data-col="syndates"], .wide-table.hide-col-semidates [data-col="semidates"], .wide-table.hide-col-finaldates [data-col="finaldates"], .wide-table.hide-col-status [data-col="status"] {
+  .wide-table.hide-col-reg [data-col="reg"], .wide-table.hide-col-degree [data-col="degree"], .wide-table.hide-col-progress [data-col="progress"], .wide-table.hide-col-folderdates [data-col="folderdates"], .wide-table.hide-col-syndates [data-col="syndates"], .wide-table.hide-col-semidates [data-col="semidates"], .wide-table.hide-col-finaldates [data-col="finaldates"], .wide-table.hide-col-status [data-col="status"] {
     display: none;
   }
   .cols-wrap {
