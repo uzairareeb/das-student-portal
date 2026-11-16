@@ -2586,6 +2586,44 @@
     color: #94a3b8;
     font-weight: 600;
   }
+  .dept-dash .stats {
+    grid-template-columns: repeat(4, 1fr);
+  }
+  @media (max-width: 1024px) {
+    .dept-dash .stats {
+      grid-template-columns: repeat(2, 1fr);
+    }
+  }
+  .dept-dash .stat {
+    min-height: 88px;
+  }
+  .dept-dash .card {
+    border-radius: 16px;
+  }
+  .dept-dash .section-icon {
+    background: linear-gradient(135deg, #1769e8, #38bdf8);
+    color: #fff;
+  }
+  .dept-dash .section-icon.ok {
+    background: linear-gradient(135deg, #059669, #34d399);
+    color: #fff;
+  }
+  .dept-dash .section-icon.warn {
+    background: linear-gradient(135deg, #d97706, #f59e0b);
+    color: #fff;
+  }
+  .dept-dash .section-icon.bad {
+    background: linear-gradient(135deg, #dc2626, #f87171);
+    color: #fff;
+  }
+  .dept-dash .qa-ico {
+    background: linear-gradient(135deg, #1769e8, #38bdf8);
+    color: #fff;
+  }
+  .dept-dash .dl-icon {
+    background: linear-gradient(135deg, #1769e8, #38bdf8);
+    color: #fff;
+  }
   .sched-table tr.sched-next td {
     background: #eaf2ff;
   }

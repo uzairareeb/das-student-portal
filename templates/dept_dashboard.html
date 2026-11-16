@@ -1,5 +1,6 @@
 {% extends "dept_base.html" %}
 {% block content %}
+<div class="dept-dash">
 <div class="d-banner">
   <span class="greet">{% if greeting == 'Good Evening' %}<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>{% else %}<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></svg>{% endif %}{{ greeting }}</span>
   <h2>{{ dept.name }}</h2>
@@ -130,5 +131,6 @@
   {% else %}
   <div class="empty"><p>No submissions yet — send your first file from the Upload page.</p></div>
   {% endif %}
+</div>
 </div>
 {% endblock %}
