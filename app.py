@@ -5239,6 +5239,14 @@ def student_dashboard():
         " remarks, total_marks, obtained_marks, next_viva_date"
         " FROM viva_records WHERE student_id=? ORDER BY id DESC",
         (s["id"],))]
+    s["syn_at_disp"] = fmt_stamp(s.get("synopsis_at"))
+    s["semi_at_disp"] = fmt_stamp(s.get("semi_final_thesis_at"))
+    s["final_at_disp"] = fmt_stamp(s.get("final_thesis_at"))
+    s["folder_at_disp"] = fmt_stamp(s.get("folder_file_at"))
+    done_n, next_step = journey_progress(
+        s, viva_pass=any(v.get("result") == "Pass" for v in vivas))
+    s["journey_pct"] = round(done_n / 7 * 100)
+    s["next_step"] = next_step
     timeline = [
         {"label": "Synopsis", "done": s.get("synopsis") == "Received"},
         {"label": "Semi-Final Thesis",
@@ -5268,17 +5276,6 @@ def student_record():
         session.pop("student_id", None)
         return redirect(url_for("student_login"))
     s["coe_display"] = fmt_coe(s.get("thesis_forward_coe"))
-    s["syn_at_disp"] = fmt_stamp(s.get("synopsis_at"))
-    s["semi_at_disp"] = fmt_stamp(s.get("semi_final_thesis_at"))
-    s["final_at_disp"] = fmt_stamp(s.get("final_thesis_at"))
-    s["folder_at_disp"] = fmt_stamp(s.get("folder_file_at"))
-    vivas = [dict(r) for r in get_db().fetchall(
-        "SELECT result FROM viva_records WHERE student_id=?"
-        " ORDER BY id DESC", (s["id"],))]
-    done_n, next_step = journey_progress(
-        s, viva_pass=any(v.get("result") == "Pass" for v in vivas))
-    s["journey_pct"] = round(done_n / 7 * 100)
-    s["next_step"] = next_step
     return render_template("student_record.html", uni=UNI_NAME,
                            title=PORTAL_TITLE, s=s)
 

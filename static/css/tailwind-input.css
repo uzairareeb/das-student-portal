@@ -629,6 +629,7 @@
   .status-chip.sc-warn .dot { @apply bg-amber-500; }
   .status-chip.sc-bad { @apply border-red-200 bg-red-50 text-red-700; }
   .status-chip.sc-bad .dot { @apply bg-red-500; }
+  @media (min-width: 1024px) { .sp-stats.five { grid-template-columns: repeat(5, 1fr); } }
   .rec-group { margin-top: 20px; }
   .rec-group:first-of-type { margin-top: 0; }
   .rec-group-t { display: flex; align-items: center; gap: 8px; font-size: 12px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; color: #1769e8; margin-bottom: 10px; }

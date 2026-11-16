@@ -2,14 +2,36 @@
 {% block content %}
 {% set parts = s.name.split(' ') %}
 <div class="sp-hero">
+  <span class="hero-accent"></span>
   <div class="sp-hero-top">
     <span class="sp-avatar">{{ parts[0][0] }}{% if parts|length > 1 %}{{ parts[1][0] }}{% endif %}</span>
-    <div>
+    <div class="sp-identity">
       <h2>{{ s.name }}</h2>
-      <p class="sp-sub">{{ s.reg_no }} &middot; {{ s.degree or '—' }} &middot; Session {{ s.session or '—' }}{% if s.department %} &middot; {{ s.department }}{% endif %}</p>
+      <div class="sp-chips">
+        <span class="sp-chip">{{ s.reg_no }}</span>
+        <span class="sp-chip">{{ s.degree or '—' }}</span>
+        <span class="sp-chip">Session {{ s.session or '—' }}</span>
+        {% if s.department %}<span class="sp-chip">{{ s.department }}</span>{% endif %}
+      </div>
       {% if s.status in ['Continue', 'Viva Done', 'Pass Out', 'Sent to COE'] %}<span class="pill q">{{ s.status }}</span>
       {% elif s.status in ['Viva Pending', 'Defense Pending'] %}<span class="pill warn">{{ s.status }}</span>
       {% else %}<span class="pill nq">{{ s.status }}</span>{% endif %}
+    </div>
+    <div class="sp-ring">
+      <div class="ring-wrap">
+        <svg viewBox="0 0 100 100" class="ring-svg" aria-hidden="true">
+          <defs><linearGradient id="ringGrad" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0%" stop-color="#1769e8"/><stop offset="55%" stop-color="#7c3aed"/><stop offset="100%" stop-color="#db2777"/>
+          </linearGradient></defs>
+          <circle cx="50" cy="50" r="42" class="ring-bg"/>
+          <circle cx="50" cy="50" r="42" class="ring-fg" stroke="url(#ringGrad)" stroke-dasharray="264" stroke-dashoffset="{{ (264 * (100 - s.journey_pct) / 100) | round(1) }}"/>
+        </svg>
+        <span class="ring-pct">{{ s.journey_pct }}%</span>
+      </div>
+      <span class="ring-label">{% if s.next_step %}Next: {{ s.next_step }}{% else %}Complete{% endif %}</span>
+    </div>
+    <div class="sp-actions">
+      <a class="btn light sm" href="{{ url_for('student_profile_sheet') }}">Print Profile Sheet</a>
     </div>
   </div>
 </div>
@@ -61,7 +83,7 @@
   </div>
 </div>
 
-<div class="sp-stats">
+<div class="sp-stats five">
   <div class="sp-stat">
     <div class="k">Documents</div>
     <div class="v">{{ docs|length }} uploaded</div>
@@ -69,17 +91,57 @@
   <div class="sp-stat">
     <div class="k">Synopsis</div>
     <div class="v">{% if s.synopsis == 'Received' %}<span class="pill q">Received</span>{% else %}<span class="pill nq">Not Received</span>{% endif %}</div>
+    {% if s.synopsis_at %}<div class="hint" style="margin-top:4px">{{ s.syn_at_disp }}</div>{% endif %}
+  </div>
+  <div class="sp-stat">
+    <div class="k">Semi-Final Thesis</div>
+    <div class="v">{% if s.semi_final_thesis == 'Received' %}<span class="pill q">Received</span>{% else %}<span class="pill nq">Not Received</span>{% endif %}</div>
+    {% if s.semi_final_thesis_at %}<div class="hint" style="margin-top:4px">{{ s.semi_at_disp }}</div>{% endif %}
   </div>
   <div class="sp-stat">
     <div class="k">Final Thesis</div>
     <div class="v">{% if s.final_thesis == 'Received' %}<span class="pill q">Received</span>{% else %}<span class="pill nq">Not Received</span>{% endif %}</div>
+    {% if s.final_thesis_at %}<div class="hint" style="margin-top:4px">{{ s.final_at_disp }}</div>{% endif %}
   </div>
   <div class="sp-stat">
     <div class="k">Folder / File</div>
     <div class="v">{% if s.folder_file == 'Completed' %}<span class="pill q">Completed</span>{% else %}<span class="pill nq">Not Completed</span>{% endif %}</div>
+    {% if s.folder_file_at %}<div class="hint" style="margin-top:4px">{{ s.folder_at_disp }}</div>{% endif %}
   </div>
 </div>
 
+
+<div class="card section">
+  <div class="section-head">
+    <span class="section-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></span>
+    <h3>Personal &amp; Academic Details</h3>
+  </div>
+
+  <div class="rec-group">
+    <div class="rec-group-t">Personal Details</div>
+    <div class="record-grid">
+      <div class="rec-field"><div class="rec-k">Full Name</div><div class="rec-v">{{ s.name }}</div></div>
+      <div class="rec-field"><div class="rec-k">Father Name</div><div class="rec-v">{{ s.father_name or '—' }}</div></div>
+      <div class="rec-field"><div class="rec-k">CNIC</div><div class="rec-v">{{ s.cnic or '—' }}</div></div>
+      <div class="rec-field"><div class="rec-k">Gender</div><div class="rec-v">{{ s.gender or '—' }}</div></div>
+      <div class="rec-field"><div class="rec-k">Registration No.</div><div class="rec-v">{{ s.reg_no }}</div></div>
+      <div class="rec-field"><div class="rec-k">Status</div><div class="rec-v"><span class="status-plain {% if s.status in ['Pass Out', 'Viva Done', 'Sent to COE', 'Continue'] %}sp-ok{% elif s.status in ['Viva Pending', 'Defense Pending', 'Freeze'] %}sp-warn{% elif s.status in ['Left', 'Admission Cancelled'] %}sp-bad{% endif %}"><span class="dot"></span>{{ s.status or '—' }}</span></div></div>
+    </div>
+  </div>
+
+  <div class="rec-group">
+    <div class="rec-group-t">Academic Details</div>
+    <div class="record-grid">
+      <div class="rec-field"><div class="rec-k">Degree Programme</div><div class="rec-v">{{ s.degree or '—' }}</div></div>
+      <div class="rec-field"><div class="rec-k">Session</div><div class="rec-v">{{ s.session or '—' }}</div></div>
+      <div class="rec-field"><div class="rec-k">Department</div><div class="rec-v">{{ s.department or '—' }}</div></div>
+      <div class="rec-field"><div class="rec-k">Thesis Forward (COE)</div><div class="rec-v">{{ s.coe_display }}</div></div>
+      <div class="rec-field full"><div class="rec-k">Comments (Missing)</div><div class="rec-v">{{ s.comments_missing or '—' }}</div></div>
+    </div>
+  </div>
+
+  <p class="hint" style="margin-top:16px">This record is maintained by the DAS office. If anything looks wrong, contact the office.</p>
+</div>
 {% if vivas %}
 <div class="card section">
   <div class="section-head">

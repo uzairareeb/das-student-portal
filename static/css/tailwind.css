@@ -4625,6 +4625,11 @@
   .status-chip.sc-bad .dot {
     background-color: var(--color-red-500);
   }
+  @media (min-width: 1024px) {
+    .sp-stats.five {
+      grid-template-columns: repeat(5, 1fr);
+    }
+  }
   .rec-group {
     margin-top: 20px;
   }
