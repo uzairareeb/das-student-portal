@@ -3695,6 +3695,35 @@ def dept_dashboard():
                               " WHERE department_id=? AND status='pending'",
                               (dept["id"],)),
     }
+    stats["viva_total"] = _n(
+        "SELECT COUNT(*) AS n FROM viva_records v"
+        " JOIN students s ON s.id=v.student_id"
+        " WHERE REPLACE(LOWER(s.department), 'department of ', '')"
+        "=REPLACE(LOWER(?), 'department of ', '')", (dept["name"],))
+    from zoneinfo import ZoneInfo
+    _now_pkt = datetime.now(ZoneInfo("Asia/Karachi"))
+    greeting = ("Good Morning" if _now_pkt.hour < 12 else
+                "Good Afternoon" if _now_pkt.hour < 17 else "Good Evening")
+    today_str = _now_pkt.strftime("%A, %d %B %Y")
+    _match = ("REPLACE(LOWER(department), 'department of ', '')"
+              "=REPLACE(LOWER(?), 'department of ', '')")
+    _total = stats["students"]
+    status_rows = []
+    for r in db.fetchall(
+            "SELECT status, COUNT(*) AS n FROM students WHERE " + _match
+            + " GROUP BY status ORDER BY n DESC", (dept["name"],)):
+        status_rows.append({
+            "status": r["status"] or "\u2014", "n": r["n"],
+            "pct": (round(r["n"] * 100 / _total) if _total else 0)})
+    _prog = {}
+    for r in db.fetchall(
+            "SELECT degree, COUNT(*) AS n FROM students WHERE " + _match
+            + " GROUP BY degree", (dept["name"],)):
+        _key = (r["degree"] or "Other").split(" ")[0]
+        _prog[_key] = _prog.get(_key, 0) + r["n"]
+    prog_rows = [{"name": k, "n": n,
+                  "pct": (round(n * 100 / _total) if _total else 0)}
+                 for k, n in sorted(_prog.items(), key=lambda kv: -kv[1])]
     schedules = []
     for _summ in _list_saved_schedules():
         _rec = _get_saved_schedule(_summ["id"])
@@ -3704,7 +3733,10 @@ def dept_dashboard():
                 schedules.append(_model)
     return render_template("dept_dashboard.html", uni=UNI_NAME,
                            title=PORTAL_TITLE, dept=dept, uploads=uploads,
-                           stats=stats, schedules=schedules)
+                           stats=stats, schedules=schedules,
+                           greeting=greeting, today_str=today_str,
+                           status_rows=status_rows, prog_rows=prog_rows,
+                           recent_uploads=uploads[:5])
 
 
 @app.route("/dept/students")
@@ -3810,6 +3842,21 @@ def dept_student_profile(sid):
                            vivas=vivas)
 
 
+@app.route("/dept/upload", methods=["GET"])
+@dept_required
+def dept_upload_page():
+    """The department's Upload page: the send-for-review form and the
+    full submissions history live here (moved off the dashboard)."""
+    dept = current_dept()
+    db = get_db()
+    uploads = [dict(r) for r in db.fetchall(
+        "SELECT id, file_name, row_count, status, admin_comment, created_at,"
+        " reviewed_at FROM dept_uploads WHERE department_id=?"
+        " ORDER BY id DESC", (dept["id"],))]
+    return render_template("dept_upload.html", uni=UNI_NAME,
+                           title=PORTAL_TITLE, dept=dept, uploads=uploads)
+
+
 @app.route("/dept/upload", methods=["POST"])
 @dept_required
 def dept_upload():
@@ -3819,19 +3866,19 @@ def dept_upload():
     file = request.files.get("file")
     if not file or not file.filename:
         flash("Please choose a file to upload.")
-        return redirect(url_for("dept_dashboard"))
+        return redirect(url_for("dept_upload_page"))
     if not file.filename.lower().endswith(".xlsx"):
         flash("Only Excel (.xlsx) files are allowed.")
-        return redirect(url_for("dept_dashboard"))
+        return redirect(url_for("dept_upload_page"))
     raw = file.read()
     if not raw:
         flash("The file is empty.")
-        return redirect(url_for("dept_dashboard"))
+        return redirect(url_for("dept_upload_page"))
     try:
         records, skipped, _ = parse_import_rows(io.BytesIO(raw))
     except ValueError as e:
         flash(str(e))
-        return redirect(url_for("dept_dashboard"))
+        return redirect(url_for("dept_upload_page"))
     db = get_db()
     now = datetime.now().strftime("%Y-%m-%d %H:%M")
     db.execute(
@@ -3844,7 +3891,7 @@ def dept_upload():
                  f"{len(records)} row(s) sent for review ({file.filename})")
     flash(f"Sent for DAS review: {len(records)} student row(s)."
           f" You will see the decision here.")
-    return redirect(url_for("dept_dashboard"))
+    return redirect(url_for("dept_upload_page"))
 
 
 @app.route("/dept/uploads/<int:uid>/download")
