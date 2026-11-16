@@ -24,6 +24,28 @@
 {% endif %}
 {% endfor %}
 
+{% if sched %}
+<div class="card section">
+  <div class="section-head">
+    <span class="section-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg></span>
+    <h3>Academic Schedule</h3>
+    <span class="hint">Session {{ sched.session }}</span>
+  </div>
+  <p class="hint" style="margin-top:0">Official deadlines issued by the Directorate of Advanced Studies &middot; Commencement: <strong>{{ sched.commencement_disp }}</strong> &middot; Termination: <strong>{{ sched.termination_disp }}</strong></p>
+  <div class="sched-cards">
+    {% for it in sched.rows %}
+    <div class="dl-card{% if it.next %} next{% elif it.past %} passed{% endif %}">
+      {% if it.next %}<span class="next-pill">NEXT</span>{% endif %}
+      <span class="dl-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">{{ it.icon | safe }}</svg></span>
+      <div class="dl-nm">{{ it.short }}</div>
+      <div class="dl-dt">{{ it.date_disp }}</div>
+      <div class="dl-st">{{ it.status_disp }}</div>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+{% endif %}
+
 <div class="card section">
   <div class="section-head">
     <span class="section-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg></span>
@@ -38,34 +60,6 @@
     {% endfor %}
   </div>
 </div>
-
-{% if sched %}
-{% if sched.days_left is not none and sched.days_left <= 30 %}
-<div class="alert alert-warn"><strong>Upcoming deadline:</strong> {{ sched.next_doc }} &mdash; last date {{ sched.next_date_disp }} ({{ sched.days_left }} day(s) left).</div>
-{% endif %}
-<div class="card section">
-  <div class="section-head">
-    <span class="section-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg></span>
-    <h3>Academic Schedule</h3>
-    <span class="hint">Session {{ sched.session }}</span>
-  </div>
-  <p class="hint" style="margin-top:0">Official deadlines issued by the Directorate of Advanced Studies &middot; Commencement: <strong>{{ sched.commencement_disp }}</strong> &middot; Termination: <strong>{{ sched.termination_disp }}</strong></p>
-  <div class="table-scroll">
-    <table class="data-table sched-table">
-      <thead><tr><th>Document / Milestone</th><th>Last Date</th><th></th></tr></thead>
-      <tbody>
-        {% for it in sched.rows %}
-        <tr{% if it.next %} class="sched-next"{% elif it.past %} class="sched-past"{% endif %}>
-          <td>{{ it.document }}</td>
-          <td class="nowrap"><strong>{{ it.date_disp }}</strong> <span class="hint">({{ it.day_disp }})</span>{% if it.is_range %}<div class="hint">Window: {{ it.range_disp }}</div>{% endif %}</td>
-          <td class="nowrap">{% if it.next %}<span class="pill warn">Next Deadline</span>{% elif it.past %}<span class="hint">Passed</span>{% endif %}</td>
-        </tr>
-        {% endfor %}
-      </tbody>
-    </table>
-  </div>
-</div>
-{% endif %}
 
 <div class="sp-stats">
   <div class="sp-stat">
