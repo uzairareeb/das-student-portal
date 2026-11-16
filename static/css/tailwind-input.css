@@ -629,6 +629,10 @@
   .status-chip.sc-warn .dot { @apply bg-amber-500; }
   .status-chip.sc-bad { @apply border-red-200 bg-red-50 text-red-700; }
   .status-chip.sc-bad .dot { @apply bg-red-500; }
+  .rec-group { margin-top: 20px; }
+  .rec-group:first-of-type { margin-top: 0; }
+  .rec-group-t { display: flex; align-items: center; gap: 8px; font-size: 12px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; color: #1769e8; margin-bottom: 10px; }
+  .rec-group-t::after { content: ""; flex: 1; height: 1px; background: #e5eaf2; }
   .record-grid { @apply grid grid-cols-1 gap-3 md:grid-cols-2; }
   .rec-field { @apply rounded-[10px] border border-line bg-[#fbfbfe] px-4 py-3; }
   .rec-field.full { @apply md:col-span-2; }
