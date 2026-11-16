@@ -4968,6 +4968,10 @@ def student_dashboard():
          "done": any(v.get("result") == "Pass" for v in vivas)},
     ]
     sched_rec = _saved_schedule_for_session(s.get("session"))
+    if sched_rec is None:
+        _summ = _list_saved_schedules()
+        if _summ:
+            sched_rec = _get_saved_schedule(_summ[0]["id"])
     sched = _portal_schedule(sched_rec) if sched_rec else None
     return render_template("student_dashboard.html", uni=UNI_NAME,
                            title=PORTAL_TITLE, s=s, docs=docs, vivas=vivas,
