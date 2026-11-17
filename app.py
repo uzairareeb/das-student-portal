@@ -5281,129 +5281,186 @@ def student_record():
 
 
 def _student_profile_pdf_bytes(s, docs, vivas):
-    """Premium DAS student profile PDF (official CUVAS design spec).
+    """Student profile PDF in the approved reference design.
 
-    A4 portrait; navy/blue/purple institutional theme; identity card with
-    a dynamic status badge; thesis-journey progress bar driven by the
-    existing journey_progress(); structured detail sections; submission
-    record table; footer with Page X of Y. All data is the student's own
-    live record — nothing is hardcoded per student.
+    Centred institutional header, soft status pill, rounded thesis
+    journey card with progress bar, label-over-value detail pairs,
+    hairline degree table, numbered submission list and a minimal
+    footer. All values come from the student's live record and the
+    existing journey_progress(); nothing is hardcoded per student.
     """
     from xml.sax.saxutils import escape as _esc
     from reportlab.lib import colors
     from reportlab.lib.pagesizes import A4
     from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
     from reportlab.lib.units import mm
+    from reportlab.pdfbase.pdfmetrics import stringWidth
     from reportlab.pdfgen import canvas as _pdfcanvas
-    from reportlab.platypus import (HRFlowable, Image, KeepTogether,
-                                    Paragraph, SimpleDocTemplate, Spacer,
-                                    Table, TableStyle)
+    from reportlab.platypus import (Flowable, HRFlowable, Image,
+                                    KeepTogether, Paragraph,
+                                    SimpleDocTemplate, Spacer, Table,
+                                    TableStyle)
 
     NAVY = colors.HexColor("#17365D")
     BLUE = colors.HexColor("#2457A7")
     PURPLE = colors.HexColor("#6654A3")
-    BG = colors.HexColor("#F4F7FB")
     LIGHT = colors.HexColor("#EAF0F8")
     TEXT = colors.HexColor("#263445")
     MUTED = colors.HexColor("#697586")
     GREEN = colors.HexColor("#198754")
+    LINE = colors.HexColor("#E3EAF3")
+    BARTRACK = colors.HexColor("#D8E2EF")
     GREEN_H = "#198754"
-    ORANGE = colors.HexColor("#E07B39")
-    RED = colors.HexColor("#C0392B")
-    LINE = colors.HexColor("#D9E1EC")
-    BARTRACK = colors.HexColor("#DFE7F1")
+    RED_H = "#C0392B"
     MUTED_H = "#697586"
 
     done_n, next_step = journey_progress(
         s, viva_pass=any(v.get("result") == "Pass" for v in vivas))
     pct = round(done_n / 7 * 100)
-    gen_str = _pkt_now().strftime("%d %b %Y, %I:%M %p") + " (PKT)"
+    now_pkt = _pkt_now()
+    gen_str = now_pkt.strftime("%d %b %Y, %I:%M %p") + " (PKT)"
+    gen_footer = now_pkt.strftime("%d %b %Y \u00b7 %I:%M %p") + " PKT"
     status = (s.get("status") or "").strip()
 
-    BADGE_COLORS = {
-        "Continue": GREEN,
-        "Freeze": ORANGE,
-        "Pass Out": BLUE,
-        "Viva Done": BLUE,
-        "Sent to COE": BLUE,
-        "Viva Pending": PURPLE,
-        "Defense Pending": PURPLE,
-        "Left": RED,
-        "Admission Cancelled": RED,
+    # status -> (pill background, pill text colour)
+    BADGE = {
+        "Continue": ("#E2F3E9", GREEN),
+        "Freeze": ("#FCEEE1", colors.HexColor("#C96A1E")),
+        "Pass Out": ("#E3EAF6", BLUE),
+        "Viva Done": ("#E3EAF6", BLUE),
+        "Sent to COE": ("#E3EAF6", BLUE),
+        "Viva Pending": ("#EBE8F4", PURPLE),
+        "Defense Pending": ("#EBE8F4", PURPLE),
+        "Left": ("#F9E4E4", colors.HexColor("#C0392B")),
+        "Admission Cancelled": ("#F9E4E4", colors.HexColor("#C0392B")),
     }
-    badge_color = BADGE_COLORS.get(status, MUTED)
+    badge_bg, badge_fg = BADGE.get(status, ("#EDF1F5", MUTED))
+    badge_bg = colors.HexColor(badge_bg)
 
     styles = getSampleStyleSheet()
-    uni_style = ParagraphStyle("uuni", parent=styles["Normal"], fontSize=12,
-                               leading=15, fontName="Helvetica-Bold",
-                               textColor=NAVY)
-    das_style = ParagraphStyle("udas", parent=styles["Normal"], fontSize=10,
-                               leading=13, fontName="Helvetica-Bold",
-                               textColor=BLUE)
-    title_style = ParagraphStyle("utitle", parent=styles["Normal"],
-                                 fontSize=16, leading=19,
-                                 fontName="Helvetica-Bold", textColor=NAVY)
-    subtitle_style = ParagraphStyle("usub", parent=styles["Normal"],
-                                    fontSize=8.5, leading=11,
-                                    fontName="Helvetica-Bold",
-                                    textColor=PURPLE)
-    meta_lab = ParagraphStyle("umetal", parent=styles["Normal"], fontSize=7.5,
-                              leading=10, fontName="Helvetica-Bold",
-                              textColor=MUTED, alignment=2)
-    meta_val = ParagraphStyle("umetav", parent=styles["Normal"], fontSize=9.5,
-                              leading=12, fontName="Helvetica-Bold",
-                              textColor=TEXT, alignment=2)
-    name_style = ParagraphStyle("uname", parent=styles["Normal"],
-                                fontSize=14.5, leading=17,
-                                fontName="Helvetica-Bold", textColor=NAVY)
-    id_line = ParagraphStyle("uidline", parent=styles["Normal"], fontSize=9.5,
-                             leading=13.5, textColor=TEXT)
-    badge_style = ParagraphStyle("ubadge", parent=styles["Normal"],
-                                 fontSize=9, leading=11,
-                                 fontName="Helvetica-Bold",
-                                 textColor=colors.white, alignment=1)
-    cap_style = ParagraphStyle("ucap", parent=styles["Normal"], fontSize=7,
-                               leading=9, fontName="Helvetica-Bold",
-                               textColor=MUTED, alignment=2)
-    prog_lab = ParagraphStyle("uprog", parent=styles["Normal"], fontSize=10,
-                              leading=13, fontName="Helvetica-Bold",
-                              textColor=NAVY)
-    prog_pct = ParagraphStyle("uproct", parent=styles["Normal"], fontSize=10,
-                              leading=13, fontName="Helvetica-Bold",
-                              textColor=BLUE, alignment=2)
-    next_style = ParagraphStyle("unext", parent=styles["Normal"], fontSize=9,
-                                leading=12, textColor=MUTED)
-    sec_style = ParagraphStyle("usec", parent=styles["Normal"], fontSize=10.5,
-                               leading=13, fontName="Helvetica-Bold",
-                               textColor=NAVY, spaceBefore=13, spaceAfter=4,
+    uni_style = ParagraphStyle("muni", parent=styles["Normal"], fontSize=12,
+                               leading=15.5, fontName="Helvetica-Bold",
+                               textColor=NAVY, alignment=1)
+    city_style = ParagraphStyle("mcity", parent=styles["Normal"], fontSize=8,
+                                leading=10.5, textColor=MUTED, alignment=1,
+                                spaceBefore=1)
+    das_style = ParagraphStyle("mdas", parent=styles["Normal"], fontSize=9.5,
+                               leading=12, fontName="Helvetica-Bold",
+                               textColor=PURPLE, alignment=1, spaceBefore=2)
+    title_style = ParagraphStyle("mtitle", parent=styles["Normal"],
+                                 fontSize=17, leading=20,
+                                 fontName="Helvetica-Bold", textColor=NAVY,
+                                 alignment=1)
+    subtitle_style = ParagraphStyle("msub", parent=styles["Normal"],
+                                    fontSize=8, leading=10.5, textColor=MUTED,
+                                    alignment=1, spaceBefore=2)
+    name_style = ParagraphStyle("mname", parent=styles["Normal"],
+                                fontSize=13, leading=16,
+                                fontName="Helvetica-Bold", textColor=TEXT)
+    id_style = ParagraphStyle("mid", parent=styles["Normal"], fontSize=9.5,
+                              leading=13.5, textColor=TEXT)
+    sec_style = ParagraphStyle("msec", parent=styles["Normal"], fontSize=11,
+                               leading=14, fontName="Helvetica-Bold",
+                               textColor=TEXT, spaceBefore=11, spaceAfter=5,
                                keepWithNext=1)
-    lab_style = ParagraphStyle("ulab", parent=styles["Normal"], fontSize=7.5,
+    lab_style = ParagraphStyle("mlab", parent=styles["Normal"], fontSize=7.5,
                                leading=10, fontName="Helvetica-Bold",
-                               textColor=MUTED)
-    val_style = ParagraphStyle("uval", parent=styles["Normal"], fontSize=9.5,
+                               textColor=MUTED, spaceAfter=2)
+    val_style = ParagraphStyle("mval", parent=styles["Normal"], fontSize=10,
+                               leading=13, fontName="Helvetica-Bold",
+                               textColor=TEXT)
+    na_style = ParagraphStyle("mna", parent=val_style, textColor=MUTED,
+                              fontName="Helvetica")
+    fld_style = ParagraphStyle("mfld", parent=styles["Normal"], fontSize=9.5,
                                leading=12.5, textColor=TEXT)
-    na_style = ParagraphStyle("una", parent=val_style, textColor=MUTED)
-    cell_style = ParagraphStyle("ucell", parent=styles["Normal"], fontSize=9.5,
+    th_style = ParagraphStyle("mth", parent=styles["Normal"], fontSize=7.5,
+                              leading=10, fontName="Helvetica-Bold",
+                              textColor=MUTED)
+    item_style = ParagraphStyle("mitem", parent=styles["Normal"], fontSize=10,
+                                leading=13, fontName="Helvetica-Bold",
+                                textColor=TEXT)
+    sub_style = ParagraphStyle("msub2", parent=styles["Normal"], fontSize=8.5,
+                               leading=11.5, textColor=MUTED, spaceBefore=1)
+    num_style = ParagraphStyle("mnum", parent=styles["Normal"], fontSize=10,
+                               leading=13, fontName="Helvetica-Bold",
+                               textColor=NAVY)
+    cell_style = ParagraphStyle("mcell", parent=styles["Normal"], fontSize=9.5,
                                 leading=12.5, textColor=TEXT)
-    head_style = ParagraphStyle("uhead", parent=styles["Normal"], fontSize=9,
-                                leading=11.5, fontName="Helvetica-Bold",
-                                textColor=colors.white)
 
-    def P(text, style=val_style):
+    def P(text, style=fld_style):
         return Paragraph(_esc(str(text)), style)
 
-    def V(value):
-        """Detail value: real value, or a muted N/A when missing."""
+    def V(value, style=val_style):
         v = "" if value is None else str(value).strip()
         if not v or v == "\u2014":
             return Paragraph("N/A", na_style)
-        return Paragraph(_esc(v), val_style)
+        return Paragraph(_esc(v), style)
 
-    def date_or_na(stamp_disp):
-        return "N/A" if stamp_disp == "\u2014" else stamp_disp
+    class Pill(Flowable):
+        """Rounded status pill: soft background, coloured bold text."""
+
+        def __init__(self, text, bg, fg):
+            super().__init__()
+            self.text = text or "N/A"
+            self.bg = bg
+            self.fg = fg
+            self.hAlign = "RIGHT"
+
+        def wrap(self, avail_w, avail_h):
+            self.width = stringWidth(self.text, "Helvetica-Bold", 8.5) + 18
+            self.height = 14
+            return self.width, self.height
+
+        def draw(self):
+            c = self.canv
+            c.setFillColor(self.bg)
+            c.roundRect(0, 0, self.width, self.height, 7, stroke=0, fill=1)
+            c.setFillColor(self.fg)
+            c.setFont("Helvetica-Bold", 8.5)
+            c.drawCentredString(self.width / 2.0, 4.6, self.text)
+
+    class JourneyCard(Flowable):
+        """Rounded light card: title + % , progress bar, next milestone."""
+
+        def __init__(self, width, pct_, next_text):
+            super().__init__()
+            self.width = width
+            self.height = 19.5 * mm
+            self.pct = pct_
+            self.next_text = next_text
+
+        def wrap(self, avail_w, avail_h):
+            return self.width, self.height
+
+        def draw(self):
+            c = self.canv
+            w, h = self.width, self.height
+            pad = 12
+            c.setFillColor(LIGHT)
+            c.roundRect(0, 0, w, h, 4 * mm, stroke=0, fill=1)
+            c.setFillColor(TEXT)
+            c.setFont("Helvetica-Bold", 10)
+            c.drawString(pad, h - 16, "Thesis Journey Progress")
+            c.setFillColor(BLUE)
+            c.setFont("Helvetica-Bold", 10.5)
+            c.drawRightString(w - pad, h - 16, f"{self.pct}%")
+            bar_w = w - 2 * pad
+            bar_h = 3.6 * mm
+            bar_y = h - 16 - 6 - bar_h
+            c.setFillColor(BARTRACK)
+            c.roundRect(pad, bar_y, bar_w, bar_h, bar_h / 2, stroke=0,
+                        fill=1)
+            if self.pct > 0:
+                fill_w = min(bar_w, max(bar_h, bar_w * self.pct / 100.0))
+                c.setFillColor(BLUE)
+                c.roundRect(pad, bar_y, fill_w, bar_h, bar_h / 2,
+                            stroke=0, fill=1)
+            c.setFillColor(MUTED)
+            c.setFont("Helvetica", 8.5)
+            c.drawString(pad, bar_y - 11.5, self.next_text)
 
     class ProfileCanvas(_pdfcanvas.Canvas):
-        """Footer on every page, with Page X of Y numbering."""
+        """Minimal footer on every page (reference-design style)."""
 
         def __init__(self, *args, **kwargs):
             super().__init__(*args, **kwargs)
@@ -5423,265 +5480,178 @@ def _student_profile_pdf_bytes(s, docs, vivas):
 
         def _draw_footer(self, page_no, total):
             self.saveState()
-            self.setStrokeColor(LINE)
-            self.setLineWidth(0.7)
-            self.line(15 * mm, 16 * mm, A4[0] - 15 * mm, 16 * mm)
+            self.setFillColor(MUTED)
+            self.setFont("Helvetica", 7.5)
+            self.drawString(15 * mm, 12.4 * mm, f"Generated: {gen_footer}")
             self.setFillColor(NAVY)
             self.setFont("Helvetica-Bold", 7.5)
-            self.drawCentredString(A4[0] / 2.0, 12.2 * mm,
-                                   "DIRECTORATE OF ADVANCED STUDIES")
+            self.drawRightString(A4[0] - 15 * mm, 12.4 * mm, "CUVAS \u00b7 DAS")
             self.setFillColor(MUTED)
             self.setFont("Helvetica", 7)
-            self.drawCentredString(
-                A4[0] / 2.0, 8.6 * mm,
-                "Cholistan University of Veterinary and Animal Sciences, "
-                "Bahawalpur")
-            self.drawCentredString(A4[0] / 2.0, 5.2 * mm,
-                                   f"Generated on: {gen_str}")
-            self.setFont("Helvetica", 7.5)
-            self.drawRightString(A4[0] - 15 * mm, 12.2 * mm,
-                                 f"Page {page_no} of {total}")
+            self.drawCentredString(A4[0] / 2.0, 8.2 * mm,
+                                   "OFFICIAL STUDENT ACADEMIC RECORD")
+            if total > 1:
+                self.setFont("Helvetica", 7)
+                self.drawRightString(A4[0] - 15 * mm, 8.2 * mm,
+                                     f"Page {page_no} of {total}")
             self.restoreState()
 
     buf = io.BytesIO()
     doc = SimpleDocTemplate(
         buf, pagesize=A4, leftMargin=15 * mm, rightMargin=15 * mm,
-        topMargin=12 * mm, bottomMargin=19 * mm,
+        topMargin=10.5 * mm, bottomMargin=16 * mm,
         title=f"Student Profile - {s.get('name') or ''}",
         author="Directorate of Advanced Studies, CUVAS")
     W = doc.width
     story = []
 
-    # ---- Institutional header -------------------------------------------
+    # ---- Centred institutional header --------------------------------------
     logo_path = os.path.join(os.path.dirname(os.path.abspath(__file__)),
                              "static", "img", "cuvas-logo.png")
-    logo_flow = (Image(logo_path, width=37 * mm, height=14.8 * mm)
-                 if os.path.exists(logo_path) else Spacer(37 * mm, 14.8 * mm))
-    hdr = Table([[logo_flow,
-                  [Paragraph("CHOLISTAN UNIVERSITY OF VETERINARY AND "
-                             "ANIMAL SCIENCES, BAHAWALPUR", uni_style),
-                   Paragraph("Directorate of Advanced Studies", das_style)]]],
-                colWidths=[42 * mm, W - 42 * mm])
-    hdr.setStyle(TableStyle([
-        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
-        ("LEFTPADDING", (0, 0), (-1, -1), 0),
-        ("RIGHTPADDING", (0, 0), (-1, -1), 0),
-        ("TOPPADDING", (0, 0), (-1, -1), 0),
-        ("BOTTOMPADDING", (0, 0), (-1, -1), 2),
-    ]))
-    story.append(hdr)
-    story.append(HRFlowable(width="100%", thickness=1.1, color=NAVY,
-                            spaceBefore=3, spaceAfter=8))
+    if os.path.exists(logo_path):
+        logo = Image(logo_path, width=29.1 * mm, height=16 * mm)
+        logo.hAlign = "CENTER"
+        story.append(logo)
+        story.append(Spacer(1, 2.5 * mm))
+    story.append(Paragraph(
+        "CHOLISTAN UNIVERSITY OF VETERINARY AND ANIMAL SCIENCES", uni_style))
+    story.append(Paragraph("BAHAWALPUR", city_style))
+    story.append(Paragraph("DIRECTORATE OF ADVANCED STUDIES", das_style))
+    story.append(HRFlowable(width="100%", thickness=0.9, color=BLUE,
+                            spaceBefore=6, spaceAfter=8))
 
-    # ---- Title block ------------------------------------------------------
-    title_tbl = Table(
-        [[
-            [Paragraph("STUDENT PROFILE", title_style),
-             Paragraph("POSTGRADUATE ACADEMIC RECORD", subtitle_style)],
-            [Paragraph("REGISTRATION NUMBER", meta_lab),
-             Paragraph(_esc(str(s.get("reg_no") or "N/A")), meta_val),
-             Paragraph("GENERATED ON", meta_lab),
-             Paragraph(_esc(gen_str), meta_val)],
-        ]],
-        colWidths=[W * 0.52, W * 0.48])
-    title_tbl.setStyle(TableStyle([
-        ("VALIGN", (0, 0), (-1, -1), "TOP"),
-        ("LEFTPADDING", (0, 0), (-1, -1), 0),
-        ("RIGHTPADDING", (0, 0), (-1, -1), 0),
-        ("TOPPADDING", (0, 0), (-1, -1), 0),
-        ("BOTTOMPADDING", (0, 0), (-1, -1), 0),
-    ]))
-    story.append(title_tbl)
+    # ---- Title ---------------------------------------------------------------
+    story.append(Paragraph("STUDENT PROFILE", title_style))
+    story.append(Paragraph("POSTGRADUATE ACADEMIC RECORD", subtitle_style))
     story.append(Spacer(1, 4 * mm))
 
-    # ---- Identity card ----------------------------------------------------
-    badge_w = max(26 * mm, min(52 * mm, (len(status) * 2.1 + 12) * mm))
-    badge = Table([[Paragraph(_esc(status or "N/A"), badge_style)]],
-                  colWidths=[badge_w])
-    badge.setStyle(TableStyle([
-        ("BACKGROUND", (0, 0), (-1, -1), badge_color),
-        ("LEFTPADDING", (0, 0), (-1, -1), 8),
-        ("RIGHTPADDING", (0, 0), (-1, -1), 8),
-        ("TOPPADDING", (0, 0), (-1, -1), 4),
-        ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
-        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
-    ]))
-    badge.hAlign = "RIGHT"
-    id_meta = " &middot; ".join(
-        _esc(str(x)) for x in (s.get("degree"), s.get("department")) if x)
-    id_sess = _esc(str(s.get("session") or "N/A"))
+    # ---- Identity (plain, pill badge at right) -------------------------------
+    degree_line = " \u00b7 ".join(
+        str(x) for x in (s.get("degree"),
+                         f"Session {s.get('session')}" if s.get("session")
+                         else None) if x) or "N/A"
     identity = Table(
         [[
             [P(s.get("name") or "N/A", name_style),
-             Paragraph(f"Reg. No: {_esc(str(s.get('reg_no') or 'N/A'))}"
-                       f" &middot; Session {id_sess}", id_line),
-             Paragraph(id_meta or "N/A", id_line)],
-            [Paragraph("CURRENT STATUS", cap_style), badge],
+             P(s.get("reg_no") or "N/A", id_style),
+             P(degree_line, id_style)],
+            Pill(status, badge_bg, badge_fg),
         ]],
-        colWidths=[W * 0.66, W * 0.34])
+        colWidths=[W * 0.72, W * 0.28])
     identity.setStyle(TableStyle([
-        ("BACKGROUND", (0, 0), (-1, -1), LIGHT),
-        ("BOX", (0, 0), (-1, -1), 0.7, LINE),
-        ("LEFTPADDING", (0, 0), (-1, -1), 10),
-        ("RIGHTPADDING", (0, 0), (-1, -1), 10),
-        ("TOPPADDING", (0, 0), (-1, -1), 9),
-        ("BOTTOMPADDING", (0, 0), (-1, -1), 9),
         ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
-    ]))
-    story.append(identity)
-    story.append(Spacer(1, 5 * mm))
-
-    # ---- Thesis journey progress ------------------------------------------
-    prog_head = Table(
-        [[Paragraph("THESIS JOURNEY PROGRESS", prog_lab),
-          Paragraph(f"{pct}% Complete", prog_pct)]],
-        colWidths=[W * 0.6, W * 0.4])
-    prog_head.setStyle(TableStyle([
-        ("LEFTPADDING", (0, 0), (-1, -1), 0),
-        ("RIGHTPADDING", (0, 0), (-1, -1), 0),
-        ("TOPPADDING", (0, 0), (-1, -1), 0),
-        ("BOTTOMPADDING", (0, 0), (-1, -1), 3),
-        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
-    ]))
-    if pct <= 0:
-        bar = Table([[""]], colWidths=[W], rowHeights=[6.5 * mm])
-        bar_style = [("BACKGROUND", (0, 0), (-1, -1), BARTRACK)]
-    elif pct >= 100:
-        bar = Table([[""]], colWidths=[W], rowHeights=[6.5 * mm])
-        bar_style = [("BACKGROUND", (0, 0), (-1, -1), BLUE)]
-    else:
-        fill_w = W * pct / 100.0
-        bar = Table([["", ""]], colWidths=[fill_w, W - fill_w],
-                    rowHeights=[6.5 * mm])
-        bar_style = [("BACKGROUND", (0, 0), (0, 0), BLUE),
-                     ("BACKGROUND", (1, 0), (1, 0), BARTRACK)]
-    bar.setStyle(TableStyle(bar_style + [
-        ("BOX", (0, 0), (-1, -1), 0.5, LINE),
+        ("ALIGN", (1, 0), (1, 0), "RIGHT"),
         ("LEFTPADDING", (0, 0), (-1, -1), 0),
         ("RIGHTPADDING", (0, 0), (-1, -1), 0),
         ("TOPPADDING", (0, 0), (-1, -1), 0),
         ("BOTTOMPADDING", (0, 0), (-1, -1), 0),
     ]))
+    story.append(identity)
+    story.append(Spacer(1, 4 * mm))
+
+    # ---- Thesis journey card ---------------------------------------------------
     if next_step:
-        next_html = (f"Next Milestone: <font color='#6654A3'><b>"
-                     f"{_esc(next_step)}</b></font>")
+        next_text = f"Next Milestone: {next_step}"
     else:
-        next_html = ("<font color='#198754'><b>All stages completed</b>"
-                     "</font>")
-    story.append(KeepTogether([
-        prog_head, bar,
-        Paragraph(next_html, ParagraphStyle(
-            "unext2", parent=next_style, spaceBefore=4)),
+        next_text = "All stages completed"
+    story.append(JourneyCard(W, pct, next_text))
+
+    # ---- Personal & academic details (label over value, two columns) ---------
+    story.append(Paragraph("PERSONAL & ACADEMIC DETAILS", sec_style))
+    fg_hex = "#%02x%02x%02x" % (int(badge_fg.red * 255),
+                                int(badge_fg.green * 255),
+                                int(badge_fg.blue * 255))
+    status_val = Paragraph(
+        f"<font color='{fg_hex}'><b>{_esc(status or 'N/A')}</b></font>",
+        val_style)
+    pairs = Table(
+        [
+            [[P("FULL NAME", lab_style), V(s.get("name"))],
+             [P("FATHER NAME", lab_style), V(s.get("father_name"))]],
+            [[P("CNIC", lab_style), V(s.get("cnic"))],
+             [P("GENDER", lab_style), V(s.get("gender"))]],
+            [[P("REGISTRATION NO.", lab_style), V(s.get("reg_no"))],
+             [P("STATUS", lab_style), status_val]],
+        ],
+        colWidths=[W / 2, W / 2])
+    pairs.setStyle(TableStyle([
+        ("VALIGN", (0, 0), (-1, -1), "TOP"),
+        ("LEFTPADDING", (0, 0), (-1, -1), 0),
+        ("RIGHTPADDING", (0, 0), (-1, -1), 8),
+        ("TOPPADDING", (0, 0), (-1, -1), 3),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 3),
     ]))
+    story.append(KeepTogether(pairs))
 
-    # ---- Detail sections ----------------------------------------------------
-    def section(title_text):
-        story.append(Paragraph(title_text, sec_style))
-        _hr = HRFlowable(width="100%", thickness=0.7, color=LINE,
-                         spaceAfter=5)
-        _hr.keepWithNext = 1
-        story.append(_hr)
-
-    def detail_table(rows, span_last=False):
-        t = Table(rows, colWidths=[32 * mm, (W - 64 * mm) / 2, 32 * mm,
-                                   (W - 64 * mm) / 2])
-        cmds = [
-            ("GRID", (0, 0), (-1, -1), 0.5, LINE),
-            ("BACKGROUND", (0, 0), (0, -1), BG),
-            ("BACKGROUND", (2, 0), (2, -1), BG),
-            ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
-            ("LEFTPADDING", (0, 0), (-1, -1), 6),
-            ("RIGHTPADDING", (0, 0), (-1, -1), 6),
-            ("TOPPADDING", (0, 0), (-1, -1), 5),
-            ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
-        ]
-        if span_last:
-            cmds.append(("SPAN", (1, -1), (3, -1)))
-        t.setStyle(TableStyle(cmds))
-        return t
-
-    section("PERSONAL & ACADEMIC DETAILS")
-    story.append(KeepTogether(detail_table([
-        [P("FULL NAME", lab_style), V(s.get("name")),
-         P("FATHER NAME", lab_style), V(s.get("father_name"))],
-        [P("CNIC", lab_style), V(s.get("cnic")),
-         P("GENDER", lab_style), V(s.get("gender"))],
-        [P("REGISTRATION NO.", lab_style), V(s.get("reg_no")),
-         P("STUDENT STATUS", lab_style),
-         Paragraph(f"<font color='#{badge_color.hexval()[2:]}'><b>"
-                   f"{_esc(status or 'N/A')}</b></font>", val_style)],
-    ])))
-
-    section("DEGREE INFORMATION")
+    # ---- Degree information (hairline table) -----------------------------------
+    story.append(Paragraph("DEGREE INFORMATION", sec_style))
     coe_disp = fmt_coe(s.get("thesis_forward_coe"))
-    story.append(KeepTogether(detail_table([
-        [P("PROGRAMME", lab_style), V(s.get("degree")),
-         P("SESSION", lab_style), V(s.get("session"))],
-        [P("DEPARTMENT", lab_style), V(s.get("department")),
-         P("THESIS FORWARD (COE)", lab_style), V(coe_disp)],
-        [P("COMMENTS (MISSING)", lab_style), V(s.get("comments_missing")),
-         "", ""],
-    ], span_last=True)))
-
-    # ---- Submission record --------------------------------------------------
-    section("THESIS SUBMISSION RECORD")
-    coe_iso = parse_coe(s.get("thesis_forward_coe"))
-    if coe_iso:
-        coe_status, coe_date = "Forwarded", fmt_coe(s.get("thesis_forward_coe"))
-    else:
-        coe_status, coe_date = "Not Forwarded", "N/A"
-    sub_items = [
-        ("Synopsis", s.get("synopsis"),
-         date_or_na(fmt_stamp(s.get("synopsis_at")))),
-        ("Semi-Final Thesis", s.get("semi_final_thesis"),
-         date_or_na(fmt_stamp(s.get("semi_final_thesis_at")))),
-        ("Final Thesis", s.get("final_thesis"),
-         date_or_na(fmt_stamp(s.get("final_thesis_at")))),
-        ("Folder / File (With GS-Forms)", s.get("folder_file"),
-         date_or_na(fmt_stamp(s.get("folder_file_at")))),
-        ("Thesis Forward (COE)", coe_status, coe_date),
+    deg_rows = [
+        [P("Field", th_style), P("Details", th_style)],
+        [P("Programme"), V(s.get("degree"), fld_style)],
+        [P("Session"), V(s.get("session"), fld_style)],
+        [P("Department"), V(s.get("department"), fld_style)],
+        [P("Thesis Forward (COE)"), V(coe_disp, fld_style)],
     ]
-    sub_rows = [[Paragraph("Sr. No.", head_style),
-                 Paragraph("Submission Item", head_style),
-                 Paragraph("Status", head_style),
-                 Paragraph("Date & Time", head_style)]]
-    for i, (label, st, when) in enumerate(sub_items, start=1):
-        st = st or "Not Received"
-        ok = st in ("Received", "Completed", "Forwarded")
-        col = GREEN_H if ok else MUTED_H
-        sub_rows.append([
-            P(str(i), cell_style),
-            P(label, cell_style),
-            Paragraph(f"<font color='{col}'>\u2022</font> "
-                      f"<font color='{col}'><b>{_esc(st)}</b></font>",
-                      cell_style),
-            P(when, cell_style),
-        ])
-    sub = Table(sub_rows, colWidths=[14 * mm, 64 * mm, 40 * mm, W - 118 * mm],
-                repeatRows=1)
-    sub.setStyle(TableStyle([
-        ("BACKGROUND", (0, 0), (-1, 0), NAVY),
-        ("GRID", (0, 0), (-1, -1), 0.5, LINE),
-        ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, BG]),
+    comments = (s.get("comments_missing") or "").strip()
+    if comments and comments not in ("\u2014", "-", "N/A", "n/a", "None"):
+        deg_rows.append([P("Comments (Missing)"), P(comments)])
+    deg = Table(deg_rows, colWidths=[58 * mm, W - 58 * mm])
+    deg.setStyle(TableStyle([
+        ("LINEBELOW", (0, 0), (-1, -1), 0.5, LINE),
         ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
-        ("LEFTPADDING", (0, 0), (-1, -1), 6),
-        ("RIGHTPADDING", (0, 0), (-1, -1), 6),
-        ("TOPPADDING", (0, 0), (-1, -1), 5),
-        ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
+        ("LEFTPADDING", (0, 0), (-1, -1), 0),
+        ("RIGHTPADDING", (0, 0), (-1, -1), 0),
+        ("TOPPADDING", (0, 0), (-1, -1), 4),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
     ]))
-    story.append(KeepTogether(sub))
+    story.append(KeepTogether(deg))
 
-    # ---- Viva records (existing profile data, same theme) -------------------
+    # ---- Thesis submission record (numbered list) --------------------------------
+    story.append(Paragraph("THESIS SUBMISSION RECORD", sec_style))
+
+    def sub_line(st, stamp_disp):
+        st = st or "Not Received"
+        if stamp_disp == "\u2014":
+            return st
+        return f"{st} \u00b7 {stamp_disp}"
+
+    sub_items = [
+        ("Synopsis", sub_line(s.get("synopsis"),
+                              fmt_stamp(s.get("synopsis_at")))),
+        ("Semi-Final Thesis", sub_line(
+            s.get("semi_final_thesis"),
+            fmt_stamp(s.get("semi_final_thesis_at")))),
+        ("Final Thesis", sub_line(s.get("final_thesis"),
+                                  fmt_stamp(s.get("final_thesis_at")))),
+        ("Folder / File (With GS-Forms)", sub_line(
+            s.get("folder_file"), fmt_stamp(s.get("folder_file_at")))),
+    ]
+    sub_rows = []
+    for i, (label, line) in enumerate(sub_items, start=1):
+        sub_rows.append([P(str(i), num_style),
+                         [P(label, item_style), P(line, sub_style)]])
+    sub = Table(sub_rows, colWidths=[12 * mm, W - 12 * mm])
+    sub.setStyle(TableStyle([
+        ("LINEBEFORE", (0, 0), (0, -1), 0.5, LINE),
+        ("VALIGN", (0, 0), (-1, -1), "TOP"),
+        ("LEFTPADDING", (0, 0), (0, -1), 4),
+        ("LEFTPADDING", (1, 0), (1, -1), 2),
+        ("RIGHTPADDING", (0, 0), (-1, -1), 0),
+        ("TOPPADDING", (0, 0), (-1, -1), 4),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
+    ]))
+    story.append(sub)
+
+    # ---- Viva records (existing profile data, same minimal language) -------------
     if vivas:
-        section("VIVA RECORDS")
-        v_rows = [[Paragraph("Examiner", head_style),
-                   Paragraph("Viva Date", head_style),
-                   Paragraph("Result", head_style),
-                   Paragraph("Marks", head_style)]]
+        story.append(Paragraph("VIVA RECORDS", sec_style))
+        v_rows = [[P("Examiner", th_style), P("Viva Date", th_style),
+                   P("Result", th_style), P("Marks", th_style)]]
         for v in vivas:
             res = v.get("result") or "Pending"
             res_col = (GREEN_H if res == "Pass" else
-                       "#C0392B" if res == "Fail" else MUTED_H)
+                       RED_H if res == "Fail" else MUTED_H)
             marks = ("N/A" if v.get("obtained_marks") is None else
                      f"{v['obtained_marks']} / {v.get('total_marks') or 120}")
             exam = v.get("examiner_name") or "N/A"
@@ -5696,28 +5666,24 @@ def _student_profile_pdf_bytes(s, docs, vivas):
         vt = Table(v_rows, colWidths=[66 * mm, 34 * mm, 30 * mm,
                                       W - 130 * mm], repeatRows=1)
         vt.setStyle(TableStyle([
-            ("BACKGROUND", (0, 0), (-1, 0), NAVY),
-            ("GRID", (0, 0), (-1, -1), 0.5, LINE),
-            ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, BG]),
+            ("LINEBELOW", (0, 0), (-1, -2), 0.5, LINE),
             ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
-            ("LEFTPADDING", (0, 0), (-1, -1), 6),
+            ("LEFTPADDING", (0, 0), (-1, -1), 0),
             ("RIGHTPADDING", (0, 0), (-1, -1), 6),
             ("TOPPADDING", (0, 0), (-1, -1), 5),
             ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
         ]))
         story.append(vt)
 
-    # ---- Documents (existing profile data, same theme) ----------------------
+    # ---- Documents (existing profile data, same minimal language) ------------------
     if docs:
-        section("DOCUMENTS")
-        d_rows = [[Paragraph("Document", head_style),
-                   Paragraph("File Name", head_style),
-                   Paragraph("Status", head_style),
-                   Paragraph("Uploaded", head_style)]]
+        story.append(Paragraph("DOCUMENTS", sec_style))
+        d_rows = [[P("Document", th_style), P("File Name", th_style),
+                   P("Status", th_style), P("Uploaded", th_style)]]
         for d in docs:
             dst = d.get("status") or "N/A"
             dcol = (GREEN_H if dst == "Verified" else
-                    "#C0392B" if dst == "Rejected" else MUTED_H)
+                    RED_H if dst == "Rejected" else MUTED_H)
             d_rows.append([
                 P(d.get("doc_label") or "N/A", cell_style),
                 P(d.get("file_name") or "N/A", cell_style),
@@ -5727,11 +5693,9 @@ def _student_profile_pdf_bytes(s, docs, vivas):
         dt = Table(d_rows, colWidths=[50 * mm, 62 * mm, 28 * mm,
                                       W - 140 * mm], repeatRows=1)
         dt.setStyle(TableStyle([
-            ("BACKGROUND", (0, 0), (-1, 0), NAVY),
-            ("GRID", (0, 0), (-1, -1), 0.5, LINE),
-            ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, BG]),
+            ("LINEBELOW", (0, 0), (-1, -2), 0.5, LINE),
             ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
-            ("LEFTPADDING", (0, 0), (-1, -1), 6),
+            ("LEFTPADDING", (0, 0), (-1, -1), 0),
             ("RIGHTPADDING", (0, 0), (-1, -1), 6),
             ("TOPPADDING", (0, 0), (-1, -1), 5),
             ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
