@@ -95,18 +95,16 @@
   </nav>
   <div class="side-foot">
     <div class="side-profile">
-      <div class="sp-head">
+      <button type="button" id="profileBtn" class="sp-head-btn" aria-haspopup="true" aria-expanded="false">
         <span class="sp-avatar">A</span>
-        <div class="min-w-0">
-          <div class="sp-name">Administrator</div>
-          <div class="sp-sub">Admin Portal</div>
-        </div>
-      </div>
-      <div class="sp-links">
-        <a href="{{ url_for('admin_logout') }}">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
-          Logout
-        </a>
+        <span class="min-w-0 flex-1">
+          <span class="sp-name block">Administrator</span>
+          <span class="sp-sub block">Admin Portal</span>
+        </span>
+        <svg class="sp-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+      </button>
+      <div id="profileMenu" hidden class="absolute right-0 bottom-[calc(100%+8px)] left-0 z-[150] rounded-xl border border-line bg-white p-2 shadow-lg">
+        <a href="{{ url_for('admin_logout') }}" class="flex items-center gap-2.5 rounded-lg px-3 py-2.5 text-sm font-semibold text-red-600 hover:bg-red-50"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg> Logout</a>
       </div>
     </div>
   </div>
