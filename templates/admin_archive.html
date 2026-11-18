@@ -1,0 +1,35 @@
+{% extends "admin_base.html" %}
+{% block container_extra %} wide{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <h2>Archive</h2>
+    <p>Pass Out students are moved here automatically so the main student list stays clean. Their records, documents and viva history stay untouched — restore brings a student back to the main list.</p>
+  </div>
+</div>
+
+<div class="card section">
+  {% if rows %}
+  <div class="doc-list">
+    {% for r in rows %}
+    <div class="doc-row">
+      <span class="doc-icon notif-icon kind-info">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8v13H3V8"/><path d="M1 3h22v5H1z"/><path d="M10 12h4"/></svg>
+      </span>
+      <div class="doc-meta">
+        <div class="doc-name">{{ r.name }} <span class="hint">({{ r.reg_no }})</span></div>
+        <div class="doc-sub">{{ r.degree or '' }}{% if r.department %} &middot; {{ r.department }}{% endif %} &middot; Session {{ r.session or '' }}</div>
+        <div class="doc-sub">{{ r.status or '' }}</div>
+      </div>
+      <a class="btn light sm" href="{{ url_for('admin_student_profile', sid=r.id) }}">View Profile</a>
+      <form method="post" action="{{ url_for('admin_archive_restore', sid=r.id) }}">
+        <button type="submit" class="btn primary sm">Restore to List</button>
+      </form>
+    </div>
+    {% endfor %}
+  </div>
+  {% else %}
+  <div class="empty"><p>No archived students yet. Students appear here automatically when their status becomes Pass Out.</p></div>
+  {% endif %}
+</div>
+{% endblock %}

@@ -46,12 +46,13 @@ app.permanent_session_lifetime = timedelta(days=30)  # "Remember me" on admin lo
 UNI_NAME = "Advanced Studies Office"
 PORTAL_TITLE = "Student Data Management System"
 
-STATUS_LIST = ["Continue", "Freeze", "Left", "Admission Cancelled",
-               "Viva Done", "Viva Pending", "Defense Pending", "Sent to COE",
-               "Pass Out"]
+STATUS_LIST = ["Continue", "Complete", "Freeze", "Left",
+               "Admission Cancelled", "Viva Done", "Viva Pending",
+               "Defense Pending", "Sent to COE", "Pass Out"]
 def status_pill_class(status):
     """Pill colour for a status."""
-    if status in ("Continue", "Viva Done", "Pass Out", "Sent to COE"):
+    if status in ("Continue", "Complete", "Viva Done", "Pass Out",
+                  "Sent to COE"):
         return "q"
     if status in ("Viva Pending", "Defense Pending"):
         return "warn"
@@ -345,6 +346,7 @@ def init_db():
     _migrate_add_thesis_dates(db)
     _migrate_add_doc_status(db)
     _fix_passout_rows(db)
+    _migrate_add_archived(db)
     _fix_department_rows(db)
     _migrate_add_saved_schedules(db)
     _migrate_add_schedule_extensions(db)
@@ -528,6 +530,24 @@ def _migrate_add_saved_schedules(db):
         f"CREATE TABLE IF NOT EXISTS saved_schedules ({id_def},"
         " session TEXT UNIQUE, commencement TEXT, termination TEXT,"
         " rows_json TEXT, created_at TEXT, updated_at TEXT)")
+
+
+def _migrate_add_archived(db):
+    """Add students.archived (Pass Out auto-archive). Safe to rerun."""
+    try:
+        if USE_PG:
+            db.execute("ALTER TABLE students ADD COLUMN IF NOT EXISTS"
+                       " archived INTEGER DEFAULT 0")
+        else:
+            cols = [r[1] for r in db.fetchall("PRAGMA table_info(students)")]
+            if "archived" not in cols:
+                db.execute("ALTER TABLE students ADD COLUMN"
+                           " archived INTEGER DEFAULT 0")
+        db.execute("UPDATE students SET archived=1 WHERE status='Pass Out'"
+                   " AND COALESCE(archived, 0)=0")
+        db.commit()
+    except Exception:
+        pass
 
 
 def _fix_passout_rows(db):
@@ -837,6 +857,8 @@ def _student_where(args):
 
 def count_students(args):
     where, params = _student_where(args)
+    if args.get("_main_list"):
+        where.append("COALESCE(archived, 0)=0")
     sql = "SELECT COUNT(*) AS n FROM students"
     if where:
         sql += " WHERE " + " AND ".join(where)
@@ -850,6 +872,8 @@ SORTABLE_COLUMNS = {"name": "name", "reg_no": "reg_no", "status": "status"}
 def query_students(args, limit=None, offset=None):
     """Apply the dashboard filters; returns list of dicts."""
     where, params = _student_where(args)
+    if args.get("_main_list"):
+        where.append("COALESCE(archived, 0)=0")
     sql = "SELECT * FROM students"
     if where:
         sql += " WHERE " + " AND ".join(where)
@@ -1212,10 +1236,12 @@ def admin_students():
         per_page = PER_PAGE
     if per_page not in (10, 25, 50, 100):
         per_page = PER_PAGE
-    filtered_total = count_students(request.args)
+    list_args = dict(request.args)
+    list_args["_main_list"] = "1"
+    filtered_total = count_students(list_args)
     pages = max((filtered_total + per_page - 1) // per_page, 1)
     page = min(page, pages)
-    students = query_students(request.args, limit=per_page,
+    students = query_students(list_args, limit=per_page,
                               offset=(page - 1) * per_page)
     for s in students:
         s["coe_display"] = fmt_coe(s.get("thesis_forward_coe"))
@@ -1287,7 +1313,7 @@ def admin_export():
     from openpyxl import Workbook
     from openpyxl.styles import Font, PatternFill, Alignment
 
-    students = query_students(request.args)
+    students = query_students({**request.args, "_main_list": "1"})
     wb = Workbook()
     ws = wb.active
     ws.title = "Students"
@@ -1346,7 +1372,7 @@ def admin_export_pdf():
                                     PageTemplate, Paragraph, Spacer, Table,
                                     TableStyle)
 
-    students = query_students(request.args)
+    students = query_students({**request.args, "_main_list": "1"})
     try:
         from zoneinfo import ZoneInfo
         now_pkt = datetime.now(ZoneInfo("Asia/Karachi"))
@@ -1683,6 +1709,119 @@ def log_activity(actor, action, detail=""):
             " VALUES (?, ?, ?, ?)",
             (actor, action, (detail or "")[:500], now))
         db.commit()
+    except Exception:
+        pass
+
+
+_STATUS_ORDER = {"Continue": 0, "Complete": 1, "Sent to COE": 2,
+                 "Viva Pending": 2, "Defense Pending": 2, "Viva Done": 3,
+                 "Pass Out": 4}
+_STATUS_PROTECTED = {"Pass Out", "Freeze", "Left", "Admission Cancelled"}
+
+_SUB_NOTIFS = [
+    ("synopsis", "Received", "synopsis_at", "Synopsis received",
+     "Your synopsis has been received by the Directorate of"
+     " Advanced Studies"),
+    ("semi_final_thesis", "Received", "semi_final_thesis_at",
+     "Semi-Final Thesis received",
+     "Your semi-final thesis has been received by the Directorate"
+     " of Advanced Studies"),
+    ("final_thesis", "Received", "final_thesis_at",
+     "Final Thesis received",
+     "Your final thesis has been received by the Directorate of"
+     " Advanced Studies"),
+    ("folder_file", "Completed", "folder_file_at",
+     "Folder / File completed",
+     "Your folder/file (with GS-Forms) has been marked completed"),
+]
+
+
+def _auto_status_target(s):
+    """The status a record's own facts justify, or None."""
+    row = get_db().fetchone(
+        "SELECT COUNT(*) AS n FROM viva_records WHERE student_id=?"
+        " AND result='Pass'", (s["id"],))
+    viva_pass = ((row["n"] if isinstance(row, dict) else row[0])
+                 if row else 0) > 0
+    if viva_pass:
+        return "Viva Done"
+    if parse_coe(s.get("thesis_forward_coe")):
+        return "Sent to COE"
+    if (s.get("folder_file") == "Completed"
+            and s.get("synopsis") == "Received"
+            and s.get("semi_final_thesis") == "Received"
+            and s.get("final_thesis") == "Received"):
+        return "Complete"
+    return None
+
+
+def _apply_auto_rules(sid, old=None):
+    """Automation applied after any student record change.
+
+    1. Student notifications when a submission newly arrives, the
+       folder/file completes, or the thesis is forwarded to COE
+       (only when the pre-change row is passed as ``old``).
+    2. Forward-only automatic status: viva Pass -> Viva Done, COE
+       date -> Sent to COE, everything complete -> Complete.
+       Pass Out / Freeze / Left / Admission Cancelled are never
+       touched, and the status never moves backwards, so a manual
+       admin choice is respected until new facts move it forward.
+    3. Pass Out students are archived out of the main list (and
+       un-archived if their status ever changes away from Pass Out).
+    Never raises: a failure here must not break the save itself.
+    """
+    try:
+        db = get_db()
+        row = db.fetchone("SELECT * FROM students WHERE id=?", (sid,))
+        if not row:
+            return
+        s = dict(row)
+        if old:
+            for field, want, at_field, title, msg in _SUB_NOTIFS:
+                if old.get(field) != want and s.get(field) == want:
+                    stamp = fmt_stamp(s.get(at_field))
+                    full = msg + (f" on {stamp}." if stamp != "\u2014"
+                                  else ".")
+                    notify_student(sid, "submission", title, full,
+                                   url_for("student_dashboard"))
+            if (not parse_coe(old.get("thesis_forward_coe"))
+                    and parse_coe(s.get("thesis_forward_coe"))):
+                notify_student(
+                    sid, "coe", "Thesis forwarded to COE",
+                    "Your thesis has been forwarded to the Controller"
+                    " of Examinations on "
+                    + fmt_coe(s.get("thesis_forward_coe")) + ".",
+                    url_for("student_dashboard"))
+        cur = s.get("status") or "Continue"
+        if cur not in _STATUS_PROTECTED:
+            target = _auto_status_target(s)
+            if (target and _STATUS_ORDER.get(target, 0)
+                    > _STATUS_ORDER.get(cur, 0)):
+                db.execute("UPDATE students SET status=? WHERE id=?",
+                           (target, sid))
+                db.commit()
+                log_activity("system", "auto_status",
+                             f"{s.get('name')} ({s.get('reg_no')}):"
+                             f" {cur} -> {target} (automatic)")
+                notify_student(sid, "status", "Status updated",
+                               "Your student status has been updated"
+                               f" to {target}.",
+                               url_for("student_dashboard"))
+                s["status"] = target
+                cur = target
+        if cur == "Pass Out":
+            if not s.get("archived") and (
+                    old is None or old.get("status") != "Pass Out"):
+                db.execute("UPDATE students SET archived=1 WHERE id=?",
+                           (sid,))
+                db.commit()
+                log_activity("system", "auto_archive",
+                             f"{s.get('name')} ({s.get('reg_no')}):"
+                             " Pass Out - moved to Archive")
+        elif s.get("archived"):
+            db.execute("UPDATE students SET archived=0 WHERE id=?",
+                       (sid,))
+            db.commit()
     except Exception:
         pass
 
@@ -3609,10 +3748,19 @@ def inject_admin_counts():
                 tc = (trow["n"] if isinstance(trow, dict) else trow[0]) if trow else 0
             except Exception:
                 tc = 0
-            return {"pending_uploads": n, "new_vivas": nv, "trash_count": tc}
+            try:
+                arow = db.fetchone(
+                    "SELECT COUNT(*) AS n FROM students"
+                    " WHERE COALESCE(archived, 0)=1")
+                ac = (arow["n"] if isinstance(arow, dict) else arow[0]) if arow else 0
+            except Exception:
+                ac = 0
+            return {"pending_uploads": n, "new_vivas": nv,
+                    "trash_count": tc, "archive_count": ac}
         except Exception:
             pass
-    return {"pending_uploads": 0, "new_vivas": 0}
+    return {"pending_uploads": 0, "new_vivas": 0, "trash_count": 0,
+            "archive_count": 0}
 
 
 # ==================== DEPARTMENT PORTAL ====================
@@ -4249,6 +4397,7 @@ def dept_viva_bulk():
                            + (f" on {viva_date}" if viva_date else "")
                            + f". Result: {result}",
                            url_for("student_viva"))
+            _apply_auto_rules(st["id"], old=st)
             added += 1
         db.commit()
         if added:
@@ -4421,6 +4570,7 @@ def dept_viva():
                        + (f" ({obtained_marks}/{total_marks} marks)"
                           if obtained_marks is not None else ""),
                        url_for("student_viva"))
+        _apply_auto_rules(st["id"], old=st)
         flash("Viva record saved.")
         return redirect(url_for("dept_viva"))
     students = [dict(r) for r in db.fetchall(
@@ -4505,6 +4655,7 @@ def dept_viva_edit(vid):
              dept["name"], total_marks, obtained_marks,
              next_viva_date or None, vid))
         db.commit()
+        _apply_auto_rules(v["student_id"])
         notify_student(v["student_id"], "viva", "Viva record updated",
                        f"Your viva record was updated — result: {result}"
                        + (f" ({obtained_marks}/{total_marks} marks)"
@@ -4671,7 +4822,9 @@ def admin_student_new():
         log_activity("admin", "student_add", f"{name} ({reg_no})")
         flash(f"Student {name} added. Default portal password: CNIC digits.")
         row = db.fetchone("SELECT id FROM students WHERE reg_no=?", (reg_no,))
-        return redirect(url_for("admin_student_profile", sid=row["id"] if isinstance(row, dict) else row[0]))
+        _new_id = row["id"] if isinstance(row, dict) else row[0]
+        _apply_auto_rules(_new_id)
+        return redirect(url_for("admin_student_profile", sid=_new_id))
     return render_template("student_form.html", uni=UNI_NAME, title=PORTAL_TITLE,
                            form={}, status_list=STATUS_LIST,
                            genders=GENDER_OPTS, folders=FOLDER_OPTS,
@@ -4781,6 +4934,7 @@ def admin_student_save(sid):
         flash(f"Could not save (maybe duplicate Reg.No or CNIC): {e}")
         return redirect(url_for("admin_student_profile", sid=sid))
     log_activity("admin", "student_edit", f"id={sid} ({name}) record updated")
+    _apply_auto_rules(sid, old=dict(s))
     try:
         _dep_row = db.fetchone("SELECT department FROM students WHERE id=?", (sid,))
         _dept_name = (_dep_row["department"] if isinstance(_dep_row, dict)
@@ -4922,6 +5076,29 @@ def admin_trash():
                            title=PORTAL_TITLE, rows=rows)
 
 
+@app.route("/admin/archive")
+@admin_required
+def admin_archive():
+    """Archived students: Pass Out records kept out of the main list."""
+    rows = [dict(r) for r in get_db().fetchall(
+        "SELECT * FROM students WHERE COALESCE(archived, 0)=1"
+        " ORDER BY name")]
+    return render_template("admin_archive.html", uni=UNI_NAME,
+                           title=PORTAL_TITLE, rows=rows)
+
+
+@app.route("/admin/archive/<int:sid>/restore", methods=["POST"])
+@admin_required
+def admin_archive_restore(sid):
+    db = get_db()
+    db.execute("UPDATE students SET archived=0 WHERE id=?", (sid,))
+    db.commit()
+    log_activity("admin", "student_unarchive",
+                 f"id={sid} moved back to the main list")
+    flash("Student moved back to the main student list.")
+    return redirect(url_for("admin_archive"))
+
+
 @app.route("/admin/trash/<int:tid>/restore", methods=["POST"])
 @admin_required
 def admin_trash_restore(tid):
@@ -4942,6 +5119,8 @@ def admin_trash_restore(tid):
     db.execute("DELETE FROM deleted_students WHERE id=?", (tid,))
     db.commit()
     log_activity("admin", "student_restore", f"restored from trash (id={new_id})")
+    db.execute("UPDATE students SET archived=0 WHERE id=?", (new_id,))
+    db.commit()
     flash(f"Student restored from the Recycle Bin.")
     return redirect(url_for("admin_trash"))
 
@@ -5012,7 +5191,7 @@ def admin_student_json(sid):
 @admin_required
 def admin_students_search():
     """Live search for the student list."""
-    rows = query_students(request.args)
+    rows = query_students({**request.args, "_main_list": "1"})
     out = []
     for s in rows[:200]:
         st = s.get("status") or ""
@@ -5073,6 +5252,9 @@ def admin_students_bulk_update():
         flash("Choose a status or a COE date to apply first.")
         return redirect(url_for("admin_students"))
     db = get_db()
+    olds = {r["id"]: dict(r) for r in db.fetchall(
+        f"SELECT * FROM students WHERE id IN ({', '.join(['?'] * len(ids))})",
+        ids)} if ids else {}
     ph = ", ".join(["?"] * len(ids))
     db.execute(
         f"UPDATE students SET {', '.join(sets)}, updated_at=?"
@@ -5081,6 +5263,8 @@ def admin_students_bulk_update():
     db.commit()
     log_activity("admin", "student_bulk_update",
                  f"{len(ids)} student(s): " + "; ".join(done))
+    for _sid in ids:
+        _apply_auto_rules(_sid, old=olds.get(_sid))
     flash(f"Updated {len(ids)} student(s): " + "; ".join(done) + ".")
     return redirect(url_for("admin_students"))
 
@@ -5278,6 +5462,229 @@ def student_record():
     s["coe_display"] = fmt_coe(s.get("thesis_forward_coe"))
     return render_template("student_record.html", uni=UNI_NAME,
                            title=PORTAL_TITLE, s=s)
+
+
+def _das_letter_pdf(s, kind, viva=None):
+    """One DAS office letter as a print-ready PDF, auto-filled from the
+    student's record. Letter number and date are left blank for the
+    office, matching the DAS house style."""
+    from xml.sax.saxutils import escape as _esc
+    from reportlab.lib import colors
+    from reportlab.lib.pagesizes import A4
+    from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
+    from reportlab.lib.units import mm
+    from reportlab.platypus import (HRFlowable, Image, Paragraph,
+                                    SimpleDocTemplate, Spacer, Table,
+                                    TableStyle)
+
+    NAVY = colors.HexColor("#17365D")
+    TEXT = colors.HexColor("#263445")
+    MUTED = colors.HexColor("#697586")
+
+    name = (s.get("name") or "").strip()
+    reg = (s.get("reg_no") or "").strip()
+    gender = (s.get("gender") or "").strip()
+    sal = "Mr." if gender == "Male" else "Ms." if gender == "Female" else ""
+    who = (sal + " " + name).strip() or name
+    degree = (s.get("degree") or "").strip()
+    session = (s.get("session") or "").strip()
+    dept = (s.get("department") or "").strip()
+    student_line = f"{who} (Reg. No. {reg})"
+    if degree:
+        student_line += f", {degree}"
+    if session:
+        student_line += f", Session {session}"
+    if dept:
+        student_line += f", {dept}"
+    chairman = ["The Chairman,", (dept or "Department") + ",",
+                "Cholistan University of Veterinary and Animal"
+                " Sciences, Bahawalpur."]
+
+    if kind == "coe":
+        addressee = ["The Controller of Examinations,",
+                     "Cholistan University of Veterinary and Animal"
+                     " Sciences, Bahawalpur."]
+        subject = ("FORWARDING OF THESIS FOR EVALUATION \u2014 "
+                   + name.upper() + f" ({reg})")
+        coe_d = fmt_coe(s.get("thesis_forward_coe"))
+        paras = [
+            f"The final thesis of {student_line}, is forwarded"
+            " herewith to your office for evaluation and further"
+            " necessary action.",
+            ("Date of forwarding: " + coe_d + "."
+             if coe_d != "\u2014" else
+             "The date of forwarding may be noted from the office"
+             " record."),
+            "It is requested that the evaluation process may kindly"
+            " be completed at the earliest.",
+        ]
+    elif kind == "viva":
+        viva = viva or {}
+        addressee = chairman
+        subject = ("VIVA VOCE EXAMINATION RESULT \u2014 "
+                   + name.upper() + f" ({reg})")
+        paras = [f"The viva voce examination of {student_line}, was"
+                 " held as per the following detail:"]
+        if viva.get("viva_date"):
+            paras.append(f"Date of Viva: {viva['viva_date']}")
+        ex = (viva.get("examiner_name") or "").strip()
+        if viva.get("examiner_affiliation"):
+            ex += f" ({viva['examiner_affiliation']})"
+        if ex:
+            paras.append(f"Examiner: {ex}")
+        res_line = f"Result: {viva.get('result') or 'Pending'}"
+        if viva.get("obtained_marks") is not None:
+            res_line += (f" \u2014 Marks: {viva['obtained_marks']} /"
+                         f" {viva.get('total_marks') or 120}")
+        paras.append(res_line)
+        if viva.get("remarks"):
+            paras.append(f"Remarks: {viva['remarks']}")
+        paras.append("This is for your information and record.")
+    elif kind == "acknowledgement":
+        addressee = chairman
+        subject = ("ACKNOWLEDGEMENT OF SUBMISSIONS \u2014 "
+                   + name.upper() + f" ({reg})")
+        def _on(stamp):
+            return "" if stamp == "\u2014" else " on " + stamp
+
+        items = []
+        if s.get("synopsis") == "Received":
+            items.append("Synopsis \u2014 received"
+                         + _on(fmt_stamp(s.get("synopsis_at"))) + ".")
+        if s.get("semi_final_thesis") == "Received":
+            items.append("Semi-Final Thesis \u2014 received"
+                         + _on(fmt_stamp(s.get("semi_final_thesis_at")))
+                         + ".")
+        if s.get("final_thesis") == "Received":
+            items.append("Final Thesis \u2014 received"
+                         + _on(fmt_stamp(s.get("final_thesis_at"))) + ".")
+        if s.get("folder_file") == "Completed":
+            items.append("Folder / File (With GS-Forms) \u2014 completed"
+                         + _on(fmt_stamp(s.get("folder_file_at"))) + ".")
+        paras = ["This office acknowledges the following submissions"
+                 f" of {student_line}:"]
+        if items:
+            paras += [f"{i}. {it}" for i, it in enumerate(items, 1)]
+        else:
+            paras.append("No submission has been received so far.")
+        paras.append("This acknowledgement is issued for record"
+                     " purposes.")
+    else:  # synopsis
+        addressee = chairman
+        subject = ("APPROVAL OF RESEARCH SYNOPSIS \u2014 "
+                   + name.upper() + f" ({reg})")
+        paras = [
+            "I am directed to inform you that the research synopsis"
+            f" of {student_line}, has been approved by the competent"
+            " authority.",
+        ]
+        _syn_stamp = fmt_stamp(s.get("synopsis_at"))
+        if s.get("synopsis") == "Received" and _syn_stamp != "\u2014":
+            paras.append("The synopsis was received in this office on "
+                         + _syn_stamp + ".")
+        paras.append("The student may proceed with the research work"
+                     " in accordance with the approved synopsis and"
+                     " the relevant provisions of the CUVAS Statutes"
+                     " 2022.")
+
+    styles = getSampleStyleSheet()
+    uni = ParagraphStyle("luni", parent=styles["Normal"], fontSize=12.5,
+                         leading=15.5, fontName="Helvetica-Bold",
+                         textColor=NAVY)
+    sub = ParagraphStyle("lsub", parent=styles["Normal"], fontSize=9,
+                         leading=11.5, textColor=MUTED)
+    meta = ParagraphStyle("lmeta", parent=styles["Normal"], fontSize=10,
+                          leading=13, textColor=TEXT)
+    meta_r = ParagraphStyle("lmetar", parent=meta, alignment=2)
+    addr = ParagraphStyle("laddr", parent=styles["Normal"], fontSize=10.5,
+                          leading=14.5, textColor=TEXT)
+    subj = ParagraphStyle("lsubj", parent=styles["Normal"], fontSize=10.5,
+                          leading=14.5, fontName="Helvetica-Bold",
+                          textColor=TEXT, spaceBefore=12, spaceAfter=9)
+    body = ParagraphStyle("lbody", parent=styles["Normal"], fontSize=10.5,
+                          leading=15.5, textColor=TEXT, alignment=4,
+                          spaceAfter=7)
+    sig = ParagraphStyle("lsig", parent=styles["Normal"], fontSize=10.5,
+                         leading=14.5, textColor=TEXT, alignment=2)
+    signame = ParagraphStyle("lsign", parent=sig,
+                             fontName="Helvetica-Bold")
+
+    buf = io.BytesIO()
+    doc = SimpleDocTemplate(
+        buf, pagesize=A4, leftMargin=20 * mm, rightMargin=20 * mm,
+        topMargin=16 * mm, bottomMargin=18 * mm,
+        title=f"DAS Letter ({kind}) - {name}",
+        author="Directorate of Advanced Studies, CUVAS")
+    W = doc.width
+    story = []
+    logo_path = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                             "static", "img", "cuvas-logo.png")
+    head = []
+    if os.path.exists(logo_path):
+        head.append(Image(logo_path, width=24.7 * mm, height=13.6 * mm))
+    else:
+        head.append(Paragraph("", uni))
+    head.append([Paragraph(
+        "CHOLISTAN UNIVERSITY OF VETERINARY AND ANIMAL SCIENCES,"
+        " BAHAWALPUR", uni),
+        Paragraph("Directorate of Advanced Studies", sub)])
+    ht = Table([head], colWidths=[30 * mm, W - 30 * mm])
+    ht.setStyle(TableStyle([
+        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+        ("LEFTPADDING", (0, 0), (-1, -1), 0),
+        ("RIGHTPADDING", (0, 0), (-1, -1), 0),
+        ("TOPPADDING", (0, 0), (-1, -1), 0),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 0)]))
+    story.append(ht)
+    story.append(HRFlowable(width="100%", thickness=0.9, color=NAVY,
+                            spaceBefore=6, spaceAfter=10))
+    mt = Table([[Paragraph("No.: DAS/2026/D-__________", meta),
+                 Paragraph("Dated: ______________", meta_r)]],
+               colWidths=[W / 2, W / 2])
+    mt.setStyle(TableStyle([
+        ("LEFTPADDING", (0, 0), (-1, -1), 0),
+        ("RIGHTPADDING", (0, 0), (-1, -1), 0),
+        ("TOPPADDING", (0, 0), (-1, -1), 0),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 0)]))
+    story.append(mt)
+    story.append(Spacer(1, 7 * mm))
+    for line in addressee:
+        story.append(Paragraph(_esc(line), addr))
+    story.append(Paragraph("SUBJECT: " + _esc(subject), subj))
+    for para in paras:
+        story.append(Paragraph(_esc(para), body))
+    story.append(Spacer(1, 12 * mm))
+    story.append(Paragraph("(Dr. Syed Qaswar Ali Shah)", signame))
+    story.append(Paragraph("Director, Advanced Studies", sig))
+    doc.build(story)
+    buf.seek(0)
+    return buf
+
+
+@app.route("/admin/student/<int:sid>/letter/<kind>")
+@admin_required
+def admin_student_letter(sid, kind):
+    """Auto-filled DAS letters (PDF) for one student."""
+    s = get_student(sid)
+    if not s or kind not in ("synopsis", "acknowledgement", "coe",
+                             "viva"):
+        return "Not found.", 404
+    viva = None
+    if kind == "viva":
+        rows = get_db().fetchall(
+            "SELECT * FROM viva_records WHERE student_id=?"
+            " ORDER BY id DESC", (sid,))
+        if not rows:
+            flash("No viva record exists for this student yet.")
+            return redirect(url_for("admin_student_profile", sid=sid))
+        viva = dict(rows[0])
+    buf = _das_letter_pdf(s, kind, viva)
+    fname = (kind.title() + "_Letter_" + re.sub(
+        r"[^A-Za-z0-9]+", "_", s.get("reg_no") or "student") + ".pdf")
+    log_activity("admin", "letter_generate",
+                 f"{kind} letter for id={sid} ({s.get('name')})")
+    return send_file(buf, mimetype="application/pdf", as_attachment=True,
+                     download_name=fname)
 
 
 def _student_profile_pdf_bytes(s, docs, vivas):

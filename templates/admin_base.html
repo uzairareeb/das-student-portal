@@ -40,6 +40,11 @@
           Recycle Bin
           {% if trash_count %}<span class="notif-badge">{{ trash_count }}</span>{% endif %}
         </a>
+        <a href="{{ url_for('admin_archive') }}" class="{% if request.endpoint == 'admin_archive' %}active{% endif %}">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8v13H3V8"/><path d="M1 3h22v5H1z"/><path d="M10 12h4"/></svg>
+          Archive
+          {% if archive_count %}<span class="notif-badge">{{ archive_count }}</span>{% endif %}
+        </a>
       </div>
     </div>
     <div class="nav-group open" data-group="departments">

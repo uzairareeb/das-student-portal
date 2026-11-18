@@ -166,7 +166,7 @@
             <td class="dates-cell" data-col="semidates"><div class="dt-stack"><span class="dt-date">{{ s.semi_date }}</span>{% if s.semi_time %}<span class="dt-time">{{ s.semi_time }}</span>{% endif %}</div></td>
             <td class="dates-cell" data-col="finaldates"><div class="dt-stack"><span class="dt-date">{{ s.final_date }}</span>{% if s.final_time %}<span class="dt-time">{{ s.final_time }}</span>{% endif %}</div></td>
             <td data-col="status">
-              {% if s.status in ['Continue', 'Viva Done', 'Pass Out', 'Sent to COE'] %}<span class="status-plain sp-ok"><span class="dot"></span>{{ s.status }}</span>
+              {% if s.status in ['Continue', 'Complete', 'Viva Done', 'Pass Out', 'Sent to COE'] %}<span class="status-plain sp-ok"><span class="dot"></span>{{ s.status }}</span>
               {% elif s.status in ['Viva Pending', 'Defense Pending'] %}<span class="status-plain sp-warn"><span class="dot"></span>{{ s.status }}</span>
               {% else %}<span class="status-plain sp-bad"><span class="dot"></span>{{ s.status }}</span>{% endif %}
             </td>
