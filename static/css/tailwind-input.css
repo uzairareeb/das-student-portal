@@ -113,6 +113,13 @@
     @apply flex items-center gap-3 rounded-[11px] px-3.5 py-3 text-sm font-bold text-red-600 no-underline transition-colors hover:bg-red-50 hover:text-red-700;
   }
   .side-foot a svg { @apply h-5 w-5; }
+  .side-profile { @apply rounded-[13px] border border-line bg-[#f7f9fc] p-2; }
+  .side-profile .sp-head { @apply flex items-center gap-2.5 px-2 pt-1.5 pb-2.5; }
+  .side-profile .sp-avatar { @apply inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-soft text-sm font-extrabold text-primary; }
+  .side-profile .sp-name { @apply truncate text-sm font-bold leading-tight text-navy; }
+  .side-profile .sp-sub { @apply truncate text-xs leading-tight text-muted; }
+  .side-profile .sp-links { @apply flex flex-col gap-0.5 border-t border-line pt-1.5; }
+  .side-foot a.plain { @apply font-semibold text-slate-600 hover:bg-soft hover:text-navy; }
   .side-toggle {
     @apply fixed top-3.5 left-3.5 z-[300] hidden h-11 w-11 cursor-pointer items-center justify-center rounded-xl border-0 bg-primary text-white shadow-lg;
   }
