@@ -76,20 +76,6 @@
 
 <div class="card section">
   <div class="section-head">
-    <span class="section-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg></span>
-    <h3>DAS Letters</h3>
-    <span class="hint">Auto-filled from this record &middot; No. and date are left blank for the office</span>
-  </div>
-  <div style="display:flex;flex-wrap:wrap;gap:8px">
-    <a class="btn primary sm" href="{{ url_for('admin_student_letter', sid=s.id, kind='synopsis') }}">Synopsis Approval Letter</a>
-    <a class="btn primary sm" href="{{ url_for('admin_student_letter', sid=s.id, kind='acknowledgement') }}">Submission Acknowledgement</a>
-    <a class="btn primary sm" href="{{ url_for('admin_student_letter', sid=s.id, kind='coe') }}">COE Forwarding Memo</a>
-    <a class="btn primary sm" href="{{ url_for('admin_student_letter', sid=s.id, kind='viva') }}">Viva Result Intimation</a>
-  </div>
-</div>
-
-<div class="card section">
-  <div class="section-head">
     <span class="section-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></span>
     <h3>Complete Record</h3>
   </div>

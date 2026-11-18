@@ -3802,11 +3802,13 @@ def dept_login():
         if row and check_password_hash(dict(row)["password_hash"], password):
             d = dict(row)
             session["dept_id"] = d["id"]
+            session.permanent = bool(request.form.get("remember"))
             log_activity(f"dept:{d['name']}", "login",
                          "department portal sign-in")
             return redirect(url_for("dept_dashboard"))
-        flash("Invalid email or password.")
-        return redirect(url_for("dept_login"))
+        return render_template("dept_login.html", uni=UNI_NAME,
+                               title=PORTAL_TITLE,
+                               error="Invalid email or password.")
     return render_template("dept_login.html", uni=UNI_NAME, title=PORTAL_TITLE)
 
 
@@ -5397,6 +5399,7 @@ def student_login():
                 ok = True
         if ok:
             session["student_id"] = s["id"]
+            session.permanent = bool(request.form.get("remember"))
             return redirect(url_for("student_dashboard"))
         error = "Wrong Registration No. or password."
     return render_template("student_login.html", uni=UNI_NAME, title=PORTAL_TITLE,
@@ -5462,229 +5465,6 @@ def student_record():
     s["coe_display"] = fmt_coe(s.get("thesis_forward_coe"))
     return render_template("student_record.html", uni=UNI_NAME,
                            title=PORTAL_TITLE, s=s)
-
-
-def _das_letter_pdf(s, kind, viva=None):
-    """One DAS office letter as a print-ready PDF, auto-filled from the
-    student's record. Letter number and date are left blank for the
-    office, matching the DAS house style."""
-    from xml.sax.saxutils import escape as _esc
-    from reportlab.lib import colors
-    from reportlab.lib.pagesizes import A4
-    from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
-    from reportlab.lib.units import mm
-    from reportlab.platypus import (HRFlowable, Image, Paragraph,
-                                    SimpleDocTemplate, Spacer, Table,
-                                    TableStyle)
-
-    NAVY = colors.HexColor("#17365D")
-    TEXT = colors.HexColor("#263445")
-    MUTED = colors.HexColor("#697586")
-
-    name = (s.get("name") or "").strip()
-    reg = (s.get("reg_no") or "").strip()
-    gender = (s.get("gender") or "").strip()
-    sal = "Mr." if gender == "Male" else "Ms." if gender == "Female" else ""
-    who = (sal + " " + name).strip() or name
-    degree = (s.get("degree") or "").strip()
-    session = (s.get("session") or "").strip()
-    dept = (s.get("department") or "").strip()
-    student_line = f"{who} (Reg. No. {reg})"
-    if degree:
-        student_line += f", {degree}"
-    if session:
-        student_line += f", Session {session}"
-    if dept:
-        student_line += f", {dept}"
-    chairman = ["The Chairman,", (dept or "Department") + ",",
-                "Cholistan University of Veterinary and Animal"
-                " Sciences, Bahawalpur."]
-
-    if kind == "coe":
-        addressee = ["The Controller of Examinations,",
-                     "Cholistan University of Veterinary and Animal"
-                     " Sciences, Bahawalpur."]
-        subject = ("FORWARDING OF THESIS FOR EVALUATION \u2014 "
-                   + name.upper() + f" ({reg})")
-        coe_d = fmt_coe(s.get("thesis_forward_coe"))
-        paras = [
-            f"The final thesis of {student_line}, is forwarded"
-            " herewith to your office for evaluation and further"
-            " necessary action.",
-            ("Date of forwarding: " + coe_d + "."
-             if coe_d != "\u2014" else
-             "The date of forwarding may be noted from the office"
-             " record."),
-            "It is requested that the evaluation process may kindly"
-            " be completed at the earliest.",
-        ]
-    elif kind == "viva":
-        viva = viva or {}
-        addressee = chairman
-        subject = ("VIVA VOCE EXAMINATION RESULT \u2014 "
-                   + name.upper() + f" ({reg})")
-        paras = [f"The viva voce examination of {student_line}, was"
-                 " held as per the following detail:"]
-        if viva.get("viva_date"):
-            paras.append(f"Date of Viva: {viva['viva_date']}")
-        ex = (viva.get("examiner_name") or "").strip()
-        if viva.get("examiner_affiliation"):
-            ex += f" ({viva['examiner_affiliation']})"
-        if ex:
-            paras.append(f"Examiner: {ex}")
-        res_line = f"Result: {viva.get('result') or 'Pending'}"
-        if viva.get("obtained_marks") is not None:
-            res_line += (f" \u2014 Marks: {viva['obtained_marks']} /"
-                         f" {viva.get('total_marks') or 120}")
-        paras.append(res_line)
-        if viva.get("remarks"):
-            paras.append(f"Remarks: {viva['remarks']}")
-        paras.append("This is for your information and record.")
-    elif kind == "acknowledgement":
-        addressee = chairman
-        subject = ("ACKNOWLEDGEMENT OF SUBMISSIONS \u2014 "
-                   + name.upper() + f" ({reg})")
-        def _on(stamp):
-            return "" if stamp == "\u2014" else " on " + stamp
-
-        items = []
-        if s.get("synopsis") == "Received":
-            items.append("Synopsis \u2014 received"
-                         + _on(fmt_stamp(s.get("synopsis_at"))) + ".")
-        if s.get("semi_final_thesis") == "Received":
-            items.append("Semi-Final Thesis \u2014 received"
-                         + _on(fmt_stamp(s.get("semi_final_thesis_at")))
-                         + ".")
-        if s.get("final_thesis") == "Received":
-            items.append("Final Thesis \u2014 received"
-                         + _on(fmt_stamp(s.get("final_thesis_at"))) + ".")
-        if s.get("folder_file") == "Completed":
-            items.append("Folder / File (With GS-Forms) \u2014 completed"
-                         + _on(fmt_stamp(s.get("folder_file_at"))) + ".")
-        paras = ["This office acknowledges the following submissions"
-                 f" of {student_line}:"]
-        if items:
-            paras += [f"{i}. {it}" for i, it in enumerate(items, 1)]
-        else:
-            paras.append("No submission has been received so far.")
-        paras.append("This acknowledgement is issued for record"
-                     " purposes.")
-    else:  # synopsis
-        addressee = chairman
-        subject = ("APPROVAL OF RESEARCH SYNOPSIS \u2014 "
-                   + name.upper() + f" ({reg})")
-        paras = [
-            "I am directed to inform you that the research synopsis"
-            f" of {student_line}, has been approved by the competent"
-            " authority.",
-        ]
-        _syn_stamp = fmt_stamp(s.get("synopsis_at"))
-        if s.get("synopsis") == "Received" and _syn_stamp != "\u2014":
-            paras.append("The synopsis was received in this office on "
-                         + _syn_stamp + ".")
-        paras.append("The student may proceed with the research work"
-                     " in accordance with the approved synopsis and"
-                     " the relevant provisions of the CUVAS Statutes"
-                     " 2022.")
-
-    styles = getSampleStyleSheet()
-    uni = ParagraphStyle("luni", parent=styles["Normal"], fontSize=12.5,
-                         leading=15.5, fontName="Helvetica-Bold",
-                         textColor=NAVY)
-    sub = ParagraphStyle("lsub", parent=styles["Normal"], fontSize=9,
-                         leading=11.5, textColor=MUTED)
-    meta = ParagraphStyle("lmeta", parent=styles["Normal"], fontSize=10,
-                          leading=13, textColor=TEXT)
-    meta_r = ParagraphStyle("lmetar", parent=meta, alignment=2)
-    addr = ParagraphStyle("laddr", parent=styles["Normal"], fontSize=10.5,
-                          leading=14.5, textColor=TEXT)
-    subj = ParagraphStyle("lsubj", parent=styles["Normal"], fontSize=10.5,
-                          leading=14.5, fontName="Helvetica-Bold",
-                          textColor=TEXT, spaceBefore=12, spaceAfter=9)
-    body = ParagraphStyle("lbody", parent=styles["Normal"], fontSize=10.5,
-                          leading=15.5, textColor=TEXT, alignment=4,
-                          spaceAfter=7)
-    sig = ParagraphStyle("lsig", parent=styles["Normal"], fontSize=10.5,
-                         leading=14.5, textColor=TEXT, alignment=2)
-    signame = ParagraphStyle("lsign", parent=sig,
-                             fontName="Helvetica-Bold")
-
-    buf = io.BytesIO()
-    doc = SimpleDocTemplate(
-        buf, pagesize=A4, leftMargin=20 * mm, rightMargin=20 * mm,
-        topMargin=16 * mm, bottomMargin=18 * mm,
-        title=f"DAS Letter ({kind}) - {name}",
-        author="Directorate of Advanced Studies, CUVAS")
-    W = doc.width
-    story = []
-    logo_path = os.path.join(os.path.dirname(os.path.abspath(__file__)),
-                             "static", "img", "cuvas-logo.png")
-    head = []
-    if os.path.exists(logo_path):
-        head.append(Image(logo_path, width=24.7 * mm, height=13.6 * mm))
-    else:
-        head.append(Paragraph("", uni))
-    head.append([Paragraph(
-        "CHOLISTAN UNIVERSITY OF VETERINARY AND ANIMAL SCIENCES,"
-        " BAHAWALPUR", uni),
-        Paragraph("Directorate of Advanced Studies", sub)])
-    ht = Table([head], colWidths=[30 * mm, W - 30 * mm])
-    ht.setStyle(TableStyle([
-        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
-        ("LEFTPADDING", (0, 0), (-1, -1), 0),
-        ("RIGHTPADDING", (0, 0), (-1, -1), 0),
-        ("TOPPADDING", (0, 0), (-1, -1), 0),
-        ("BOTTOMPADDING", (0, 0), (-1, -1), 0)]))
-    story.append(ht)
-    story.append(HRFlowable(width="100%", thickness=0.9, color=NAVY,
-                            spaceBefore=6, spaceAfter=10))
-    mt = Table([[Paragraph("No.: DAS/2026/D-__________", meta),
-                 Paragraph("Dated: ______________", meta_r)]],
-               colWidths=[W / 2, W / 2])
-    mt.setStyle(TableStyle([
-        ("LEFTPADDING", (0, 0), (-1, -1), 0),
-        ("RIGHTPADDING", (0, 0), (-1, -1), 0),
-        ("TOPPADDING", (0, 0), (-1, -1), 0),
-        ("BOTTOMPADDING", (0, 0), (-1, -1), 0)]))
-    story.append(mt)
-    story.append(Spacer(1, 7 * mm))
-    for line in addressee:
-        story.append(Paragraph(_esc(line), addr))
-    story.append(Paragraph("SUBJECT: " + _esc(subject), subj))
-    for para in paras:
-        story.append(Paragraph(_esc(para), body))
-    story.append(Spacer(1, 12 * mm))
-    story.append(Paragraph("(Dr. Syed Qaswar Ali Shah)", signame))
-    story.append(Paragraph("Director, Advanced Studies", sig))
-    doc.build(story)
-    buf.seek(0)
-    return buf
-
-
-@app.route("/admin/student/<int:sid>/letter/<kind>")
-@admin_required
-def admin_student_letter(sid, kind):
-    """Auto-filled DAS letters (PDF) for one student."""
-    s = get_student(sid)
-    if not s or kind not in ("synopsis", "acknowledgement", "coe",
-                             "viva"):
-        return "Not found.", 404
-    viva = None
-    if kind == "viva":
-        rows = get_db().fetchall(
-            "SELECT * FROM viva_records WHERE student_id=?"
-            " ORDER BY id DESC", (sid,))
-        if not rows:
-            flash("No viva record exists for this student yet.")
-            return redirect(url_for("admin_student_profile", sid=sid))
-        viva = dict(rows[0])
-    buf = _das_letter_pdf(s, kind, viva)
-    fname = (kind.title() + "_Letter_" + re.sub(
-        r"[^A-Za-z0-9]+", "_", s.get("reg_no") or "student") + ".pdf")
-    log_activity("admin", "letter_generate",
-                 f"{kind} letter for id={sid} ({s.get('name')})")
-    return send_file(buf, mimetype="application/pdf", as_attachment=True,
-                     download_name=fname)
 
 
 def _student_profile_pdf_bytes(s, docs, vivas):

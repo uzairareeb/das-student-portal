@@ -592,6 +592,7 @@
   .dip-panel-mid { @apply relative z-10 my-auto px-1 py-10 text-center; }
   .dip-panel-mid h1 { @apply text-[34px] leading-tight font-extrabold lg:text-[38px]; }
   .dip-panel-mid p { @apply mx-auto mt-4 max-w-[290px] text-[13.5px] leading-relaxed text-blue-100; }
+  .dip-badge { @apply mt-5 inline-block rounded-full bg-white/15 px-4 py-1.5 text-[11px] font-bold uppercase tracking-[0.22em] text-white ring-1 ring-white/40; }
   .dip-outline-btn { @apply mt-8 inline-block rounded-full border-2 border-white/90 px-9 py-2.5 text-[12.5px] font-bold tracking-[0.14em] text-white transition hover:bg-white hover:text-primary; }
   .dip-form-side { @apply flex flex-1 items-center justify-center px-8 py-10 sm:px-12; }
   .dip-form { @apply w-full max-w-[380px] text-center; animation: loginUp .5s ease both; }
