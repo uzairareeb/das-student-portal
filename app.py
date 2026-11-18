@@ -3717,7 +3717,12 @@ def admin_schedule_print():
 def _inject_dept_notif():
     try:
         if request.path.startswith("/dept") and "dept_id" in session:
-            return {"dept_unread": dept_unread_count(session["dept_id"])}
+            dnotes = [dict(r) for r in get_db().fetchall(
+                "SELECT id, kind, title, message, link, created_at"
+                " FROM dept_notifications WHERE department_id=?"
+                " ORDER BY id DESC LIMIT 8", (session["dept_id"],))]
+            return {"dept_unread": dept_unread_count(session["dept_id"]),
+                    "dept_recent_notes": dnotes}
         if request.path.startswith("/admin") and session.get("admin"):
             notes = [dict(r) for r in get_db().fetchall(
                 "SELECT id, kind, title, message, link, created_at"
@@ -3725,7 +3730,13 @@ def _inject_dept_notif():
             return {"admin_unread": admin_unread_count(),
                     "admin_recent_notes": notes}
         if request.path.startswith("/student") and session.get("student_id"):
-            return {"student_unread": student_unread_count(session["student_id"])}
+            snotes = [dict(r) for r in get_db().fetchall(
+                "SELECT id, kind, title, message, link, created_at"
+                " FROM student_notifications WHERE student_id=?"
+                " ORDER BY id DESC LIMIT 8", (session["student_id"],))]
+            return {"student_unread":
+                    student_unread_count(session["student_id"]),
+                    "student_recent_notes": snotes}
     except Exception:
         pass
     return {}
