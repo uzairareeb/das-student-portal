@@ -1030,9 +1030,11 @@
     border-radius: 13px;
     border-style: var(--tw-border-style);
     border-width: 1px;
-    border-color: var(--color-line);
-    background-color: #f7f9fc;
+    border-color: #bcd6fb;
+    background-color: var(--color-soft);
     padding: calc(var(--spacing) * 2);
+    --tw-shadow: 0 4px 14px var(--tw-shadow-color, rgba(23,105,232,0.14));
+    box-shadow: var(--tw-inset-shadow), var(--tw-inset-ring-shadow), var(--tw-ring-offset-shadow), var(--tw-ring-shadow), var(--tw-shadow);
   }
   .side-profile .sp-head-btn {
     display: flex;
@@ -1061,12 +1063,14 @@
     align-items: center;
     justify-content: center;
     border-radius: calc(infinity * 1px);
-    background-color: var(--color-soft);
+    background-color: var(--color-primary);
     font-size: var(--text-sm);
     line-height: var(--tw-leading, var(--text-sm--line-height));
     --tw-font-weight: var(--font-weight-extrabold);
     font-weight: var(--font-weight-extrabold);
-    color: var(--color-primary);
+    color: var(--color-white);
+    --tw-shadow: 0 1px 3px 0 var(--tw-shadow-color, rgb(0 0 0 / 0.1)), 0 1px 2px -1px var(--tw-shadow-color, rgb(0 0 0 / 0.1));
+    box-shadow: var(--tw-inset-shadow), var(--tw-inset-ring-shadow), var(--tw-ring-offset-shadow), var(--tw-ring-shadow), var(--tw-shadow);
   }
   .side-profile .sp-name {
     overflow: hidden;
