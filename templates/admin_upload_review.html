@@ -1,0 +1,108 @@
+{% extends "admin_base.html" %}
+{% block container_extra %} wide{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <h2>Review Upload — {{ u.dept_name }}</h2>
+    <p>{{ u.file_name }} &middot; sent {{ u.created_at }} &middot; template {{ u.template_version or '—' }} &middot;
+    {% if u.status == 'pending' %}<span class="pill warn">Waiting for Review</span>
+    {% elif u.status == 'approved' %}<span class="pill q">Approved &amp; Locked</span>
+    {% else %}<span class="pill nq">Returned</span>{% endif %}</p>
+  </div>
+  <a class="btn ghost" href="{{ url_for('admin_uploads') }}">&larr; All Uploads</a>
+</div>
+
+<div class="card section">
+  <div class="row" style="gap:10px;flex-wrap:wrap">
+    <span class="sp-chip">Total rows: <strong>{{ summary.total }}</strong></span>
+    <span class="sp-chip">Valid: <strong>{{ summary.valid }}</strong></span>
+    <span class="sp-chip">Errors: <strong>{{ summary.errors }}</strong></span>
+    <span class="sp-chip">Possible duplicates: <strong>{{ summary.dups }}</strong></span>
+    {% if u.status == 'pending' %}<span class="sp-chip">Decisions pending: <strong>{{ summary.pending }}</strong></span>{% endif %}
+    {% if u.status == 'approved' %}<span class="sp-chip">Imported: <strong>{{ u.imported_count or 0 }}</strong></span>
+    <span class="sp-chip">Reviewed by: <strong>{{ u.reviewed_by or '—' }}</strong></span>{% endif %}
+  </div>
+  {% if u.parse_error %}<p class="form-error" style="margin-top:12px">Parse problem: {{ u.parse_error }}</p>{% endif %}
+  <div class="row" style="margin-top:14px;gap:8px;flex-wrap:wrap">
+    <a class="btn ghost sm" href="{{ url_for('admin_upload_download', uid=u.id) }}">Download Original File</a>
+    <a class="btn ghost sm" href="{{ url_for('admin_upload_errors', uid=u.id) }}">Download Error / Duplicate Report (Excel)</a>
+  </div>
+</div>
+
+{% if u.status == 'pending' %}
+<form method="post" action="{{ url_for('admin_upload_decisions', uid=u.id) }}">
+{% endif %}
+<div class="card section">
+  <h3 style="margin-top:0">Rows ({{ rows|length }})</h3>
+  {% if rows %}
+  <div class="table-scroll">
+    <table class="data-table">
+      <thead>
+        <tr><th>Row</th><th>Student</th><th>CNIC</th><th>Degree / Session</th><th>Findings</th>{% if u.status == 'pending' %}<th>Decision</th>{% else %}<th>Outcome</th>{% endif %}</tr>
+      </thead>
+      <tbody>
+        {% for r in rows %}
+        <tr>
+          <td>{{ r.row_no }}</td>
+          <td><strong>{{ r.data.get('name') or '—' }}</strong><br><span class="hint">{{ r.data.get('reg_no') or '—' }}</span></td>
+          <td class="nowrap">{{ r.data.get('cnic') or '—' }}</td>
+          <td>{{ r.data.get('degree') or '—' }}<br><span class="hint">{{ r.data.get('session') or '—' }}</span></td>
+          <td>
+            {% for e in r.errors %}<div><span class="pill nq">Error</span> {{ e }}</div>{% endfor %}
+            {% for w in r.warnings %}<div><span class="pill warn">Check</span> {{ w }}</div>{% endfor %}
+            {% for m in r.matches %}<div><span class="pill warn">Possible duplicate</span> {{ m.name }} ({{ m.reg_no }}, {{ m.status }}) — matched by {{ 'Registration No.' if m.match == 'reg_no' else ('CNIC' if m.match == 'cnic' else 'name + father name') }}</div>{% endfor %}
+            {% if not r.errors and not r.warnings and not r.matches %}<span class="pill q">Valid</span>{% endif %}
+          </td>
+          {% if u.status == 'pending' %}
+          <td>
+            {% if r.errors %}
+              <span class="hint">Cannot import — department must fix and re-upload</span>
+            {% else %}
+              <select name="decision_{{ r.id }}" class="no-icon">
+                {% if r.decision == 'pending' %}<option value="pending" selected>Choose…</option>{% endif %}
+                <option value="import" {% if r.decision == 'import' %}selected{% endif %}>Import as new</option>
+                {% if r.matches %}<option value="link" {% if r.decision == 'link' %}selected{% endif %}>Link to existing</option>{% endif %}
+                <option value="skip" {% if r.decision == 'skip' %}selected{% endif %}>Skip</option>
+              </select>
+            {% endif %}
+          </td>
+          {% else %}
+          <td>
+            {% if r.errors %}<span class="pill nq">Error — not imported</span>
+            {% elif r.decision == 'import' %}<span class="pill q">Imported</span>
+            {% elif r.decision == 'link' %}<span class="pill q">Linked to existing</span>
+            {% else %}<span class="pill">Skipped</span>{% endif %}
+          </td>
+          {% endif %}
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="empty"><p>No parsed rows for this batch.</p></div>
+  {% endif %}
+  {% if u.status == 'pending' %}
+  <div class="row" style="margin-top:14px">
+    <button type="submit" class="btn ghost">Save Decisions</button>
+  </div>
+  {% endif %}
+</div>
+{% if u.status == 'pending' %}
+</form>
+
+<div class="card section">
+  <h3 style="margin-top:0">Finish Review</h3>
+  <div class="row" style="gap:10px;flex-wrap:wrap;align-items:flex-start">
+    <form method="post" action="{{ url_for('admin_upload_approve', uid=u.id) }}" style="margin:0">
+      <button type="submit" class="btn primary" data-confirm="Approve this batch? Rows decided 'Import' will be added as students, 'Link' rows will be attached to the existing records, and the batch will lock.">Approve &amp; Import</button>
+    </form>
+    <form method="post" action="{{ url_for('admin_upload_reject', uid=u.id) }}" class="reject-form" style="flex:1;min-width:280px">
+      <input type="text" name="comment" placeholder="If returning: what is missing or wrong? Write it here…" required>
+      <button type="submit" class="btn danger" data-confirm="Return this batch to the department with your comment?">Return to Department</button>
+    </form>
+  </div>
+  <p class="hint">Approval is blocked while any possible-duplicate row has no decision. Error rows are never imported — the department fixes them and re-uploads.</p>
+</div>
+{% endif %}
+{% endblock %}

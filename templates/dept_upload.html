@@ -46,7 +46,7 @@
       <tbody>
         {% for u in uploads %}
         <tr>
-          <td>{{ u.file_name }}</td>
+          <td>{{ u.file_name }}{% if u.valid_count is not none %}<br><span class="hint">{{ u.valid_count }} valid &middot; {{ u.error_count }} errors &middot; {{ u.dup_count }} possible duplicates</span>{% endif %}</td>
           <td>{{ u.row_count }}</td>
           <td class="nowrap">{{ u.created_at }}</td>
           <td>
@@ -55,19 +55,24 @@
             {% else %}<span class="pill nq">Needs Fixing</span>{% endif %}
           </td>
           <td>
-            {% if u.status == 'rejected' and u.admin_comment %}
+            {% if u.status in ('rejected', 'returned') and u.admin_comment %}
               <div class="admin-note">
                 <strong>What to fix:</strong> {{ u.admin_comment }}
               </div>
               <div class="row" style="gap:8px; margin-top:8px">
+                <a class="btn ghost sm" href="{{ url_for('dept_upload_detail', uid=u.id) }}">View Rows</a>
                 <a class="btn ghost sm" href="{{ url_for('dept_upload_download', uid=u.id) }}">Download Your File</a>
                 <a class="btn primary sm" href="#upload-form">Fix &amp; Re-upload</a>
               </div>
             {% elif u.status == 'approved' %}
               <span class="hint">Added to the system.</span>
+              <div style="margin-top:8px">
+                <a class="btn ghost sm" href="{{ url_for('dept_upload_detail', uid=u.id) }}">View Rows</a>
+              </div>
             {% else %}
               <span class="hint">Waiting for DAS office.</span>
               <div style="margin-top:8px">
+                <a class="btn ghost sm" href="{{ url_for('dept_upload_detail', uid=u.id) }}">View Rows</a>
                 <a class="btn ghost sm" href="{{ url_for('dept_upload_download', uid=u.id) }}">Download Your File</a>
               </div>
             {% endif %}

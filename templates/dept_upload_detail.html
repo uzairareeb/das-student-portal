@@ -1,0 +1,70 @@
+{% extends "dept_base.html" %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <h2>Submission Detail</h2>
+    <p>{{ u.file_name }} &middot; sent {{ u.created_at }} &middot; template {{ u.template_version or '—' }}</p>
+  </div>
+  <a class="btn ghost" href="{{ url_for('dept_upload_page') }}">&larr; Upload Page</a>
+</div>
+
+<div class="card section">
+  <div class="row" style="gap:10px;flex-wrap:wrap;align-items:center">
+    {% if u.status == 'pending' %}<span class="pill warn">Pending DAS Review</span>
+    {% elif u.status == 'approved' %}<span class="pill q">Approved</span>
+    {% else %}<span class="pill nq">Returned — Needs Fixing</span>{% endif %}
+    <span class="sp-chip">Total rows: <strong>{{ summary.total }}</strong></span>
+    <span class="sp-chip">Valid: <strong>{{ summary.valid }}</strong></span>
+    <span class="sp-chip">Errors: <strong>{{ summary.errors }}</strong></span>
+    <span class="sp-chip">Possible duplicates: <strong>{{ summary.dups }}</strong></span>
+    {% if u.status == 'approved' %}<span class="sp-chip">Imported: <strong>{{ u.imported_count or 0 }}</strong></span>{% endif %}
+  </div>
+  {% if u.status in ('returned', 'rejected') and u.admin_comment %}
+  <div class="admin-note" style="margin-top:12px"><strong>DAS message — what to fix:</strong> {{ u.admin_comment }}</div>
+  {% endif %}
+  {% if u.parse_error %}<p class="form-error" style="margin-top:12px">Parse problem: {{ u.parse_error }}</p>{% endif %}
+  <div class="row" style="margin-top:14px;gap:8px;flex-wrap:wrap">
+    <a class="btn ghost sm" href="{{ url_for('dept_upload_download', uid=u.id) }}">Download Your File</a>
+    <a class="btn ghost sm" href="{{ url_for('dept_upload_errors', uid=u.id) }}">Download Error / Duplicate Report (Excel)</a>
+  </div>
+  <p class="hint" style="margin-bottom:0">Rows with errors are never imported. Fix them in your file and send a corrected file — DAS links rows that are already in the system instead of creating duplicates.</p>
+</div>
+
+<div class="card section">
+  <h3 style="margin-top:0">Rows ({{ rows|length }})</h3>
+  {% if rows %}
+  <div class="table-scroll">
+    <table class="data-table">
+      <thead>
+        <tr><th>Row</th><th>Student</th><th>CNIC</th><th>Degree / Session</th><th>Findings</th><th>Outcome</th></tr>
+      </thead>
+      <tbody>
+        {% for r in rows %}
+        <tr>
+          <td>{{ r.row_no }}</td>
+          <td><strong>{{ r.data.get('name') or '—' }}</strong><br><span class="hint">{{ r.data.get('reg_no') or '—' }}</span></td>
+          <td class="nowrap">{{ r.data.get('cnic') or '—' }}</td>
+          <td>{{ r.data.get('degree') or '—' }}<br><span class="hint">{{ r.data.get('session') or '—' }}</span></td>
+          <td>
+            {% for e in r.errors %}<div><span class="pill nq">Error</span> {{ e }}</div>{% endfor %}
+            {% for w in r.warnings %}<div><span class="pill warn">Check</span> {{ w }}</div>{% endfor %}
+            {% for m in r.matches %}<div><span class="pill warn">Possible duplicate</span> Already in the system as {{ m.name }} ({{ m.reg_no }})</div>{% endfor %}
+            {% if not r.errors and not r.warnings and not r.matches %}<span class="pill q">Valid</span>{% endif %}
+          </td>
+          <td>
+            {% if u.status != 'approved' %}<span class="hint">Waiting for DAS</span>
+            {% elif r.errors %}<span class="pill nq">Not imported — error</span>
+            {% elif r.decision == 'import' %}<span class="pill q">Imported</span>
+            {% elif r.decision == 'link' %}<span class="pill q">Linked to existing</span>
+            {% else %}<span class="pill">Skipped</span>{% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="empty"><p>No parsed rows for this submission.</p></div>
+  {% endif %}
+</div>
+{% endblock %}

@@ -27,6 +27,7 @@ from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.utils import secure_filename
 from viva_pdf import build_viva_pdf
 import workflow as wf
+import intake
 from academic_schedule import (RULES as SCHEDULE_RULES,
                                build_schedule, deserialize_rows,
                                display_row,
@@ -357,6 +358,7 @@ def init_db():
     _migrate_add_audit_columns(db)
     _migrate_add_dept_faculty(db)
     _seed_reference_data(db)
+    _create_intake_tables(db)
     # Admin password: the env var is the source of truth. Only overwrite
     # the stored hash when the env var is actually set, so a missing env
     # var can never silently downgrade the live password to a fallback.
@@ -689,6 +691,137 @@ def _seed_reference_data(db):
             _insert("sessions", ses)
     except Exception:
         pass
+
+
+def _create_intake_tables(db):
+    """Phase 2 (Central System): parsed intake rows + batch columns."""
+    id_def = "id SERIAL PRIMARY KEY" if USE_PG else \
+        "id INTEGER PRIMARY KEY AUTOINCREMENT"
+    db.execute(f"""
+        CREATE TABLE IF NOT EXISTS intake_rows (
+            {id_def},
+            upload_id INTEGER NOT NULL REFERENCES dept_uploads(id),
+            row_no INTEGER, data_json TEXT, errors_json TEXT,
+            warnings_json TEXT, match_json TEXT,
+            decision TEXT DEFAULT 'import',
+            student_id INTEGER, created_at TEXT
+        )
+    """)
+    for col, decl in (("template_version", "TEXT"),
+                      ("valid_count", "INTEGER"),
+                      ("error_count", "INTEGER"),
+                      ("dup_count", "INTEGER"),
+                      ("imported_count", "INTEGER"),
+                      ("parse_error", "TEXT"),
+                      ("reviewed_by", "TEXT")):
+        _add_column_if_missing(db, "dept_uploads", col, decl)
+
+
+def _rec_values(rec, now):
+    """Canonical record dict -> INSERT value tuple (see parse_import_rows)."""
+    return tuple(rec.get(c) for c in STUDENT_INSERT_COLS[:-3]) + \
+        (None, now, now)
+
+
+def _build_intake_rows(db, upload_id, recs):
+    """Validate + duplicate-check parsed records into intake_rows.
+
+    Defaults: clean row -> decision 'import'; row with a possible
+    duplicate -> 'pending' (DAS must decide); row with errors -> 'skip'
+    (it can never be imported). Returns the counts dict.
+    """
+    students = [dict(r) for r in db.execute(
+        "SELECT id, name, father_name, reg_no, cnic, status"
+        " FROM students").fetchall()]
+    index = intake.build_index(students)
+    flags = intake.infile_flags(recs)
+    now = datetime.now().strftime("%Y-%m-%d %H:%M")
+    counts = {"valid": 0, "errors": 0, "dups": 0}
+    for row_no, rec in recs:
+        errors, warnings = intake.validate_record(rec)
+        warnings = warnings + flags.get(row_no, [])
+        matches = intake.find_matches(rec, index)
+        if errors:
+            decision = "skip"
+            counts["errors"] += 1
+        elif matches:
+            decision = "pending"
+            counts["dups"] += 1
+        else:
+            decision = "import"
+            counts["valid"] += 1
+        db.execute(
+            "INSERT INTO intake_rows (upload_id, row_no, data_json,"
+            " errors_json, warnings_json, match_json, decision,"
+            " created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+            (upload_id, row_no, _json.dumps(rec, default=str),
+             _json.dumps(errors), _json.dumps(warnings),
+             _json.dumps(matches), decision, now))
+    db.execute(
+        "UPDATE dept_uploads SET template_version=?, valid_count=?,"
+        " error_count=?, dup_count=? WHERE id=?",
+        (intake.TEMPLATE_VERSION, counts["valid"], counts["errors"],
+         counts["dups"], upload_id))
+    return counts
+
+
+def _intake_rows_for(db, uid):
+    """Parsed intake rows of one batch, JSON fields decoded."""
+    out = []
+    for r in db.execute(
+            "SELECT * FROM intake_rows WHERE upload_id=?"
+            " ORDER BY row_no, id", (uid,)).fetchall():
+        d = dict(r)
+        for key, col in (("data", "data_json"), ("errors", "errors_json"),
+                         ("warnings", "warnings_json"),
+                         ("matches", "match_json")):
+            try:
+                d[key] = _json.loads(d.get(col) or "null") or (
+                    {} if key == "data" else [])
+            except Exception:
+                d[key] = {} if key == "data" else []
+        out.append(d)
+    return out
+
+
+def _intake_summary(rows):
+    return {
+        "total": len(rows),
+        "valid": sum(1 for r in rows if not r["errors"] and not r["matches"]),
+        "errors": sum(1 for r in rows if r["errors"]),
+        "dups": sum(1 for r in rows if r["matches"] and not r["errors"]),
+        "pending": sum(1 for r in rows if r["decision"] == "pending"),
+        "imported": sum(1 for r in rows if r["decision"] == "import"
+                        and r.get("student_id")),
+        "linked": sum(1 for r in rows if r["decision"] == "link"),
+    }
+
+
+def _intake_error_workbook(uid):
+    """Excel report of every flagged row (errors, warnings, matches)."""
+    from openpyxl import Workbook
+    rows = _intake_rows_for(get_db(), uid)
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Intake Report"
+    ws.append(["Row", "Name", "Registration No.", "CNIC", "Finding",
+               "Details"])
+    for r in rows:
+        d = r["data"]
+        base = [r["row_no"], d.get("name", ""), d.get("reg_no", ""),
+                d.get("cnic", "")]
+        for e in r["errors"]:
+            ws.append(base + ["Error", e])
+        for w in r["warnings"]:
+            ws.append(base + ["Warning", w])
+        for m in r["matches"]:
+            ws.append(base + ["Possible duplicate",
+                              f"Matches existing student {m['name']}"
+                              f" ({m['reg_no']}, status {m['status']})"
+                              f" — matched by {m['match']}"])
+    buf = io.BytesIO()
+    wb.save(buf)
+    return buf.getvalue()
 
 
 def _migrate_add_archived(db):
@@ -2066,13 +2199,12 @@ def _apply_auto_rules(sid, old=None):
         pass
 
 
-def parse_import_rows(file_storage):
-    """Parse an .xlsx upload into student record value-tuples.
+def parse_import_records(file_storage):
+    """Parse an .xlsx upload into canonical record dicts.
 
-    Returns (records, skipped, skip_notes); records is a list of
-    (row_no, reg_no, values) aligned with STUDENT_INSERT_COLS
-    (department=None; the caller may override it).
-    Raises ValueError on structural problems.
+    Returns a list of (row_no, rec) for every non-empty file row —
+    including rows that lack a Name/Reg.No (the caller decides what
+    to do with them). Raises ValueError on structural problems.
     """
     try:
         raw_rows = read_xlsx(file_storage)
@@ -2088,10 +2220,7 @@ def parse_import_rows(file_storage):
     if "name" not in mapping.values() or "reg_no" not in mapping.values():
         raise ValueError(
             "File must contain at least a Name column and a Registration No. column.")
-    now = datetime.now().strftime("%Y-%m-%d %H:%M")
-    # Every file row becomes its own record (plain INSERT, no merging):
-    # the file is imported exactly as-is, even with duplicate Reg.No/CNIC.
-    records, skipped, skip_notes = [], 0, []
+    out = []
     for i, rr in enumerate(raw_rows, start=2):
         rec = {}
         for hdr, val in rr.items():
@@ -2103,17 +2232,9 @@ def parse_import_rows(file_storage):
             elif isinstance(val, date):
                 val = val.isoformat()
             rec[field] = str(val).strip() if val is not None else ""
-        name = rec.get("name", "")
-        reg_no = rec.get("reg_no", "")
-        cnic = norm_cnic(rec.get("cnic", ""))
-        if not name and not reg_no:
-            skipped += 1
-            if len(skip_notes) < 8:
-                skip_notes.append(f"row {i}: blank row (no Name / Reg.No)")
-            continue
-        rec["name"] = name
-        rec["reg_no"] = reg_no
-        rec["cnic"] = cnic
+        rec["name"] = rec.get("name", "")
+        rec["reg_no"] = rec.get("reg_no", "")
+        rec["cnic"] = norm_cnic(rec.get("cnic", ""))
         rec["folder_file"] = pick(rec.get("folder_file"), FOLDER_OPTS,
                                   "Not Completed")
         rec["synopsis"] = pick(rec.get("synopsis"), RECEIVED_OPTS,
@@ -2133,8 +2254,29 @@ def parse_import_rows(file_storage):
         # password_hash stays NULL: it is created lazily on the student's
         # first portal login (default password = CNIC digits). Hashing every
         # row up-front would take minutes for large files.
-        values = tuple(rec.get(c) for c in STUDENT_INSERT_COLS[:-3]) + (None, now, now)
-        records.append((i, reg_no, values))
+        out.append((i, rec))
+    return out
+
+
+def parse_import_rows(file_storage):
+    """Parse an .xlsx upload into student record value-tuples.
+
+    Returns (records, skipped, skip_notes); records is a list of
+    (row_no, reg_no, values) aligned with STUDENT_INSERT_COLS
+    (department=None; the caller may override it).
+    Raises ValueError on structural problems.
+    """
+    now = datetime.now().strftime("%Y-%m-%d %H:%M")
+    # Every file row becomes its own record (plain INSERT, no merging):
+    # the file is imported exactly as-is, even with duplicate Reg.No/CNIC.
+    records, skipped, skip_notes = [], 0, []
+    for i, rec in parse_import_records(file_storage):
+        if not rec["name"] and not rec["reg_no"]:
+            skipped += 1
+            if len(skip_notes) < 8:
+                skip_notes.append(f"row {i}: blank row (no Name / Reg.No)")
+            continue
+        records.append((i, rec["reg_no"], _rec_values(rec, now)))
     return records, skipped, skip_notes
 
 
@@ -2323,12 +2465,14 @@ def admin_uploads():
     db = get_db()
     pending = [dict(r) for r in db.fetchall(
         "SELECT u.id, u.file_name, u.row_count, u.status, u.created_at,"
+        " u.valid_count, u.error_count, u.dup_count, u.template_version,"
         " d.name AS dept_name FROM dept_uploads u"
         " JOIN departments d ON d.id=u.department_id"
         " WHERE u.status='pending' ORDER BY u.id DESC")]
     reviewed = [dict(r) for r in db.fetchall(
         "SELECT u.id, u.file_name, u.row_count, u.status, u.admin_comment,"
-        " u.created_at, u.reviewed_at, d.name AS dept_name FROM dept_uploads u"
+        " u.created_at, u.reviewed_at, u.imported_count, u.reviewed_by,"
+        " d.name AS dept_name FROM dept_uploads u"
         " JOIN departments d ON d.id=u.department_id"
         " WHERE u.status!='pending' ORDER BY u.id DESC LIMIT 50")]
     return render_template("admin_uploads.html", uni=UNI_NAME,
@@ -2352,11 +2496,81 @@ def admin_upload_download(uid):
                              f'attachment; filename="{safe_filename(u.get("file_name"))}"'})
 
 
+
+@app.route("/admin/uploads/<int:uid>/review")
+@admin_required
+def admin_upload_review(uid):
+    """DAS review of one department batch: every parsed row with its
+    validation findings and duplicate matches, per-row decisions, and
+    the approve / return actions. Approved batches are locked."""
+    db = get_db()
+    row = db.fetchone(
+        "SELECT u.*, d.name AS dept_name FROM dept_uploads u"
+        " JOIN departments d ON d.id=u.department_id WHERE u.id=?",
+        (uid,))
+    if not row:
+        flash("Upload not found.")
+        return redirect(url_for("admin_uploads"))
+    u = dict(row)
+    rows = _intake_rows_for(db, uid)
+    return render_template("admin_upload_review.html", uni=UNI_NAME,
+                           title=PORTAL_TITLE, u=u, rows=rows,
+                           summary=_intake_summary(rows))
+
+
+@app.route("/admin/uploads/<int:uid>/decisions", methods=["POST"])
+@admin_required
+def admin_upload_decisions(uid):
+    """Save DAS decisions (Import / Link / Skip) for flagged rows."""
+    db = get_db()
+    row = db.fetchone("SELECT * FROM dept_uploads WHERE id=?", (uid,))
+    if not row:
+        flash("Upload not found.")
+        return redirect(url_for("admin_uploads"))
+    if dict(row)["status"] != "pending":
+        flash("This batch is already reviewed and locked.")
+        return redirect(url_for("admin_upload_review", uid=uid))
+    changed = 0
+    for r in _intake_rows_for(db, uid):
+        if r["errors"]:
+            continue  # error rows can never be imported
+        val = request.form.get(f"decision_{r['id']}")
+        if val in ("import", "link", "skip") and val != r["decision"]:
+            if val == "link" and not r["matches"]:
+                val = "skip"
+            db.execute("UPDATE intake_rows SET decision=? WHERE id=?",
+                       (val, r["id"]))
+            changed += 1
+    db.commit()
+    log_activity(current_admin()["name"], "upload_decisions",
+                 f"Saved decisions on upload #{uid} ({changed} changed)",
+                 entity_type="dept_upload", entity_id=uid)
+    flash(f"Decisions saved ({changed} changed).")
+    return redirect(url_for("admin_upload_review", uid=uid))
+
+
+@app.route("/admin/uploads/<int:uid>/errors.xlsx")
+@admin_required
+def admin_upload_errors(uid):
+    row = get_db().fetchone("SELECT id FROM dept_uploads WHERE id=?",
+                             (uid,))
+    if not row:
+        flash("Upload not found.")
+        return redirect(url_for("admin_uploads"))
+    return Response(_intake_error_workbook(uid),
+                    mimetype="application/vnd.openxmlformats-officedocument."
+                             "spreadsheetml.sheet",
+                    headers={"Content-Disposition":
+                             f'attachment; filename="intake-report-{uid}.xlsx"'})
+
+
 @app.route("/admin/uploads/<int:uid>/approve", methods=["POST"])
 @admin_required
 def admin_upload_approve(uid):
-    """Approve a department file: every row is inserted as its own
-    student record, tagged with the department name."""
+    """Approve a department batch: import the rows decided 'import',
+    link the rows decided 'link' to their existing records, skip the
+    rest. Rows still awaiting a duplicate decision block approval.
+    After approval the batch is locked."""
     db = get_db()
     row = db.fetchone(
         "SELECT u.*, d.name AS dept_name FROM dept_uploads u"
@@ -2368,27 +2582,74 @@ def admin_upload_approve(uid):
     if u["status"] != "pending":
         flash("This upload was already reviewed.")
         return redirect(url_for("admin_uploads"))
-    try:
-        records, skipped, _ = parse_import_rows(io.BytesIO(doc_bytes(u)))
-    except ValueError as e:
-        flash(f"Could not parse the file: {e}")
-        return redirect(url_for("admin_uploads"))
-    added, _, _, _ = insert_student_records(db, records,
-                                            department=u["dept_name"])
+    rows = _intake_rows_for(db, uid)
+    if not rows:
+        # Upload from before Phase 2: parse it into rows now and let
+        # DAS review them before anything is imported.
+        try:
+            recs = parse_import_records(io.BytesIO(doc_bytes(u)))
+            _build_intake_rows(db, uid, recs)
+            db.commit()
+        except ValueError as e:
+            flash(f"Could not parse the file: {e}")
+            return redirect(url_for("admin_uploads"))
+        flash("This file has been parsed into rows — review them"
+              " (especially possible duplicates), then approve.")
+        return redirect(url_for("admin_upload_review", uid=uid))
+    undecided = [r for r in rows if r["decision"] == "pending"]
+    if undecided:
+        flash(f"{len(undecided)} row(s) look like possible duplicates"
+              " and need your decision (Import / Link / Skip) before"
+              " approval.")
+        return redirect(url_for("admin_upload_review", uid=uid))
+    now = datetime.now().strftime("%Y-%m-%d %H:%M")
+    import_rows = [r for r in rows if r["decision"] == "import"]
+    records = [(r["row_no"], r["data"].get("reg_no", ""),
+                _rec_values(r["data"], now)) for r in import_rows]
+    added = 0
+    if records:
+        added, _, _, _ = insert_student_records(
+            db, records, department=u["dept_name"])
+    linked = skipped = errored = 0
+    for r in rows:
+        if r["decision"] == "link" and r["matches"]:
+            db.execute("UPDATE intake_rows SET student_id=? WHERE id=?",
+                       (r["matches"][0]["student_id"], r["id"]))
+            linked += 1
+        elif r["decision"] == "import":
+            srow = db.fetchone(
+                "SELECT id FROM students WHERE reg_no=?"
+                " ORDER BY id DESC", (r["data"].get("reg_no", ""),))
+            if srow:
+                db.execute(
+                    "UPDATE intake_rows SET student_id=? WHERE id=?",
+                    (srow["id"] if isinstance(srow, dict) else srow[0],
+                     r["id"]))
+        elif r["errors"]:
+            errored += 1
+        else:
+            skipped += 1
     _sync_missing_dimensions(db)
-    db.execute("UPDATE dept_uploads SET status='approved', reviewed_at=?"
+    db.execute("UPDATE dept_uploads SET status='approved',"
+               " imported_count=?, reviewed_by=?, reviewed_at=?"
                " WHERE id=?",
-               (datetime.now().strftime("%Y-%m-%d %H:%M"), uid))
+               (added, current_admin()["name"], now, uid))
     db.commit()
-    log_activity("admin", "upload_approve",
-                 f"{u['dept_name']}: {added} student(s) added from"
-                 f" {u['file_name']}")
+    log_activity(current_admin()["name"], "upload_approve",
+                 f"{u['dept_name']}: {added} imported, {linked} linked,"
+                 f" {skipped} skipped, {errored} with errors from"
+                 f" {u['file_name']}",
+                 entity_type="dept_upload", entity_id=uid,
+                 old_value="pending", new_value="approved")
     notify_dept(u["department_id"], "upload", "Upload approved",
-                f"{added} student record(s) from {u['file_name']}"
-                " were added to the system.",
-                url_for("dept_dashboard"))
-    flash(f"Approved — {added} student record(s) from {u['dept_name']}"
-          f" are now in the system.")
+                f"{added} new student record(s) from {u['file_name']}"
+                f" were added. {linked} row(s) linked to existing"
+                f" records, {skipped} skipped, {errored} had errors"
+                " (see the batch report).",
+                url_for("dept_upload_detail", uid=uid))
+    flash(f"Approved — {added} new student(s) from {u['dept_name']}"
+          f" added ({linked} linked, {skipped} skipped,"
+          f" {errored} with errors). The batch is now locked.")
     return redirect(url_for("admin_uploads"))
 
 
@@ -2411,16 +2672,21 @@ def admin_upload_reject(uid):
     if u["status"] != "pending":
         flash("This upload was already reviewed.")
         return redirect(url_for("admin_uploads"))
-    db.execute("UPDATE dept_uploads SET status='rejected', admin_comment=?,"
-               " reviewed_at=? WHERE id=?",
-               (comment, datetime.now().strftime("%Y-%m-%d %H:%M"), uid))
+    db.execute("UPDATE dept_uploads SET status='returned',"
+               " admin_comment=?, reviewed_by=?, reviewed_at=?"
+               " WHERE id=?",
+               (comment, current_admin()["name"],
+                datetime.now().strftime("%Y-%m-%d %H:%M"), uid))
     db.commit()
-    log_activity("admin", "upload_reject",
-                 f"{u['dept_name']}: {comment[:120]}")
-    notify_dept(u["department_id"], "upload", "Upload rejected — action needed",
-                comment, url_for("dept_dashboard"))
-    flash(f"Rejected with your comment — {u['dept_name']} will see it on"
-          f" their portal and can fix and re-upload.")
+    log_activity(current_admin()["name"], "upload_return",
+                 f"{u['dept_name']}: {comment[:120]}",
+                 entity_type="dept_upload", entity_id=uid,
+                 old_value="pending", new_value="returned")
+    notify_dept(u["department_id"], "upload",
+                "Upload returned — action needed",
+                comment, url_for("dept_upload_detail", uid=uid))
+    flash(f"Returned with your comment — {u['dept_name']} will see it"
+          f" on their portal and can fix and re-upload.")
     return redirect(url_for("admin_uploads"))
 
 
@@ -4254,7 +4520,8 @@ def dept_dashboard():
     db = get_db()
     uploads = [dict(r) for r in db.fetchall(
         "SELECT id, file_name, row_count, status, admin_comment, created_at,"
-        " reviewed_at FROM dept_uploads WHERE department_id=?"
+        " reviewed_at, valid_count, error_count, dup_count, imported_count"
+        " FROM dept_uploads WHERE department_id=?"
         " ORDER BY id DESC", (dept["id"],))]
     def _n(sql, params):
         row = db.fetchone(sql, params)
@@ -4555,7 +4822,8 @@ def dept_upload_page():
     db = get_db()
     uploads = [dict(r) for r in db.fetchall(
         "SELECT id, file_name, row_count, status, admin_comment, created_at,"
-        " reviewed_at FROM dept_uploads WHERE department_id=?"
+        " reviewed_at, valid_count, error_count, dup_count, imported_count"
+        " FROM dept_uploads WHERE department_id=?"
         " ORDER BY id DESC", (dept["id"],))]
     return render_template("dept_upload.html", uni=UNI_NAME,
                            title=PORTAL_TITLE, dept=dept, uploads=uploads)
@@ -4579,23 +4847,44 @@ def dept_upload():
         flash("The file is empty.")
         return redirect(url_for("dept_upload_page"))
     try:
-        records, skipped, _ = parse_import_rows(io.BytesIO(raw))
+        recs = parse_import_records(io.BytesIO(raw))
     except ValueError as e:
         flash(str(e))
         return redirect(url_for("dept_upload_page"))
     db = get_db()
     now = datetime.now().strftime("%Y-%m-%d %H:%M")
-    db.execute(
-        "INSERT INTO dept_uploads (department_id, file_name, file_data,"
-        " row_count, status, created_at)"
-        " VALUES (?, ?, ?, ?, 'pending', ?)",
-        (dept["id"], file.filename, raw, len(records), now))
+    _vals = (dept["id"], file.filename, raw, len(recs),
+             intake.TEMPLATE_VERSION, now)
+    if USE_PG:
+        uid = db.fetchone(
+            "INSERT INTO dept_uploads (department_id, file_name,"
+            " file_data, row_count, status, template_version, created_at)"
+            " VALUES (?, ?, ?, ?, 'pending', ?, ?) RETURNING id",
+            _vals)["id"]
+    else:
+        uid = db.execute(
+            "INSERT INTO dept_uploads (department_id, file_name,"
+            " file_data, row_count, status, template_version, created_at)"
+            " VALUES (?, ?, ?, ?, 'pending', ?, ?)", _vals).lastrowid
+    counts = {"valid": 0, "errors": 0, "dups": 0}
+    try:
+        counts = _build_intake_rows(db, uid, recs)
+    except Exception as e:
+        db.execute("UPDATE dept_uploads SET parse_error=? WHERE id=?",
+                   (str(e)[:300], uid))
     db.commit()
     log_activity(f"dept:{dept['name']}", "upload",
-                 f"{len(records)} row(s) sent for review ({file.filename})")
-    flash(f"Sent for DAS review: {len(records)} student row(s)."
-          f" You will see the decision here.")
-    return redirect(url_for("dept_upload_page"))
+                 f"{len(recs)} row(s) sent for review ({file.filename})",
+                 entity_type="dept_upload", entity_id=uid)
+    notify_admin("upload", "New department upload",
+                 f"{dept['name']} sent {file.filename} — {len(recs)} rows"
+                 f" ({counts['valid']} valid, {counts['errors']} with"
+                 f" errors, {counts['dups']} possible duplicates).",
+                 url_for("admin_upload_review", uid=uid))
+    flash(f"Sent for DAS review: {len(recs)} student row(s) —"
+          f" {counts['valid']} valid, {counts['errors']} with errors,"
+          f" {counts['dups']} possible duplicate(s).")
+    return redirect(url_for("dept_upload_detail", uid=uid))
 
 
 @app.route("/dept/uploads/<int:uid>/download")
@@ -4616,6 +4905,43 @@ def dept_upload_download(uid):
                              "spreadsheetml.sheet",
                     headers={"Content-Disposition":
                              f'attachment; filename="{safe_filename(u.get("file_name"))}"'})
+
+
+@app.route("/dept/uploads/<int:uid>")
+@dept_required
+def dept_upload_detail(uid):
+    """The department's own view of one submitted batch: parse results,
+    DAS decision and per-row findings."""
+    dept = current_dept()
+    db = get_db()
+    row = db.fetchone(
+        "SELECT * FROM dept_uploads WHERE id=? AND department_id=?",
+        (uid, dept["id"]))
+    if not row:
+        flash("Upload not found.")
+        return redirect(url_for("dept_upload_page"))
+    u = dict(row)
+    rows = _intake_rows_for(db, uid)
+    return render_template("dept_upload_detail.html", uni=UNI_NAME,
+                           title=PORTAL_TITLE, dept=dept, u=u, rows=rows,
+                           summary=_intake_summary(rows))
+
+
+@app.route("/dept/uploads/<int:uid>/errors.xlsx")
+@dept_required
+def dept_upload_errors(uid):
+    dept = current_dept()
+    row = get_db().fetchone(
+        "SELECT id FROM dept_uploads WHERE id=? AND department_id=?",
+        (uid, dept["id"]))
+    if not row:
+        flash("Upload not found.")
+        return redirect(url_for("dept_upload_page"))
+    return Response(_intake_error_workbook(uid),
+                    mimetype="application/vnd.openxmlformats-officedocument."
+                             "spreadsheetml.sheet",
+                    headers={"Content-Disposition":
+                             f'attachment; filename="intake-report-{uid}.xlsx"'})
 
 
 @app.route("/dept/notifications")

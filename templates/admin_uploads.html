@@ -19,18 +19,16 @@
     <div class="upload-card">
       <div class="upload-main">
         <div class="upload-title">{{ u.dept_name }}</div>
-        <div class="upload-sub">{{ u.file_name }} &middot; {{ u.row_count }} rows &middot; sent {{ u.created_at }}</div>
+        <div class="upload-sub">{{ u.file_name }} &middot; {{ u.row_count }} rows &middot; sent {{ u.created_at }}{% if u.valid_count is not none %} &middot; <strong>{{ u.valid_count }} valid</strong> &middot; {{ u.error_count }} errors &middot; {{ u.dup_count }} possible duplicates{% endif %}</div>
       </div>
       <div class="upload-actions">
         <a class="btn ghost sm" href="{{ url_for('admin_upload_download', uid=u.id) }}">Download File</a>
-        <form method="post" action="{{ url_for('admin_upload_approve', uid=u.id) }}" style="margin:0">
-          <button type="submit" class="btn primary sm" data-confirm="Approve this file? All {{ u.row_count }} rows will be added as student records.">Approve &amp; Add</button>
-        </form>
+        <a class="btn primary sm" href="{{ url_for('admin_upload_review', uid=u.id) }}">Review Rows</a>
       </div>
       <form method="post" action="{{ url_for('admin_upload_reject', uid=u.id) }}" class="reject-form">
-        <input type="text" name="comment" placeholder="If rejecting: what is missing or wrong? Write it here…" required>
+        <input type="text" name="comment" placeholder="If returning: what is missing or wrong? Write it here…" required>
         <button type="submit" class="btn danger sm"
-                data-confirm="Reject this file with your comment?">Reject</button>
+                data-confirm="Return this file to the department with your comment?">Return</button>
       </form>
     </div>
     {% endfor %}
@@ -57,7 +55,7 @@
           <td>{{ u.dept_name }}</td>
           <td>{{ u.file_name }}</td>
           <td>{{ u.row_count }}</td>
-          <td>{% if u.status == 'approved' %}<span class="pill q">Approved</span>{% else %}<span class="pill nq">Rejected</span>{% endif %}</td>
+          <td>{% if u.status == 'approved' %}<span class="pill q">Approved</span> <span class="hint">{{ u.imported_count or 0 }} imported</span>{% else %}<span class="pill nq">Returned</span>{% endif %}{% if u.reviewed_by %}<br><span class="hint">by {{ u.reviewed_by }}</span>{% endif %}</td>
           <td>{{ u.admin_comment or '—' }}</td>
           <td class="nowrap">{{ u.reviewed_at or '—' }}</td>
         </tr>
