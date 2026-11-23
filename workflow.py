@@ -174,6 +174,10 @@ def sync_student_dimensions(db, sid, actor="system", actor_role="System",
     changes = []
     for col, new_val in target.items():
         old_val = s.get(col)
+        if col == "degree_status" and old_val == "Issued":
+            # Issuance is an authorized Phase 6 record, not a derived
+            # fact — derivation never un-issues a degree.
+            continue
         if old_val != new_val:
             db.execute(f"UPDATE students SET {col}=? WHERE id=?",
                        (new_val, sid))

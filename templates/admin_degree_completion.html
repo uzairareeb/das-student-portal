@@ -1,0 +1,32 @@
+{% extends "admin_base.html" %}
+{% block container_extra %} wide{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <h2>Degree Completion</h2>
+    <p>Students who are eligible, ready on the completion checklist, or already issued. A degree is marked Issued only from the student's Result &amp; Degree tab, after every required item is complete.</p>
+  </div>
+</div>
+<div class="card section">
+  {% if rows %}
+  <div class="table-scroll">
+    <table class="data-table">
+      <thead><tr><th>Student</th><th>Degree / Session</th><th>Checklist</th><th>State</th><th></th></tr></thead>
+      <tbody>
+        {% for r in rows %}
+        <tr>
+          <td>{{ r.s.name }}<div class="hint">{{ r.s.reg_no }}</div></td>
+          <td>{{ r.s.degree or '—' }} / {{ r.s.session or '—' }}</td>
+          <td>{{ r.done }} of {{ r.req }} required</td>
+          <td>{% if r.rec %}<span class="pill q">Issued {{ r.rec.issued_date }}</span>{% elif r.ready %}<span class="pill q">Ready to Issue</span>{% else %}<span class="pill">{{ r.s.degree_status or '—' }}</span>{% endif %}</td>
+          <td><a class="btn ghost sm" href="{{ url_for('admin_student_progress', sid=r.s.id) }}">Open</a></td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="empty"><p>No student is at the completion stage yet.</p></div>
+  {% endif %}
+</div>
+{% endblock %}

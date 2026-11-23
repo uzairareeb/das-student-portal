@@ -83,7 +83,7 @@
   </div>
 </div>
 
-{% if research and (research.synopsis or research.supervisors or research.case) %}
+{% if research and (research.synopsis or research.supervisors or research.case or research.degree) %}
 <div class="card section">
   <div class="section-head">
     <span class="section-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg></span>
@@ -99,6 +99,9 @@
         {% for a in research.supervisors %}
         <tr><th>{{ a.role }}</th><td>{{ a.supervisor_name }}{% if a.designation %} &middot; {{ a.designation }}{% endif %}</td></tr>
         {% endfor %}
+        {% if research.degree %}
+        <tr><th>Degree</th><td><span class="pill q">Issued</span> &middot; {{ research.degree.issued_date }}{% if research.degree.degree_no %} &middot; Degree No. {{ research.degree.degree_no }}{% endif %}</td></tr>
+        {% endif %}
         {% if research.case %}
         <tr><th>Thesis Case</th><td><span class="pill">{{ research.case.case_status }}</span>{% if research.case.received_date %} &middot; received by Controller {{ research.case.received_date }}{% elif research.case.forwarded_date %} &middot; forwarded {{ research.case.forwarded_date }}{% endif %}</td></tr>
         {% if research.case.case_status == 'Returned with Objections' %}<tr><th>Controller Objections</th><td>{{ research.case.objections }}</td></tr>{% endif %}

@@ -92,6 +92,10 @@
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9 12l2 2 4-4"/></svg>
           Controller Office
         </a>
+        <a href="{{ url_for('admin_degree_completion') }}" class="{% if request.endpoint == 'admin_degree_completion' %}active{% endif %}">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="6"/><path d="M15.5 13 17 22l-5-3-5 3 1.5-9"/></svg>
+          Degree Completion
+        </a>
       </div>
     </div>
     <div class="nav-group open" data-group="system">
@@ -117,6 +121,14 @@
         <a href="{{ url_for('admin_doc_catalogue') }}" class="{% if request.endpoint in ('admin_doc_catalogue', 'admin_doc_catalogue_save') %}active{% endif %}">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
           Document Catalogue
+        </a>
+        <a href="{{ url_for('admin_completion_items') }}" class="{% if request.endpoint in ('admin_completion_items', 'admin_completion_item_save') %}active{% endif %}">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+          Completion Checklist
+        </a>
+        <a href="{{ url_for('admin_correspondence') }}" class="{% if request.endpoint == 'admin_correspondence' %}active{% endif %}">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+          Correspondence
         </a>
       </div>
     </div>

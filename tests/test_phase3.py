@@ -162,7 +162,7 @@ check("timeline shows receipt + upload events",
 h = admin.get(f"/admin/student/{a['id']}/progress").data.decode()
 check("progress tab shows dimensions",
       "Status Dimensions" in h and "Degree" in h
-      and "official degree-completion checklist" in h)
+      and "Degree Completion Checklist" in h)
 h = admin.get(f"/admin/student/{a['id']}/viva").data.decode()
 check("viva tab renders", "Viva Records" in h)
 h = admin.get(f"/admin/student/{a['id']}").data.decode()

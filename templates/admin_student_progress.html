@@ -31,6 +31,78 @@
       </tbody>
     </table>
   </div>
-  <p class="hint" style="margin-bottom:0">This is a progress summary drawn from the recorded facts. The official degree-completion checklist — where an authorized officer marks the degree Issued — arrives in Phase 6. Nothing here marks a degree as issued.</p>
+  <p class="hint" style="margin-bottom:0">This summary is drawn from the recorded facts. The official checklist below is what authorizes a degree to be marked Issued.</p>
+</div>
+
+<div class="card section">
+  <div class="section-head">
+    <span class="section-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg></span>
+    <h3>Degree Completion Checklist</h3>
+  </div>
+  <p class="hint" style="margin-top:0">{{ cdone }} of {{ creq }} required items complete. Items marked <strong>Auto</strong> follow the recorded facts (ASRB, exams, GS receipts, Controller result, viva) and cannot be ticked by hand. The official DAS checklist has not been supplied yet — this list is configuration and can be edited on the <a href="{{ url_for('admin_completion_items') }}">Completion Checklist</a> page.</p>
+  <div class="table-scroll">
+    <table class="data-table">
+      <thead><tr><th>Requirement</th><th>State</th><th>Action</th></tr></thead>
+      <tbody>
+        {% for r in comp %}
+        <tr>
+          <td>{{ r.item.name }}{% if r.item.required %} <span class="hint">(required)</span>{% endif %}</td>
+          <td>
+            {% if r.done %}<span class="pill q">Complete{% if r.via == 'waived' %} (waived){% elif r.via == 'record' %} · from records{% endif %}</span>
+            {% else %}<span class="pill warn">Pending</span>{% endif %}
+            {% if r.mark and not r.item.auto_source %}<div class="hint">{{ r.mark.status }} by {{ r.mark.marked_by }} · {{ r.mark.created_at }}</div>{% endif %}
+          </td>
+          <td>
+            {% if r.item.auto_source %}<span class="hint">Auto</span>
+            {% else %}
+            <form method="post" action="{{ url_for('admin_completion_mark', sid=s.id, item_id=r.item.id) }}" class="row" style="gap:6px">
+              <select name="status" class="no-icon">
+                <option value="Done">Done</option>
+                <option value="Waived">Waived</option>
+                <option value="Pending">Pending</option>
+              </select>
+              <input type="text" name="remarks" placeholder="Remarks">
+              <button type="submit" class="btn ghost sm">Save</button>
+            </form>
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<div class="card section">
+  <div class="section-head">
+    <span class="section-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="6"/><path d="M15.5 13 17 22l-5-3-5 3 1.5-9"/></svg></span>
+    <h3>Degree Issuance</h3>
+  </div>
+  {% if degree_rec %}
+  <div class="table-scroll">
+    <table class="data-table">
+      <tbody>
+        <tr><th style="width:220px">Status</th><td><span class="pill q">Degree Issued</span></td></tr>
+        <tr><th>Issued on</th><td>{{ degree_rec.issued_date }}</td></tr>
+        <tr><th>Degree No.</th><td>{{ degree_rec.degree_no or '—' }}</td></tr>
+        <tr><th>Issued by</th><td>{{ degree_rec.issued_by }}</td></tr>
+        {% if degree_rec.remarks %}<tr><th>Remarks</th><td>{{ degree_rec.remarks }}</td></tr>{% endif %}
+      </tbody>
+    </table>
+  </div>
+  <form method="post" action="{{ url_for('admin_degree_revoke', sid=s.id) }}" style="margin-top:12px">
+    <button type="submit" class="btn danger sm" data-confirm="Revoke this issuance? The degree status will follow the recorded facts again.">Revoke Issuance (correction)</button>
+  </form>
+  {% elif ready %}
+  <p class="hint" style="margin-top:0">All required checklist items are complete. Only an authorized DAS officer can mark the degree Issued — this is a separate, recorded act; nothing issues a degree automatically.</p>
+  <form method="post" action="{{ url_for('admin_degree_issue', sid=s.id) }}" class="row" style="gap:8px;flex-wrap:wrap">
+    <input type="date" name="issued_date" value="{{ today }}">
+    <input type="text" name="degree_no" placeholder="Degree No.">
+    <input type="text" name="remarks" placeholder="Remarks">
+    <button type="submit" class="btn primary" data-confirm="Mark this degree as ISSUED? This is recorded with your name.">Mark Degree Issued</button>
+  </form>
+  {% else %}
+  <div class="empty"><p>The degree cannot be issued yet — {{ creq - cdone }} required checklist item(s) are still pending above.</p></div>
+  {% endif %}
 </div>
 {% endblock %}

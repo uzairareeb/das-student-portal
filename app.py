@@ -363,6 +363,7 @@ def init_db():
     _create_document_tables(db)
     _create_phase4_tables(db)
     _create_phase5_tables(db)
+    _create_phase6_tables(db)
     # Admin password: the env var is the source of truth. Only overwrite
     # the stored hash when the env var is actually set, so a missing env
     # var can never silently downgrade the live password to a fallback.
@@ -1189,6 +1190,140 @@ def thesis_case_of(db, student_id):
 
 def _case_event(db, sid, text, actor, role, remarks=""):
     wf.record_event(db, sid, "thesis", "", text, actor, role, remarks)
+
+
+COMPLETION_AUTO_SOURCES = ["", "synopsis", "comprehensive", "documents",
+                           "thesis", "viva"]
+
+# Starter configuration only — DAS has not supplied the official
+# completion checklist; every item is editable on the Completion
+# Checklist page and nothing here is treated as university policy.
+_COMPLETION_SEED = [
+    ("Synopsis approved by ASRB", "synopsis", 1),
+    ("Comprehensive exam passed", "comprehensive", 2),
+    ("All GS hard-copy documents received at DAS", "documents", 3),
+    ("Thesis result declared by Controller", "thesis", 4),
+    ("Viva-voce passed", "viva", 5),
+    ("Dues / fee clearance", "", 6),
+    ("Library clearance", "", 7),
+]
+
+
+def _create_phase6_tables(db):
+    """Phase 6 (Central System): degree completion checklist, degree
+    issuance records and the correspondence register."""
+    id_def = "id SERIAL PRIMARY KEY" if USE_PG else \
+        "id INTEGER PRIMARY KEY AUTOINCREMENT"
+    db.execute(f"""
+        CREATE TABLE IF NOT EXISTS completion_items (
+            {id_def}, name TEXT NOT NULL, auto_source TEXT DEFAULT '',
+            required INTEGER DEFAULT 1, active INTEGER DEFAULT 1,
+            sort INTEGER DEFAULT 0
+        )
+    """)
+    db.execute(f"""
+        CREATE TABLE IF NOT EXISTS completion_marks (
+            {id_def},
+            student_id INTEGER NOT NULL REFERENCES students(id),
+            item_id INTEGER NOT NULL REFERENCES completion_items(id),
+            status TEXT DEFAULT 'Done', marked_by TEXT, remarks TEXT,
+            created_at TEXT
+        )
+    """)
+    db.execute(f"""
+        CREATE TABLE IF NOT EXISTS degree_records (
+            {id_def},
+            student_id INTEGER NOT NULL REFERENCES students(id),
+            issued_date TEXT, degree_no TEXT, issued_by TEXT,
+            remarks TEXT, created_at TEXT
+        )
+    """)
+    db.execute(f"""
+        CREATE TABLE IF NOT EXISTS correspondence (
+            {id_def},
+            student_id INTEGER REFERENCES students(id),
+            direction TEXT DEFAULT 'Inward', subject TEXT,
+            party TEXT, ref_no TEXT, diary_no TEXT, dispatch_no TEXT,
+            letter_date TEXT, sent_date TEXT, received_date TEXT,
+            status TEXT DEFAULT 'Received', remarks TEXT,
+            recorded_by TEXT, created_at TEXT
+        )
+    """)
+    if not db.fetchone("SELECT id FROM completion_items LIMIT 1"):
+        for name, src, sort in _COMPLETION_SEED:
+            db.execute(
+                "INSERT INTO completion_items (name, auto_source,"
+                " required, active, sort) VALUES (?, ?, 1, 1, ?)",
+                (name, src, sort))
+
+
+def _auto_item_done(db, s, source):
+    """Whether an automatic checklist item is satisfied by the recorded
+    facts. Auto items follow records only — they are never ticked by
+    hand, so the checklist cannot claim an event that did not happen."""
+    sid = s["id"]
+    if source == "synopsis":
+        syn = synopsis_of(db, sid)
+        return bool(syn and (syn.get("asrb_status") or "")
+                    .startswith("Approved"))
+    if source == "comprehensive":
+        return bool(db.fetchone(
+            "SELECT id FROM comprehensive_exams WHERE student_id=?"
+            " AND result='Pass'", (sid,)))
+    if source == "documents":
+        hard = [c for c in student_doc_checklist(db, s)
+                if c.get("requires_hardcopy")]
+        return bool(hard) and all(c.get("receipt") for c in hard)
+    if source == "thesis":
+        case = thesis_case_of(db, sid)
+        return bool(case and case.get("case_status")
+                    in ("Result Declared", "Closed"))
+    if source == "viva":
+        return bool(db.fetchone(
+            "SELECT id FROM viva_records WHERE student_id=?"
+            " AND result='Pass'", (sid,)))
+    return False
+
+
+def completion_state(db, s):
+    """Checklist rows for one student: each active item with its
+    satisfied state and where the satisfaction came from."""
+    rows = []
+    items = db.execute(
+        "SELECT * FROM completion_items WHERE COALESCE(active,1)=1"
+        " ORDER BY sort, id").fetchall()
+    for it in items:
+        it = dict(it)
+        mark = db.fetchone(
+            "SELECT * FROM completion_marks WHERE student_id=?"
+            " AND item_id=? ORDER BY id DESC", (s["id"], it["id"]))
+        mark = dict(mark) if mark else None
+        if it.get("auto_source"):
+            done = _auto_item_done(db, s, it["auto_source"])
+            via = "record"
+        elif mark and mark["status"] in ("Done", "Waived"):
+            done = True
+            via = mark["status"].lower()
+        else:
+            done = False
+            via = ""
+        rows.append({"item": it, "done": done, "via": via, "mark": mark})
+    return rows
+
+
+def completion_ready(db, s):
+    """(ready, done_count, required_count) over required items."""
+    rows = completion_state(db, s)
+    req = [r for r in rows if r["item"].get("required")]
+    done = sum(1 for r in req if r["done"])
+    return (bool(req) and done == len(req)), done, len(req)
+
+
+def degree_record_of(db, student_id):
+    row = db.fetchone(
+        "SELECT * FROM degree_records WHERE student_id=?"
+        " ORDER BY id DESC", (student_id,))
+    return dict(row) if row else None
 
 
 def _migrate_add_archived(db):
@@ -6770,9 +6905,13 @@ def admin_student_progress(sid):
         ("Viva passed", any(v.get("result") == "Pass" for v in vivas)),
     ]
     dims = [(wf.DIMENSIONS[c][0], s.get(c)) for c in wf.DIMENSIONS]
-    return render_template("admin_student_progress.html", uni=UNI_NAME,
-                           title=PORTAL_TITLE, s=s, checks=checks,
-                           dims=dims)
+    comp = completion_state(db, s)
+    ready, cdone, creq = completion_ready(db, s)
+    return render_template(
+        "admin_student_progress.html", uni=UNI_NAME, title=PORTAL_TITLE,
+        s=s, checks=checks, dims=dims, comp=comp, ready=ready,
+        cdone=cdone, creq=creq, degree_rec=degree_record_of(db, sid),
+        today=datetime.now().strftime("%Y-%m-%d"))
 
 
 @app.route("/admin/student/<int:sid>/timeline")
@@ -8020,6 +8159,321 @@ def controller_notifications():
                            title=PORTAL_TITLE, cu=cu, notes=notes)
 
 
+
+# ==================== DEGREE COMPLETION + CORRESPONDENCE (Phase 6) =====
+
+@app.route("/admin/student/<int:sid>/completion/<int:item_id>/mark",
+           methods=["POST"])
+@admin_required
+def admin_completion_mark(sid, item_id):
+    db = get_db()
+    item = db.fetchone("SELECT * FROM completion_items WHERE id=?",
+                       (item_id,))
+    if not item:
+        return redirect(url_for("admin_student_progress", sid=sid))
+    item = dict(item)
+    if item.get("auto_source"):
+        flash("This item follows the recorded facts automatically —"
+              " it cannot be ticked by hand.")
+        return redirect(url_for("admin_student_progress", sid=sid))
+    status = pick(request.form.get("status"),
+                  ["Done", "Waived", "Pending"], "Done")
+    db.execute(
+        "INSERT INTO completion_marks (student_id, item_id, status,"
+        " marked_by, remarks, created_at) VALUES (?, ?, ?, ?, ?, ?)",
+        (sid, item_id, status, current_admin()["name"],
+         (request.form.get("remarks") or "").strip(),
+         datetime.now().strftime("%Y-%m-%d %H:%M")))
+    db.commit()
+    log_activity(current_admin()["name"], "completion_mark",
+                 f"{item['name']} -> {status} (student id={sid})",
+                 entity_type="student", entity_id=sid)
+    flash(f"Checklist updated: {item['name']} — {status}.")
+    return redirect(url_for("admin_student_progress", sid=sid))
+
+
+@app.route("/admin/student/<int:sid>/degree/issue", methods=["POST"])
+@admin_required
+def admin_degree_issue(sid):
+    """The ONLY place a degree becomes Issued: every required checklist
+    item must be satisfied by records or authorized marks first."""
+    db = get_db()
+    s = get_student(sid)
+    if not s:
+        return redirect(url_for("admin_students"))
+    ready, done, req = completion_ready(db, s)
+    if not ready:
+        flash(f"Degree cannot be issued yet — {done} of {req} required"
+              " checklist items are complete.")
+        return redirect(url_for("admin_student_progress", sid=sid))
+    now = datetime.now().strftime("%Y-%m-%d %H:%M")
+    db.execute(
+        "INSERT INTO degree_records (student_id, issued_date,"
+        " degree_no, issued_by, remarks, created_at)"
+        " VALUES (?, ?, ?, ?, ?, ?)",
+        (sid, (request.form.get("issued_date") or "").strip()
+         or now[:10],
+         (request.form.get("degree_no") or "").strip(),
+         current_admin()["name"],
+         (request.form.get("remarks") or "").strip(), now))
+    db.execute("UPDATE students SET degree_status='Issued' WHERE id=?",
+               (sid,))
+    wf.record_event(db, sid, "degree_status", s.get("degree_status"),
+                    "Issued", current_admin()["name"],
+                    current_admin()["role"],
+                    "Degree issued — completion checklist verified")
+    db.commit()
+    log_activity(current_admin()["name"], "degree_issue",
+                 f"degree issued for student id={sid}",
+                 entity_type="student", entity_id=sid)
+    notify_student(sid, "degree", "Degree issued",
+                   "Your degree has been issued by the Directorate of"
+                   " Advanced Studies. Please contact the DAS office"
+                   " for collection details.",
+                   url_for("student_dashboard"))
+    flash("Degree marked as Issued.")
+    return redirect(url_for("admin_student_progress", sid=sid))
+
+
+@app.route("/admin/student/<int:sid>/degree/revoke", methods=["POST"])
+@admin_required
+def admin_degree_revoke(sid):
+    """Correct an issuance recorded in error: removes the record and
+    lets the degree dimension derive from the facts again."""
+    db = get_db()
+    s = get_student(sid)
+    rec = degree_record_of(db, sid)
+    if rec:
+        db.execute("DELETE FROM degree_records WHERE id=?",
+                   (rec["id"],))
+    db.execute("UPDATE students SET degree_status=NULL WHERE id=?",
+               (sid,))
+    wf.sync_student_dimensions(db, sid, current_admin()["name"],
+                               current_admin()["role"])
+    db.commit()
+    log_activity(current_admin()["name"], "degree_revoke",
+                 f"issuance revoked for student id={sid}",
+                 entity_type="student", entity_id=sid)
+    notify_student(sid, "degree", "Degree issuance corrected",
+                   "A degree issuance recorded on your account was"
+                   " revoked by the DAS office as a correction.",
+                   url_for("student_dashboard"))
+    flash("Issuance revoked — the degree status now follows the"
+          " recorded facts again.")
+    return redirect(url_for("admin_student_progress", sid=sid))
+
+
+@app.route("/admin/completion-items", methods=["GET", "POST"])
+@admin_required
+def admin_completion_items():
+    db = get_db()
+    if request.method == "POST":
+        name = (request.form.get("name") or "").strip()
+        if name:
+            db.execute(
+                "INSERT INTO completion_items (name, auto_source,"
+                " required, active, sort) VALUES (?, ?, ?, 1, ?)",
+                (name,
+                 pick(request.form.get("auto_source"),
+                      COMPLETION_AUTO_SOURCES, ""),
+                 1 if request.form.get("required") else 0,
+                 int(request.form.get("sort") or 0)))
+            db.commit()
+            flash("Checklist item added.")
+        return redirect(url_for("admin_completion_items"))
+    items = [dict(r) for r in db.execute(
+        "SELECT * FROM completion_items ORDER BY sort, id").fetchall()]
+    return render_template("admin_completion_items.html", uni=UNI_NAME,
+                           title=PORTAL_TITLE, rows=items,
+                           auto_sources=COMPLETION_AUTO_SOURCES)
+
+
+@app.route("/admin/completion-items/<int:iid>/save", methods=["POST"])
+@admin_required
+def admin_completion_item_save(iid):
+    db = get_db()
+    db.execute(
+        "UPDATE completion_items SET name=?, auto_source=?, required=?,"
+        " active=?, sort=? WHERE id=?",
+        ((request.form.get("name") or "").strip(),
+         pick(request.form.get("auto_source"),
+              COMPLETION_AUTO_SOURCES, ""),
+         1 if request.form.get("required") else 0,
+         1 if request.form.get("active") else 0,
+         int(request.form.get("sort") or 0), iid))
+    db.commit()
+    flash("Checklist item updated.")
+    return redirect(url_for("admin_completion_items"))
+
+
+@app.route("/admin/degree-completion")
+@admin_required
+def admin_degree_completion():
+    db = get_db()
+    # Completion candidates are usually Pass Out students, who are
+    # auto-archived — the queue must not hide them behind the archive
+    # filter; the row filter below keeps only relevant students.
+    students = [dict(r) for r in db.execute(
+        "SELECT * FROM students ORDER BY name").fetchall()]
+    rows = []
+    for s in students:
+        ready, done, req = completion_ready(db, s)
+        rec = degree_record_of(db, s["id"])
+        if rec or ready or s.get("degree_status") in (
+                "Eligible", "Issued"):
+            rows.append({"s": s, "ready": ready, "done": done,
+                         "req": req, "rec": rec})
+    rows.sort(key=lambda r: (0 if r["rec"] else 1 if r["ready"] else 2,
+                             r["s"]["name"]))
+    return render_template("admin_degree_completion.html", uni=UNI_NAME,
+                           title=PORTAL_TITLE, rows=rows)
+
+
+@app.route("/admin/student/<int:sid>/correspondence")
+@admin_required
+def admin_student_correspondence(sid):
+    s = _tab_student(sid)
+    if not s:
+        return render_template("notfound.html", uni=UNI_NAME,
+                               title=PORTAL_TITLE,
+                               message="Student not found."), 404
+    rows = [dict(r) for r in get_db().execute(
+        "SELECT * FROM correspondence WHERE student_id=?"
+        " ORDER BY id DESC", (sid,)).fetchall()]
+    return render_template(
+        "admin_student_correspondence.html", uni=UNI_NAME,
+        title=PORTAL_TITLE, s=s, rows=rows,
+        today=datetime.now().strftime("%Y-%m-%d"))
+
+
+@app.route("/admin/student/<int:sid>/correspondence/add", methods=["POST"])
+@admin_required
+def admin_correspondence_add(sid):
+    db = get_db()
+    form_sid = request.form.get("student_id")
+    if form_sid:
+        try:
+            sid = int(form_sid)
+        except ValueError:
+            pass
+    direction = pick(request.form.get("direction"),
+                     ["Inward", "Outward"], "Inward")
+    now = datetime.now().strftime("%Y-%m-%d %H:%M")
+    if direction == "Inward":
+        status = "Received"
+        sent = ""
+        received = (request.form.get("letter_date") or "").strip() \
+            or now[:10]
+    else:
+        # Dispatched is not received: received_date stays empty until
+        # the receiving office's acknowledgment is recorded.
+        status = "Dispatched"
+        sent = (request.form.get("letter_date") or "").strip() or now[:10]
+        received = ""
+    db.execute(
+        "INSERT INTO correspondence (student_id, direction, subject,"
+        " party, ref_no, diary_no, dispatch_no, letter_date, sent_date,"
+        " received_date, status, remarks, recorded_by, created_at)"
+        " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        (sid or None, direction,
+         (request.form.get("subject") or "").strip(),
+         (request.form.get("party") or "").strip(),
+         (request.form.get("ref_no") or "").strip(),
+         (request.form.get("diary_no") or "").strip(),
+         (request.form.get("dispatch_no") or "").strip(),
+         (request.form.get("letter_date") or "").strip(),
+         sent, received, status,
+         (request.form.get("remarks") or "").strip(),
+         current_admin()["name"], now))
+    db.commit()
+    log_activity(current_admin()["name"], "correspondence_add",
+                 f"{direction} letter for student id={sid}:"
+                 f" {(request.form.get('subject') or '')[:60]}",
+                 entity_type="student", entity_id=sid)
+    flash("Correspondence recorded.")
+    if not sid or request.form.get("back") == "register":
+        return redirect(url_for("admin_correspondence"))
+    return redirect(url_for("admin_student_correspondence", sid=sid))
+
+
+@app.route("/admin/correspondence/<int:cid>/receive", methods=["POST"])
+@admin_required
+def admin_correspondence_receive(cid):
+    """Record the receiving office's acknowledgment of an outward
+    letter (or file an inward one). Sending alone never counts."""
+    db = get_db()
+    row = db.fetchone("SELECT * FROM correspondence WHERE id=?", (cid,))
+    if not row:
+        return redirect(url_for("admin_correspondence"))
+    c = dict(row)
+    if c["direction"] == "Outward":
+        db.execute(
+            "UPDATE correspondence SET status='Received',"
+            " received_date=? WHERE id=?",
+            ((request.form.get("received_date") or "").strip()
+             or datetime.now().strftime("%Y-%m-%d"), cid))
+        flash("Receipt acknowledged — the letter is now recorded as"
+              " received by the other office.")
+    else:
+        db.execute("UPDATE correspondence SET status='Filed'"
+                   " WHERE id=?", (cid,))
+        flash("Inward letter marked as filed.")
+    db.commit()
+    if c.get("student_id") and request.form.get("back") != "register":
+        return redirect(url_for("admin_student_correspondence",
+                                sid=c["student_id"]))
+    return redirect(url_for("admin_correspondence"))
+
+
+@app.route("/admin/correspondence/<int:cid>/delete", methods=["POST"])
+@admin_required
+def admin_correspondence_delete(cid):
+    db = get_db()
+    row = db.fetchone("SELECT * FROM correspondence WHERE id=?", (cid,))
+    db.execute("DELETE FROM correspondence WHERE id=?", (cid,))
+    db.commit()
+    flash("Correspondence entry deleted.")
+    if row and dict(row).get("student_id") \
+            and request.form.get("back") != "register":
+        return redirect(url_for("admin_student_correspondence",
+                                sid=dict(row)["student_id"]))
+    return redirect(url_for("admin_correspondence"))
+
+
+@app.route("/admin/correspondence")
+@admin_required
+def admin_correspondence():
+    db = get_db()
+    direction = (request.args.get("direction") or "").strip()
+    status = (request.args.get("status") or "").strip()
+    q = (request.args.get("q") or "").strip()
+    sql = ("SELECT c.*, st.name AS student_name, st.reg_no"
+           " FROM correspondence c"
+           " LEFT JOIN students st ON st.id = c.student_id WHERE 1=1")
+    params = []
+    if direction in ("Inward", "Outward"):
+        sql += " AND c.direction=?"
+        params.append(direction)
+    if status:
+        sql += " AND c.status=?"
+        params.append(status)
+    if q:
+        sql += (" AND (LOWER(c.subject) LIKE ? OR LOWER(c.party) LIKE ?"
+                " OR c.diary_no LIKE ? OR c.dispatch_no LIKE ?"
+                " OR LOWER(st.name) LIKE ?)")
+        like = f"%{q.lower()}%"
+        params += [like, like, f"%{q}%", f"%{q}%", like]
+    sql += " ORDER BY c.id DESC LIMIT 300"
+    rows = [dict(r) for r in db.execute(sql, params).fetchall()]
+    students = [dict(r) for r in db.execute(
+        "SELECT id, name, reg_no FROM students ORDER BY name"
+    ).fetchall()]
+    return render_template(
+        "admin_correspondence.html", uni=UNI_NAME, title=PORTAL_TITLE,
+        rows=rows, students=students, direction=direction,
+        status=status, q=q, today=datetime.now().strftime("%Y-%m-%d"))
+
+
 # ---------------- student portal ----------------
 def student_required(f):
     @wraps(f)
@@ -8126,6 +8580,7 @@ def student_dashboard():
     if _lr:
         research["latest_report"] = dict(_lr)
     research["case"] = thesis_case_of(_db, s["id"])
+    research["degree"] = degree_record_of(_db, s["id"])
     sched_rec = _saved_schedule_for_session(s.get("session"))
     if sched_rec is None:
         _summ = _list_saved_schedules()

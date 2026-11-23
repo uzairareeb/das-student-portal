@@ -1,0 +1,78 @@
+{% extends "admin_base.html" %}
+{% block container_extra %} wide{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <h2>Correspondence Register</h2>
+    <p>All inward and outward dak. An outward letter counts as received only when the receiving office's acknowledgment is recorded.</p>
+  </div>
+</div>
+<div class="card section">
+  <form method="get" class="row" style="gap:8px;flex-wrap:wrap;margin-bottom:14px">
+    <input type="text" name="q" value="{{ q }}" placeholder="Search subject, party, diary / dispatch no., student">
+    <select name="direction" class="no-icon">
+      <option value="">Both directions</option>
+      <option value="Inward" {% if direction == 'Inward' %}selected{% endif %}>Inward</option>
+      <option value="Outward" {% if direction == 'Outward' %}selected{% endif %}>Outward</option>
+    </select>
+    <select name="status" class="no-icon">
+      <option value="">All statuses</option>
+      {% for st in ['Received', 'Dispatched', 'Filed'] %}<option value="{{ st }}" {% if status == st %}selected{% endif %}>{{ st }}</option>{% endfor %}
+    </select>
+    <button type="submit" class="btn primary sm">Filter</button>
+  </form>
+  {% if rows %}
+  <div class="table-scroll">
+    <table class="data-table">
+      <thead><tr><th>Direction</th><th>Subject</th><th>Student</th><th>Party</th><th>Diary / Dispatch</th><th>Status</th><th></th></tr></thead>
+      <tbody>
+        {% for c in rows %}
+        <tr>
+          <td>{% if c.direction == 'Inward' %}<span class="pill q">Inward</span>{% else %}<span class="pill">Outward</span>{% endif %}</td>
+          <td>{{ c.subject }}{% if c.ref_no %}<div class="hint">Ref: {{ c.ref_no }}</div>{% endif %}</td>
+          <td>{% if c.student_name %}{{ c.student_name }}<div class="hint">{{ c.reg_no }}</div>{% else %}<span class="hint">General</span>{% endif %}</td>
+          <td>{{ c.party or '—' }}</td>
+          <td>{% if c.direction == 'Inward' %}Diary {{ c.diary_no or '—' }}{% else %}Dispatch {{ c.dispatch_no or '—' }}{% endif %}</td>
+          <td><span class="pill">{{ c.status }}</span>{% if c.direction == 'Outward' and c.received_date %}<div class="hint">Received {{ c.received_date }}</div>{% endif %}</td>
+          <td>
+            {% if c.direction == 'Outward' and c.status == 'Dispatched' %}
+            <form method="post" action="{{ url_for('admin_correspondence_receive', cid=c.id) }}" class="row" style="gap:6px">
+              <input type="hidden" name="back" value="register">
+              <input type="date" name="received_date" value="{{ today }}">
+              <button type="submit" class="btn ghost sm">Mark Received</button>
+            </form>
+            {% elif c.student_id %}<a class="btn ghost sm" href="{{ url_for('admin_student_correspondence', sid=c.student_id) }}">Open</a>{% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="empty"><p>No correspondence matches.</p></div>
+  {% endif %}
+
+  <form method="post" action="{{ url_for('admin_correspondence_add', sid=0) }}" class="card" style="padding:14px;margin-top:16px">
+    <input type="hidden" name="back" value="register">
+    <h4 style="margin:0 0 10px">Record a letter (register)</h4>
+    <div class="row" style="gap:8px;flex-wrap:wrap">
+      <select name="direction" class="no-icon">
+        <option value="Inward">Inward (received)</option>
+        <option value="Outward">Outward (sent)</option>
+      </select>
+      <select name="student_id" class="no-icon">
+        <option value="">General — no student</option>
+        {% for st in students %}<option value="{{ st.id }}">{{ st.name }} ({{ st.reg_no }})</option>{% endfor %}
+      </select>
+      <input type="text" name="subject" placeholder="Subject" required style="min-width:240px">
+      <input type="text" name="party" placeholder="From / To">
+      <input type="text" name="ref_no" placeholder="Letter No. / Ref">
+      <input type="text" name="diary_no" placeholder="Diary No. (inward)">
+      <input type="text" name="dispatch_no" placeholder="Dispatch No. (outward)">
+      <input type="date" name="letter_date" value="{{ today }}">
+      <button type="submit" class="btn primary sm">Record</button>
+    </div>
+    <p class="hint" style="margin-bottom:0">To attach the letter to a student, open the student's Correspondence tab instead — or pick the student here and record it from the register; the entry appears on the student's tab either way.</p>
+  </form>
+</div>
+{% endblock %}
