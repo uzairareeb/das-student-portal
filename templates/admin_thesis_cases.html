@@ -1,0 +1,38 @@
+{% extends "admin_base.html" %}
+{% block container_extra %} wide{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <h2>Thesis Cases</h2>
+    <p>Every thesis case and its current stage. Controller-side steps are recorded by the Controller office in its own portal.</p>
+  </div>
+</div>
+<div class="card section">
+  <div class="row" style="gap:8px;flex-wrap:wrap;margin-bottom:14px">
+    {% for st, n in counts.items() %}<span class="sp-chip">{{ st }}: <strong>{{ n }}</strong></span>{% endfor %}
+    {% if not counts %}<span class="hint">No cases yet.</span>{% endif %}
+  </div>
+  {% if rows %}
+  <div class="table-scroll">
+    <table class="data-table">
+      <thead><tr><th>Student</th><th>Degree / Session</th><th>Status</th><th>Forwarded</th><th>Received</th><th>Result</th><th></th></tr></thead>
+      <tbody>
+        {% for c in rows %}
+        <tr>
+          <td>{{ c.student_name }}<div class="hint">{{ c.reg_no }}</div></td>
+          <td>{{ c.degree or '—' }} / {{ c.student_session or '—' }}</td>
+          <td><span class="pill">{{ c.case_status }}</span></td>
+          <td class="nowrap">{{ c.forwarded_date or '—' }}</td>
+          <td class="nowrap">{{ c.received_date or '—' }}</td>
+          <td>{{ c.result_status }}</td>
+          <td><a class="btn ghost sm" href="{{ url_for('admin_student_thesis', sid=c.student_id) }}">Open</a></td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="empty"><p>No thesis cases yet — open one from a student's Thesis Case tab.</p></div>
+  {% endif %}
+</div>
+{% endblock %}

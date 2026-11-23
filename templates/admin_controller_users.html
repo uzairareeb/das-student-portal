@@ -1,0 +1,61 @@
+{% extends "admin_base.html" %}
+{% block container_extra %} wide{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <h2>Controller Office</h2>
+    <p>Accounts for the Controller of Examinations portal. Controller users record thesis receipts, returns, evaluation and results themselves — DAS never records those on their behalf.</p>
+  </div>
+</div>
+
+<div class="card section">
+  <h3 style="margin-top:0">Add Controller Office account</h3>
+  <form method="post" class="form-grid">
+    <div>
+      <label class="f-label" for="cu-name">Full name</label>
+      <input id="cu-name" name="name" required placeholder="e.g. Muhammad Rafiq">
+    </div>
+    <div>
+      <label class="f-label" for="cu-email">Email (login)</label>
+      <input id="cu-email" name="email" type="email" required placeholder="name@cuvas.edu.pk">
+    </div>
+    <div>
+      <label class="f-label" for="cu-pass">Password (min 6)</label>
+      <input id="cu-pass" name="password" type="text" required placeholder="Temporary password">
+    </div>
+    <div>
+      <label class="f-label" for="cu-desig">Designation</label>
+      <input id="cu-desig" name="designation" placeholder="e.g. Deputy Controller">
+    </div>
+    <div>
+      <button type="submit" class="btn primary">Create Account</button>
+    </div>
+  </form>
+</div>
+
+<div class="card section">
+  <h3 style="margin-top:0">Controller Office Accounts ({{ users|length }})</h3>
+  {% if users %}
+  {% for u in users %}
+  <div class="card" style="padding:14px;margin-bottom:12px">
+    <div><strong>{{ u.name }}</strong> <span class="hint">{{ u.email }}</span>
+      {% if not u.is_active %}<span class="pill nq">Inactive</span>{% endif %}
+      <div class="hint">Last login: {{ u.last_login_at or 'never' }}</div>
+    </div>
+    <form method="post" action="{{ url_for('admin_controller_user_save', uid=u.id) }}" class="row" style="gap:8px;flex-wrap:wrap;margin-top:10px">
+      <input name="name" value="{{ u.name }}" required>
+      <input name="designation" value="{{ u.designation or '' }}" placeholder="Designation">
+      <label class="f-label" style="margin:0"><input type="checkbox" name="is_active" {% if u.is_active %}checked{% endif %}> Active</label>
+      <button type="submit" class="btn ghost sm">Save</button>
+    </form>
+    <form method="post" action="{{ url_for('admin_controller_user_password', uid=u.id) }}" class="row" style="gap:8px;margin-top:8px">
+      <input name="password" type="text" placeholder="New password (min 6)" required>
+      <button type="submit" class="btn ghost sm">Set Password</button>
+    </form>
+  </div>
+  {% endfor %}
+  {% else %}
+  <div class="empty"><p>No Controller Office accounts yet — create the first one above.</p></div>
+  {% endif %}
+</div>
+{% endblock %}

@@ -167,7 +167,7 @@ h = admin.get(f"/admin/student/{a['id']}/viva").data.decode()
 check("viva tab renders", "Viva Records" in h)
 h = admin.get(f"/admin/student/{a['id']}").data.decode()
 check("overview shows the tab bar",
-      "Result &amp; Degree" in h and "Thesis Case · Phase 5" in h)
+      "Result &amp; Degree" in h and "Thesis Case" in h)
 
 # ---- receipt delete ----
 admin.post(f"/admin/gs-receipt/{r['id']}/delete")

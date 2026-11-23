@@ -362,6 +362,7 @@ def init_db():
     _create_intake_tables(db)
     _create_document_tables(db)
     _create_phase4_tables(db)
+    _create_phase5_tables(db)
     # Admin password: the env var is the source of truth. Only overwrite
     # the stored hash when the env var is actually set, so a missing env
     # var can never silently downgrade the live password to a fallback.
@@ -1092,6 +1093,102 @@ def synopsis_of(db, student_id):
         "SELECT * FROM synopsis_records WHERE student_id=?"
         " ORDER BY id DESC", (student_id,))
     return dict(row) if row else None
+
+
+CASE_STATUSES = ["Not Started", "Submitted to DAS",
+                 "Forwarded to Controller", "Received by Controller",
+                 "Returned with Objections", "Under Evaluation",
+                 "Corrections Required", "Corrections Submitted",
+                 "Evaluation Complete", "Result Declared", "Closed"]
+
+
+def _create_phase5_tables(db):
+    """Phase 5 (Central System): thesis cases, examiners (confidential)
+    and Controller Office accounts."""
+    id_def = "id SERIAL PRIMARY KEY" if USE_PG else \
+        "id INTEGER PRIMARY KEY AUTOINCREMENT"
+    db.execute(f"""
+        CREATE TABLE IF NOT EXISTS thesis_cases (
+            {id_def},
+            student_id INTEGER NOT NULL REFERENCES students(id),
+            case_status TEXT DEFAULT 'Not Started',
+            das_submitted_date TEXT, forwarded_date TEXT, dispatch_no TEXT,
+            received_date TEXT, received_by TEXT,
+            returned_date TEXT, objections TEXT, resubmitted_date TEXT,
+            evaluation_completed_date TEXT,
+            result_status TEXT DEFAULT 'Awaited', result_date TEXT,
+            result_remarks TEXT, remarks TEXT,
+            created_at TEXT, updated_at TEXT
+        )
+    """)
+    db.execute(f"""
+        CREATE TABLE IF NOT EXISTS thesis_examiners (
+            {id_def},
+            case_id INTEGER NOT NULL REFERENCES thesis_cases(id),
+            student_id INTEGER NOT NULL REFERENCES students(id),
+            examiner_name TEXT, affiliation TEXT,
+            examiner_role TEXT DEFAULT 'External',
+            appointed_date TEXT, report_status TEXT DEFAULT 'Awaited',
+            report_date TEXT, remarks TEXT, recorded_by TEXT,
+            created_at TEXT
+        )
+    """)
+    db.execute(f"""
+        CREATE TABLE IF NOT EXISTS controller_users (
+            {id_def}, name TEXT NOT NULL, email TEXT UNIQUE NOT NULL,
+            password_hash TEXT NOT NULL, designation TEXT,
+            is_active INTEGER DEFAULT 1, created_at TEXT,
+            last_login_at TEXT
+        )
+    """)
+    db.execute(f"""
+        CREATE TABLE IF NOT EXISTS controller_notifications (
+            {id_def},
+            user_id INTEGER NOT NULL REFERENCES controller_users(id),
+            kind TEXT, title TEXT, message TEXT, link TEXT,
+            is_read INTEGER DEFAULT 0, created_at TEXT
+        )
+    """)
+
+
+def notify_controllers(kind, title, message="", link=""):
+    """Notify every active Controller Office account."""
+    try:
+        db = get_db()
+        for u in db.execute(
+                "SELECT id FROM controller_users WHERE is_active=1"
+        ).fetchall():
+            uid = u["id"] if isinstance(u, dict) else u[0]
+            db.execute(
+                "INSERT INTO controller_notifications (user_id, kind,"
+                " title, message, link, created_at)"
+                " VALUES (?,?,?,?,?,?)",
+                (uid, kind, title, message, link,
+                 datetime.now().strftime("%Y-%m-%d %H:%M")))
+        db.commit()
+    except Exception:
+        pass
+
+
+def controller_unread_count(user_id):
+    try:
+        row = get_db().fetchone(
+            "SELECT COUNT(*) AS n FROM controller_notifications"
+            " WHERE user_id=? AND COALESCE(is_read,0)=0", (user_id,))
+        return (row["n"] if isinstance(row, dict) else row[0]) if row else 0
+    except Exception:
+        return 0
+
+
+def thesis_case_of(db, student_id):
+    row = db.fetchone(
+        "SELECT * FROM thesis_cases WHERE student_id=? ORDER BY id DESC",
+        (student_id,))
+    return dict(row) if row else None
+
+
+def _case_event(db, sid, text, actor, role, remarks=""):
+    wf.record_event(db, sid, "thesis", "", text, actor, role, remarks)
 
 
 def _migrate_add_archived(db):
@@ -4669,6 +4766,15 @@ def _inject_dept_notif():
                 " FROM admin_notifications ORDER BY id DESC LIMIT 8")]
             return {"admin_unread": admin_unread_count(),
                     "admin_recent_notes": notes}
+        if request.path.startswith("/controller") \
+                and session.get("controller_id"):
+            cnotes = [dict(r) for r in get_db().fetchall(
+                "SELECT id, kind, title, message, link, created_at"
+                " FROM controller_notifications WHERE user_id=?"
+                " ORDER BY id DESC LIMIT 8", (session["controller_id"],))]
+            return {"controller_unread":
+                    controller_unread_count(session["controller_id"]),
+                    "controller_recent_notes": cnotes}
         if request.path.startswith("/supervisor") \
                 and session.get("supervisor_id"):
             spnotes = [dict(r) for r in get_db().fetchall(
@@ -7360,6 +7466,560 @@ def supervisor_notifications():
                            title=PORTAL_TITLE, sp=sp, notes=notes)
 
 
+
+# ==================== THESIS CASES + CONTROLLER (Phase 5) ====================
+
+@app.route("/admin/controller-users", methods=["GET", "POST"])
+@admin_required
+def admin_controller_users():
+    db = get_db()
+    if request.method == "POST":
+        name = (request.form.get("name") or "").strip()
+        email = (request.form.get("email") or "").strip().lower()
+        password = request.form.get("password") or ""
+        if not name or not email or len(password) < 6:
+            flash("Name, email and a password of at least 6 characters"
+                  " are required.")
+            return redirect(url_for("admin_controller_users"))
+        if db.fetchone("SELECT id FROM controller_users WHERE email=?",
+                       (email,)):
+            flash("A Controller Office account with this email already"
+                  " exists.")
+            return redirect(url_for("admin_controller_users"))
+        db.execute(
+            "INSERT INTO controller_users (name, email, password_hash,"
+            " designation, is_active, created_at) VALUES (?, ?, ?, ?, 1, ?)",
+            (name, email, generate_password_hash(password),
+             (request.form.get("designation") or "").strip(),
+             datetime.now().strftime("%Y-%m-%d %H:%M")))
+        db.commit()
+        log_activity(current_admin()["name"], "controller_user_add",
+                     f"{name} <{email}>", entity_type="controller_user")
+        flash(f"Controller Office account created for {name}.")
+        return redirect(url_for("admin_controller_users"))
+    users = [dict(r) for r in db.execute(
+        "SELECT * FROM controller_users ORDER BY name").fetchall()]
+    return render_template("admin_controller_users.html", uni=UNI_NAME,
+                           title=PORTAL_TITLE, users=users)
+
+
+@app.route("/admin/controller-users/<int:uid>/save", methods=["POST"])
+@admin_required
+def admin_controller_user_save(uid):
+    db = get_db()
+    db.execute(
+        "UPDATE controller_users SET name=?, designation=?, is_active=?"
+        " WHERE id=?",
+        ((request.form.get("name") or "").strip(),
+         (request.form.get("designation") or "").strip(),
+         1 if request.form.get("is_active") else 0, uid))
+    db.commit()
+    flash("Controller Office account updated.")
+    return redirect(url_for("admin_controller_users"))
+
+
+@app.route("/admin/controller-users/<int:uid>/password", methods=["POST"])
+@admin_required
+def admin_controller_user_password(uid):
+    pw = request.form.get("password") or ""
+    if len(pw) < 6:
+        flash("Password must be at least 6 characters.")
+        return redirect(url_for("admin_controller_users"))
+    get_db().execute(
+        "UPDATE controller_users SET password_hash=? WHERE id=?",
+        (generate_password_hash(pw), uid))
+    get_db().commit()
+    flash("Controller Office password updated.")
+    return redirect(url_for("admin_controller_users"))
+
+
+def _get_or_open_case(db, sid):
+    case = thesis_case_of(db, sid)
+    if case:
+        return case
+    now = datetime.now().strftime("%Y-%m-%d %H:%M")
+    if USE_PG:
+        cid = db.fetchone(
+            "INSERT INTO thesis_cases (student_id, case_status,"
+            " created_at, updated_at) VALUES (?, 'Not Started', ?, ?)"
+            " RETURNING id", (sid, now, now))["id"]
+    else:
+        cid = db.execute(
+            "INSERT INTO thesis_cases (student_id, case_status,"
+            " created_at, updated_at) VALUES (?, 'Not Started', ?, ?)",
+            (sid, now, now)).lastrowid
+    db.commit()
+    return thesis_case_of(db, sid) | {"id": cid}
+
+
+@app.route("/admin/student/<int:sid>/thesis")
+@admin_required
+def admin_student_thesis(sid):
+    s = _tab_student(sid)
+    if not s:
+        return render_template("notfound.html", uni=UNI_NAME,
+                               title=PORTAL_TITLE,
+                               message="Student not found."), 404
+    db = get_db()
+    case = thesis_case_of(db, sid)
+    examiners = []
+    if case:
+        examiners = [dict(r) for r in db.execute(
+            "SELECT * FROM thesis_examiners WHERE case_id=?"
+            " ORDER BY id", (case["id"],)).fetchall()]
+    vivas = [dict(r) for r in db.execute(
+        "SELECT * FROM viva_records WHERE student_id=? ORDER BY id DESC",
+        (sid,)).fetchall()]
+    return render_template(
+        "admin_student_thesis.html", uni=UNI_NAME, title=PORTAL_TITLE,
+        s=s, case=case, examiners=examiners, vivas=vivas,
+        case_statuses=CASE_STATUSES,
+        today=datetime.now().strftime("%Y-%m-%d"))
+
+
+@app.route("/admin/student/<int:sid>/thesis/open", methods=["POST"])
+@admin_required
+def admin_thesis_open(sid):
+    db = get_db()
+    case = _get_or_open_case(db, sid)
+    _case_event(db, sid, "Thesis case opened", current_admin()["name"],
+                current_admin()["role"])
+    db.commit()
+    log_activity(current_admin()["name"], "thesis_case_open",
+                 f"case #{case['id']} for student id={sid}",
+                 entity_type="student", entity_id=sid)
+    flash("Thesis case opened.")
+    return redirect(url_for("admin_student_thesis", sid=sid))
+
+
+@app.route("/admin/student/<int:sid>/thesis/das", methods=["POST"])
+@admin_required
+def admin_thesis_das(sid):
+    """DAS-side steps: thesis submitted to DAS, forwarded to the
+    Controller (with dispatch no.), corrections re-submitted."""
+    db = get_db()
+    case = _get_or_open_case(db, sid)
+    action = request.form.get("action")
+    now = datetime.now().strftime("%Y-%m-%d %H:%M")
+    s = get_student(sid)
+    if action == "submitted":
+        db.execute(
+            "UPDATE thesis_cases SET case_status='Submitted to DAS',"
+            " das_submitted_date=?, updated_at=? WHERE id=?",
+            ((request.form.get("date") or "").strip()
+             or now[:10], now, case["id"]))
+        _case_event(db, sid, "Thesis submitted to DAS",
+                    current_admin()["name"], current_admin()["role"])
+        flash("Recorded: thesis submitted to DAS.")
+    elif action == "forward":
+        dispatch = (request.form.get("dispatch_no") or "").strip()
+        fdate = (request.form.get("date") or "").strip() or now[:10]
+        db.execute(
+            "UPDATE thesis_cases SET case_status="
+            " 'Forwarded to Controller', forwarded_date=?, dispatch_no=?,"
+            " updated_at=? WHERE id=?",
+            (fdate, dispatch, now, case["id"]))
+        _case_event(db, sid, "Thesis forwarded to Controller",
+                    current_admin()["name"], current_admin()["role"],
+                    f"Dispatch {dispatch or '—'}")
+        notify_controllers(
+            "thesis", "Thesis forwarded — awaiting receipt",
+            f"{s.get('name') if s else 'Student'}"
+            f" ({s.get('reg_no') if s else ''}) — dispatch"
+            f" {dispatch or '—'}.",
+            url_for("controller_case", sid=sid))
+        notify_student(sid, "thesis", "Thesis forwarded to Controller",
+                       f"Your thesis was forwarded to the Controller of"
+                       f" Examinations on {fdate}"
+                       f" (Dispatch No. {dispatch or '—'}). Receipt by"
+                       " the Controller office is recorded separately.",
+                       url_for("student_dashboard"))
+        flash("Recorded: forwarded to Controller. The Controller office"
+              " will record its own receipt — forwarding is not receipt.")
+    elif action == "resubmit":
+        db.execute(
+            "UPDATE thesis_cases SET case_status="
+            " 'Corrections Submitted', resubmitted_date=?, updated_at=?"
+            " WHERE id=?",
+            ((request.form.get("date") or "").strip() or now[:10],
+             now, case["id"]))
+        _case_event(db, sid, "Corrections submitted",
+                    current_admin()["name"], current_admin()["role"])
+        notify_controllers(
+            "thesis", "Corrections submitted",
+            f"{s.get('name') if s else 'Student'}"
+            f" ({s.get('reg_no') if s else ''}) submitted corrections.",
+            url_for("controller_case", sid=sid))
+        flash("Recorded: corrections submitted.")
+    db.commit()
+    log_activity(current_admin()["name"], f"thesis_{action}",
+                 f"case #{case['id']} (student id={sid})",
+                 entity_type="student", entity_id=sid)
+    return redirect(url_for("admin_student_thesis", sid=sid))
+
+
+@app.route("/admin/student/<int:sid>/thesis/examiner", methods=["POST"])
+@admin_required
+def admin_thesis_examiner_add(sid):
+    db = get_db()
+    case = _get_or_open_case(db, sid)
+    db.execute(
+        "INSERT INTO thesis_examiners (case_id, student_id,"
+        " examiner_name, affiliation, examiner_role, appointed_date,"
+        " report_status, recorded_by, created_at)"
+        " VALUES (?, ?, ?, ?, ?, ?, 'Awaited', ?, ?)",
+        (case["id"], sid,
+         (request.form.get("examiner_name") or "").strip(),
+         (request.form.get("affiliation") or "").strip(),
+         pick(request.form.get("examiner_role"),
+              ["External", "Internal"], "External"),
+         (request.form.get("appointed_date") or "").strip(),
+         current_admin()["name"],
+         datetime.now().strftime("%Y-%m-%d %H:%M")))
+    db.commit()
+    log_activity(current_admin()["name"], "examiner_add",
+                 f"examiner appointed for student id={sid} (confidential)",
+                 entity_type="student", entity_id=sid)
+    flash("Examiner recorded (confidential — never shown to the"
+          " student).")
+    return redirect(url_for("admin_student_thesis", sid=sid))
+
+
+@app.route("/admin/examiner/<int:eid>/report", methods=["POST"])
+@admin_required
+def admin_examiner_report(eid):
+    db = get_db()
+    row = db.fetchone("SELECT * FROM thesis_examiners WHERE id=?",
+                      (eid,))
+    if not row:
+        return redirect(url_for("admin_students"))
+    e = dict(row)
+    db.execute(
+        "UPDATE thesis_examiners SET report_status=?, report_date=?,"
+        " remarks=? WHERE id=?",
+        (pick(request.form.get("report_status"),
+              ["Awaited", "Received"], "Awaited"),
+         (request.form.get("report_date") or "").strip(),
+         (request.form.get("remarks") or "").strip(), eid))
+    db.commit()
+    flash("Examiner report status updated.")
+    if request.form.get("back") == "controller":
+        return redirect(url_for("controller_case",
+                                sid=e["student_id"]))
+    return redirect(url_for("admin_student_thesis",
+                            sid=e["student_id"]))
+
+
+@app.route("/admin/thesis-cases")
+@admin_required
+def admin_thesis_cases():
+    db = get_db()
+    rows = [dict(r) for r in db.execute(
+        "SELECT tc.*, st.name AS student_name, st.reg_no, st.degree,"
+        " st.session AS student_session FROM thesis_cases tc"
+        " JOIN students st ON st.id = tc.student_id"
+        " ORDER BY tc.updated_at DESC, tc.id DESC").fetchall()]
+    counts = {}
+    for r in rows:
+        counts[r["case_status"]] = counts.get(r["case_status"], 0) + 1
+    return render_template("admin_thesis_cases.html", uni=UNI_NAME,
+                           title=PORTAL_TITLE, rows=rows, counts=counts)
+
+
+
+# ==================== CONTROLLER PORTAL (Phase 5) ====================
+
+def controller_required(f):
+    @wraps(f)
+    def wrapper(*a, **kw):
+        if not session.get("controller_id"):
+            return redirect(url_for("controller_login"))
+        return f(*a, **kw)
+    return wrapper
+
+
+def current_controller():
+    row = get_db().fetchone("SELECT * FROM controller_users WHERE id=?",
+                            (session.get("controller_id"),))
+    return dict(row) if row else None
+
+
+@app.route("/controller", methods=["GET", "POST"])
+def controller_login():
+    if session.get("controller_id"):
+        return redirect(url_for("controller_dashboard"))
+    if request.method == "POST":
+        email = request.form.get("email", "").strip().lower()
+        password = request.form.get("password", "")
+        if _login_blocked("controller"):
+            return render_template(
+                "controller_login.html", uni=UNI_NAME, title=PORTAL_TITLE,
+                error="Too many failed attempts. Please wait a few"
+                      " minutes and try again.")
+        row = get_db().fetchone(
+            "SELECT * FROM controller_users WHERE email=?"
+            " AND is_active=1", (email,))
+        if row and check_password_hash(dict(row)["password_hash"],
+                                       password):
+            cu = dict(row)
+            session["controller_id"] = cu["id"]
+            session.permanent = bool(request.form.get("remember"))
+            _login_ok("controller")
+            get_db().execute(
+                "UPDATE controller_users SET last_login_at=? WHERE id=?",
+                (datetime.now().strftime("%Y-%m-%d %H:%M"), cu["id"]))
+            get_db().commit()
+            log_activity(f"controller:{cu['name']}", "login",
+                         "controller portal sign-in",
+                         entity_type="controller_user", entity_id=cu["id"])
+            return redirect(url_for("controller_dashboard"))
+        _login_fail("controller")
+        log_activity("unknown", "login_failed",
+                     f"controller portal failed sign-in for {email}")
+        return render_template("controller_login.html", uni=UNI_NAME,
+                               title=PORTAL_TITLE,
+                               error="Invalid email or password.")
+    return render_template("controller_login.html", uni=UNI_NAME,
+                           title=PORTAL_TITLE)
+
+
+@app.route("/controller/logout")
+def controller_logout():
+    session.pop("controller_id", None)
+    return redirect(url_for("controller_login"))
+
+
+@app.route("/controller/dashboard")
+@controller_required
+def controller_dashboard():
+    cu = current_controller()
+    db = get_db()
+    rows = [dict(r) for r in db.execute(
+        "SELECT tc.*, st.name AS student_name, st.reg_no FROM thesis_cases"
+        " tc JOIN students st ON st.id = tc.student_id"
+        " ORDER BY tc.updated_at DESC, tc.id DESC").fetchall()]
+    counts = {}
+    for r in rows:
+        counts[r["case_status"]] = counts.get(r["case_status"], 0) + 1
+    awaiting = [r for r in rows
+                if r["case_status"] == "Forwarded to Controller"]
+    return render_template("controller_dashboard.html", uni=UNI_NAME,
+                           title=PORTAL_TITLE, cu=cu, counts=counts,
+                           awaiting=awaiting, recent=rows[:8],
+                           total=len(rows))
+
+
+@app.route("/controller/cases")
+@controller_required
+def controller_cases():
+    cu = current_controller()
+    db = get_db()
+    status = (request.args.get("status") or "").strip()
+    q = (request.args.get("q") or "").strip()
+    sql = ("SELECT tc.*, st.name AS student_name, st.reg_no, st.degree,"
+           " st.session AS student_session FROM thesis_cases tc"
+           " JOIN students st ON st.id = tc.student_id WHERE 1=1")
+    params = []
+    if status in CASE_STATUSES:
+        sql += " AND tc.case_status=?"
+        params.append(status)
+    if q:
+        sql += " AND (LOWER(st.name) LIKE ? OR LOWER(st.reg_no) LIKE ?)"
+        params += [f"%{q.lower()}%", f"%{q.lower()}%"]
+    sql += " ORDER BY tc.updated_at DESC, tc.id DESC"
+    rows = [dict(r) for r in db.execute(sql, params).fetchall()]
+    return render_template("controller_cases.html", uni=UNI_NAME,
+                           title=PORTAL_TITLE, cu=cu, rows=rows,
+                           case_statuses=CASE_STATUSES, status=status,
+                           q=q)
+
+
+@app.route("/controller/case/<int:sid>")
+@controller_required
+def controller_case(sid):
+    cu = current_controller()
+    db = get_db()
+    s = get_student(sid)
+    case = thesis_case_of(db, sid)
+    if not s or not case:
+        return render_template("notfound.html", uni=UNI_NAME,
+                               title=PORTAL_TITLE,
+                               message="No thesis case for this"
+                                       " student."), 404
+    examiners = [dict(r) for r in db.execute(
+        "SELECT * FROM thesis_examiners WHERE case_id=? ORDER BY id",
+        (case["id"],)).fetchall()]
+    vivas = [dict(r) for r in db.execute(
+        "SELECT * FROM viva_records WHERE student_id=? ORDER BY id DESC",
+        (sid,)).fetchall()]
+    return render_template(
+        "controller_case.html", uni=UNI_NAME, title=PORTAL_TITLE, cu=cu,
+        s=s, case=case, examiners=examiners, vivas=vivas,
+        today=datetime.now().strftime("%Y-%m-%d"))
+
+
+@app.route("/controller/case/<int:sid>/action", methods=["POST"])
+@controller_required
+def controller_case_action(sid):
+    """Controller-side steps. Each is recorded by the Controller office
+    itself — DAS forwarding alone never marks a thesis received."""
+    cu = current_controller()
+    db = get_db()
+    case = thesis_case_of(db, sid)
+    if not case:
+        flash("No thesis case for this student.")
+        return redirect(url_for("controller_cases"))
+    action = request.form.get("action")
+    now = datetime.now().strftime("%Y-%m-%d %H:%M")
+    today = now[:10]
+    s = get_student(sid)
+    who = cu["name"]
+
+    def upd(sql, params):
+        db.execute(sql, params + (now, case["id"]))
+
+    if action == "receive":
+        upd("UPDATE thesis_cases SET case_status="
+            " 'Received by Controller', received_date=?, received_by=?,"
+            " updated_at=? WHERE id=?",
+            ((request.form.get("date") or "").strip() or today, who))
+        _case_event(db, sid, "Thesis received by Controller", who,
+                    "Controller")
+        notify_admin("thesis", "Thesis received by Controller",
+                     f"{s.get('name') if s else 'Student'}"
+                     f" ({s.get('reg_no') if s else ''}) — received by"
+                     f" {who}.",
+                     url_for("admin_student_thesis", sid=sid))
+        notify_student(sid, "thesis", "Thesis received by Controller",
+                       "The Controller of Examinations office has"
+                       " recorded receipt of your thesis.",
+                       url_for("student_dashboard"))
+        flash("Receipt recorded.")
+    elif action == "return":
+        objections = (request.form.get("objections") or "").strip()
+        if not objections:
+            flash("Please write the objections — a return without"
+                  " reasons cannot be recorded.")
+            return redirect(url_for("controller_case", sid=sid))
+        upd("UPDATE thesis_cases SET case_status="
+            " 'Returned with Objections', returned_date=?, objections=?,"
+            " updated_at=? WHERE id=?", (today, objections))
+        _case_event(db, sid, "Thesis returned with objections", who,
+                    "Controller", objections[:120])
+        notify_admin("thesis", "Thesis returned with objections",
+                     f"{s.get('name') if s else 'Student'}"
+                     f" ({s.get('reg_no') if s else ''}): {objections}",
+                     url_for("admin_student_thesis", sid=sid))
+        notify_student(sid, "thesis", "Thesis returned with objections",
+                       f"The Controller office returned your thesis."
+                       f" Objections: {objections}",
+                       url_for("student_dashboard"))
+        flash("Return with objections recorded.")
+    elif action == "evaluation_start":
+        upd("UPDATE thesis_cases SET case_status='Under Evaluation',"
+            " updated_at=? WHERE id=?", ())
+        _case_event(db, sid, "Evaluation started", who, "Controller")
+        flash("Case marked Under Evaluation.")
+    elif action == "corrections_required":
+        upd("UPDATE thesis_cases SET case_status='Corrections Required',"
+            " objections=?, updated_at=? WHERE id=?",
+            ((request.form.get("objections") or "").strip(),))
+        _case_event(db, sid, "Corrections required", who, "Controller",
+                    (request.form.get("objections") or "")[:120])
+        notify_student(sid, "thesis", "Corrections required",
+                       "The examiners require corrections to your"
+                       " thesis. Please contact your supervisor / DAS"
+                       " office for the correction list.",
+                       url_for("student_dashboard"))
+        notify_admin("thesis", "Corrections required",
+                     f"{s.get('name') if s else 'Student'}"
+                     f" ({s.get('reg_no') if s else ''}).",
+                     url_for("admin_student_thesis", sid=sid))
+        flash("Corrections requirement recorded.")
+    elif action == "evaluation_complete":
+        upd("UPDATE thesis_cases SET case_status='Evaluation Complete',"
+            " evaluation_completed_date=?, updated_at=? WHERE id=?",
+            (today,))
+        _case_event(db, sid, "Evaluation complete", who, "Controller")
+        notify_admin("thesis", "Thesis evaluation complete",
+                     f"{s.get('name') if s else 'Student'}"
+                     f" ({s.get('reg_no') if s else ''}).",
+                     url_for("admin_student_thesis", sid=sid))
+        flash("Evaluation marked complete.")
+    elif action == "result":
+        upd("UPDATE thesis_cases SET case_status='Result Declared',"
+            " result_status=?, result_date=?, result_remarks=?,"
+            " updated_at=? WHERE id=?",
+            (pick(request.form.get("result_status"),
+                  ["Declared — Pass", "Declared — Fail",
+                   "Declared — Referred"], "Declared — Pass"),
+             (request.form.get("date") or "").strip() or today,
+             (request.form.get("result_remarks") or "").strip()))
+        _case_event(db, sid, "Result declared", who, "Controller",
+                    request.form.get("result_status") or "")
+        notify_student(sid, "thesis", "Thesis result declared",
+                       f"Your thesis result has been declared:"
+                       f" {request.form.get('result_status')}.",
+                       url_for("student_dashboard"))
+        notify_admin("thesis", "Thesis result declared",
+                     f"{s.get('name') if s else 'Student'}"
+                     f" ({s.get('reg_no') if s else ''}):"
+                     f" {request.form.get('result_status')}.",
+                     url_for("admin_student_thesis", sid=sid))
+        flash("Result recorded.")
+    elif action == "close":
+        upd("UPDATE thesis_cases SET case_status='Closed', updated_at=?"
+            " WHERE id=?", ())
+        _case_event(db, sid, "Thesis case closed", who, "Controller")
+        flash("Case closed.")
+    db.commit()
+    log_activity(f"controller:{who}", f"thesis_{action}",
+                 f"case #{case['id']} (student id={sid})",
+                 entity_type="student", entity_id=sid)
+    return redirect(url_for("controller_case", sid=sid))
+
+
+@app.route("/controller/examiner/<int:eid>/report", methods=["POST"])
+@controller_required
+def controller_examiner_report(eid):
+    cu = current_controller()
+    db = get_db()
+    row = db.fetchone("SELECT * FROM thesis_examiners WHERE id=?",
+                      (eid,))
+    if not row:
+        return redirect(url_for("controller_cases"))
+    e = dict(row)
+    db.execute(
+        "UPDATE thesis_examiners SET report_status=?, report_date=?,"
+        " remarks=? WHERE id=?",
+        (pick(request.form.get("report_status"),
+              ["Awaited", "Received"], "Awaited"),
+         (request.form.get("report_date") or "").strip(),
+         (request.form.get("remarks") or "").strip(), eid))
+    db.commit()
+    log_activity(f"controller:{cu['name']}", "examiner_report",
+                 f"examiner #{eid} report ->"
+                 f" {request.form.get('report_status')}",
+                 entity_type="student", entity_id=e["student_id"])
+    flash("Examiner report status updated.")
+    return redirect(url_for("controller_case", sid=e["student_id"]))
+
+
+@app.route("/controller/notifications")
+@controller_required
+def controller_notifications():
+    cu = current_controller()
+    db = get_db()
+    notes = [dict(r) for r in db.fetchall(
+        "SELECT * FROM controller_notifications WHERE user_id=?"
+        " ORDER BY id DESC LIMIT 50", (cu["id"],))]
+    db.execute("UPDATE controller_notifications SET is_read=1"
+               " WHERE user_id=?", (cu["id"],))
+    db.commit()
+    return render_template("controller_notifications.html", uni=UNI_NAME,
+                           title=PORTAL_TITLE, cu=cu, notes=notes)
+
+
 # ---------------- student portal ----------------
 def student_required(f):
     @wraps(f)
@@ -7465,6 +8125,7 @@ def student_dashboard():
         " ORDER BY id DESC", (s["id"],))
     if _lr:
         research["latest_report"] = dict(_lr)
+    research["case"] = thesis_case_of(_db, s["id"])
     sched_rec = _saved_schedule_for_session(s.get("session"))
     if sched_rec is None:
         _summ = _list_saved_schedules()

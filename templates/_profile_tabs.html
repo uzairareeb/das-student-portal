@@ -4,8 +4,8 @@
   <a href="{{ url_for('admin_student_academic', sid=s.id) }}" class="{% if tab_active == 'academic' %}active{% endif %}">Academic</a>
   <a href="{{ url_for('admin_student_supervisor', sid=s.id) }}" class="{% if tab_active == 'supervisor' %}active{% endif %}">Supervisor</a>
   <a href="{{ url_for('admin_student_viva', sid=s.id) }}" class="{% if tab_active == 'viva' %}active{% endif %}">Viva</a>
+  <a href="{{ url_for('admin_student_thesis', sid=s.id) }}" class="{% if tab_active == 'thesis' %}active{% endif %}">Thesis Case</a>
   <a href="{{ url_for('admin_student_progress', sid=s.id) }}" class="{% if tab_active == 'progress' %}active{% endif %}">Result &amp; Degree</a>
   <a href="{{ url_for('admin_student_timeline', sid=s.id) }}" class="{% if tab_active == 'timeline' %}active{% endif %}">Timeline</a>
-  <span class="tab-soon">Thesis Case · Phase 5</span>
   <span class="tab-soon">Correspondence · Phase 6</span>
 </div>

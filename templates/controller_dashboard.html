@@ -1,0 +1,59 @@
+{% extends "controller_base.html" %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <h2>Welcome, {{ cu.name }}</h2>
+    <p>Controller of Examinations — thesis case desk</p>
+  </div>
+</div>
+
+<div class="sp-stats">
+  <div class="sp-stat"><div class="k">Total Cases</div><div class="v">{{ total }}</div></div>
+  <div class="sp-stat"><div class="k">Awaiting Receipt</div><div class="v">{{ counts.get('Forwarded to Controller', 0) }}</div></div>
+  <div class="sp-stat"><div class="k">Under Evaluation</div><div class="v">{{ counts.get('Under Evaluation', 0) }}</div></div>
+  <div class="sp-stat"><div class="k">Results Declared</div><div class="v">{{ counts.get('Result Declared', 0) }}</div></div>
+</div>
+
+<div class="card section">
+  <div class="section-head">
+    <span class="section-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-6l-2 3h-4l-2-3H2"/><path d="M5.45 5.11L2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/></svg></span>
+    <h3>Awaiting Your Receipt</h3>
+  </div>
+  <p class="hint" style="margin-top:0">DAS has forwarded these theses. Forwarding is not receipt — record the receipt from the case page when the thesis physically reaches your office.</p>
+  {% if awaiting %}
+  <div class="table-scroll">
+    <table class="data-table">
+      <thead><tr><th>Student</th><th>Reg. No.</th><th>Forwarded</th><th>Dispatch No.</th><th></th></tr></thead>
+      <tbody>
+        {% for c in awaiting %}
+        <tr><td>{{ c.student_name }}</td><td class="nowrap">{{ c.reg_no }}</td><td class="nowrap">{{ c.forwarded_date or '—' }}</td><td>{{ c.dispatch_no or '—' }}</td><td><a class="btn primary sm" href="{{ url_for('controller_case', sid=c.student_id) }}">Open Case</a></td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="empty"><p>Nothing awaiting receipt.</p></div>
+  {% endif %}
+</div>
+
+<div class="card section">
+  <div class="section-head">
+    <span class="section-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></span>
+    <h3>Recently Updated Cases</h3>
+  </div>
+  {% if recent %}
+  <div class="table-scroll">
+    <table class="data-table">
+      <thead><tr><th>Student</th><th>Reg. No.</th><th>Status</th><th>Updated</th><th></th></tr></thead>
+      <tbody>
+        {% for c in recent %}
+        <tr><td>{{ c.student_name }}</td><td class="nowrap">{{ c.reg_no }}</td><td><span class="pill">{{ c.case_status }}</span></td><td class="nowrap">{{ c.updated_at }}</td><td><a class="btn ghost sm" href="{{ url_for('controller_case', sid=c.student_id) }}">Open</a></td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="empty"><p>No thesis cases yet.</p></div>
+  {% endif %}
+</div>
+{% endblock %}

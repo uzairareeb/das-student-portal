@@ -1,0 +1,147 @@
+{% extends "controller_base.html" %}
+{% block container_extra %} wide{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <h2>{{ s.name }} — Thesis Case</h2>
+    <p>{{ s.reg_no }} &middot; {{ s.degree or '—' }} &middot; Session {{ s.session or '—' }}</p>
+  </div>
+  <a class="btn ghost" href="{{ url_for('controller_cases') }}">&larr; All Cases</a>
+</div>
+
+<div class="card section">
+  <h3 style="margin-top:0">Case State</h3>
+  <div class="table-scroll">
+    <table class="data-table">
+      <tbody>
+        <tr><th style="width:220px">Status</th><td><span class="pill">{{ case.case_status }}</span></td></tr>
+        <tr><th>Submitted to DAS</th><td>{{ case.das_submitted_date or '—' }}</td></tr>
+        <tr><th>Forwarded by DAS</th><td>{{ case.forwarded_date or '—' }} &middot; Dispatch {{ case.dispatch_no or '—' }}</td></tr>
+        <tr><th>Received by Controller</th><td>{% if case.received_date %}{{ case.received_date }} by {{ case.received_by }}{% else %}Not recorded — forwarding alone does not count as receipt{% endif %}</td></tr>
+        {% if case.returned_date %}<tr><th>Returned</th><td>{{ case.returned_date }} — {{ case.objections }}</td></tr>{% endif %}
+        {% if case.resubmitted_date %}<tr><th>Corrections Submitted</th><td>{{ case.resubmitted_date }}</td></tr>{% endif %}
+        {% if case.evaluation_completed_date %}<tr><th>Evaluation Completed</th><td>{{ case.evaluation_completed_date }}</td></tr>{% endif %}
+        <tr><th>Result</th><td>{{ case.result_status }}{% if case.result_date %} &middot; {{ case.result_date }}{% endif %}{% if case.result_remarks %} &middot; {{ case.result_remarks }}{% endif %}</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="row" style="gap:14px;flex-wrap:wrap;margin-top:16px;align-items:flex-start">
+    {% if case.case_status == 'Forwarded to Controller' %}
+    <form method="post" action="{{ url_for('controller_case_action', sid=s.id) }}" class="card" style="padding:14px">
+      <input type="hidden" name="action" value="receive">
+      <h4 style="margin:0 0 8px">Record receipt</h4>
+      <div class="row" style="gap:8px">
+        <input type="date" name="date" value="{{ today }}">
+        <button type="submit" class="btn primary sm">Mark Received</button>
+      </div>
+    </form>
+    <form method="post" action="{{ url_for('controller_case_action', sid=s.id) }}" class="card" style="padding:14px">
+      <input type="hidden" name="action" value="return">
+      <h4 style="margin:0 0 8px">Return with objections</h4>
+      <div class="row" style="gap:8px">
+        <input type="text" name="objections" placeholder="Objections (required)" required style="min-width:260px">
+        <button type="submit" class="btn danger sm">Return Thesis</button>
+      </div>
+    </form>
+    {% endif %}
+    {% if case.case_status in ('Received by Controller', 'Corrections Submitted') %}
+    <form method="post" action="{{ url_for('controller_case_action', sid=s.id) }}">
+      <input type="hidden" name="action" value="evaluation_start">
+      <button type="submit" class="btn primary sm">Start Evaluation</button>
+    </form>
+    {% endif %}
+    {% if case.case_status == 'Under Evaluation' %}
+    <form method="post" action="{{ url_for('controller_case_action', sid=s.id) }}" class="card" style="padding:14px">
+      <input type="hidden" name="action" value="corrections_required">
+      <h4 style="margin:0 0 8px">Corrections required</h4>
+      <div class="row" style="gap:8px">
+        <input type="text" name="objections" placeholder="Summary of corrections" style="min-width:240px">
+        <button type="submit" class="btn ghost sm">Record</button>
+      </div>
+    </form>
+    <form method="post" action="{{ url_for('controller_case_action', sid=s.id) }}">
+      <input type="hidden" name="action" value="evaluation_complete">
+      <button type="submit" class="btn primary sm">Mark Evaluation Complete</button>
+    </form>
+    {% endif %}
+    {% if case.case_status == 'Evaluation Complete' %}
+    <form method="post" action="{{ url_for('controller_case_action', sid=s.id) }}" class="card" style="padding:14px">
+      <input type="hidden" name="action" value="result">
+      <h4 style="margin:0 0 8px">Declare result</h4>
+      <div class="row" style="gap:8px;flex-wrap:wrap">
+        <select name="result_status" class="no-icon">
+          <option value="Declared — Pass">Declared — Pass</option>
+          <option value="Declared — Fail">Declared — Fail</option>
+          <option value="Declared — Referred">Declared — Referred</option>
+        </select>
+        <input type="date" name="date" value="{{ today }}">
+        <input type="text" name="result_remarks" placeholder="Remarks / notification ref.">
+        <button type="submit" class="btn primary sm">Declare Result</button>
+      </div>
+    </form>
+    {% endif %}
+    {% if case.case_status == 'Result Declared' %}
+    <form method="post" action="{{ url_for('controller_case_action', sid=s.id) }}">
+      <input type="hidden" name="action" value="close">
+      <button type="submit" class="btn ghost sm" data-confirm="Close this thesis case?">Close Case</button>
+    </form>
+    {% endif %}
+  </div>
+</div>
+
+<div class="card section">
+  <div class="section-head">
+    <span class="section-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg></span>
+    <h3>Examiners <span class="hint">(confidential — never shown to the student)</span></h3>
+  </div>
+  {% if examiners %}
+  <div class="table-scroll">
+    <table class="data-table">
+      <thead><tr><th>Examiner</th><th>Affiliation</th><th>Role</th><th>Appointed</th><th>Report</th><th>Update Report</th></tr></thead>
+      <tbody>
+        {% for e in examiners %}
+        <tr>
+          <td>{{ e.examiner_name }}</td>
+          <td>{{ e.affiliation or '—' }}</td>
+          <td>{{ e.examiner_role }}</td>
+          <td class="nowrap">{{ e.appointed_date or '—' }}</td>
+          <td>{% if e.report_status == 'Received' %}<span class="pill q">Received {{ e.report_date or '' }}</span>{% else %}<span class="pill warn">Awaited</span>{% endif %}</td>
+          <td>
+            <form method="post" action="{{ url_for('controller_examiner_report', eid=e.id) }}" class="row" style="gap:6px">
+              <select name="report_status" class="no-icon">
+                <option value="Awaited" {% if e.report_status != 'Received' %}selected{% endif %}>Awaited</option>
+                <option value="Received" {% if e.report_status == 'Received' %}selected{% endif %}>Received</option>
+              </select>
+              <input type="date" name="report_date" value="{{ e.report_date or '' }}">
+              <button type="submit" class="btn ghost sm">Save</button>
+            </form>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="empty"><p>No examiners recorded yet — DAS records appointments on the student's Thesis Case tab.</p></div>
+  {% endif %}
+</div>
+
+<div class="card section">
+  <h3 style="margin-top:0">Viva Records (recorded by the department)</h3>
+  {% if vivas %}
+  <div class="table-scroll">
+    <table class="data-table">
+      <thead><tr><th>Date</th><th>Examiner</th><th>Marks</th><th>Result</th></tr></thead>
+      <tbody>
+        {% for v in vivas %}
+        <tr><td class="nowrap">{{ v.viva_date or '—' }}</td><td>{{ v.examiner_name or '—' }}</td><td>{% if v.obtained_marks is not none and v.obtained_marks != '' %}{{ v.obtained_marks }} / {{ v.total_marks or 120 }}{% else %}—{% endif %}</td><td>{{ v.result or 'Pending' }}</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="empty"><p>No viva records yet.</p></div>
+  {% endif %}
+</div>
+{% endblock %}

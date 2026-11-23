@@ -203,7 +203,7 @@ h = admin.get(f"/admin/student/{a['id']}").data.decode()
 check("tab bar: Academic/Supervisor are links now",
       f"/admin/student/{a['id']}/academic" in h
       and "Supervisor · Phase 4" not in h
-      and "Thesis Case · Phase 5" in h)
+      and "Correspondence · Phase 6" in h)
 
 print(f"\nPHASE 4 OK — {N[0]}/{N[0]} checks passed")
 os.remove("students.db")
