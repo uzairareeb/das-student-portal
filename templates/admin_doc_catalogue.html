@@ -1,0 +1,72 @@
+{% extends "admin_base.html" %}
+{% block container_extra %} wide{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <h2>Document Catalogue</h2>
+    <p>The required documents for postgraduate students. Codes, stages and hard-copy requirements are set here — anything not yet decided by DAS stays unconfigured rather than invented.</p>
+  </div>
+</div>
+
+<div class="card section">
+  <h3 style="margin-top:0">Add catalogue entry</h3>
+  <form method="post" class="form-grid">
+    <div>
+      <label class="f-label" for="dc-code">Code (e.g. GS-08)</label>
+      <input id="dc-code" name="code" placeholder="Optional">
+    </div>
+    <div>
+      <label class="f-label" for="dc-name">Document name</label>
+      <input id="dc-name" name="name" required placeholder="Document name">
+    </div>
+    <div>
+      <label class="f-label" for="dc-level">Applies to</label>
+      <select id="dc-level" name="applies_to" class="no-icon">
+        <option value="All">All</option>
+        <option value="MPhil">MPhil</option>
+        <option value="PhD">PhD</option>
+      </select>
+    </div>
+    <div>
+      <label class="f-label" for="dc-stage">Stage</label>
+      <input id="dc-stage" name="stage" value="General">
+    </div>
+    <div>
+      <label class="f-label"><input type="checkbox" name="required" checked> Required</label>
+      <label class="f-label"><input type="checkbox" name="requires_hardcopy" checked> Hard copy required</label>
+    </div>
+    <div>
+      <button type="submit" class="btn primary">Add Entry</button>
+    </div>
+  </form>
+</div>
+
+<div class="card section">
+  <h3 style="margin-top:0">Catalogue ({{ items|length }})</h3>
+  {% for it in items %}<form id="dcf-{{ it.id }}" method="post" action="{{ url_for('admin_doc_catalogue_save', tid=it.id) }}"></form>{% endfor %}
+  <div class="table-scroll">
+    <table class="data-table">
+      <thead><tr><th>Code</th><th>Name</th><th>Applies</th><th>Stage</th><th>Required</th><th>Hard Copy</th><th>Active</th><th></th></tr></thead>
+      <tbody>
+        {% for it in items %}
+        <tr>
+          <td><input form="dcf-{{ it.id }}" name="code" value="{{ it.code or '' }}" style="max-width:80px" placeholder="—"></td>
+          <td><input form="dcf-{{ it.id }}" name="name" value="{{ it.name }}" required style="min-width:220px"></td>
+          <td>
+            <select form="dcf-{{ it.id }}" name="applies_to" class="no-icon">
+              {% for lv in ['All', 'MPhil', 'PhD'] %}<option value="{{ lv }}" {% if it.applies_to == lv %}selected{% endif %}>{{ lv }}</option>{% endfor %}
+            </select>
+          </td>
+          <td><input form="dcf-{{ it.id }}" name="stage" value="{{ it.stage or 'General' }}" style="max-width:110px"></td>
+          <td><input form="dcf-{{ it.id }}" type="checkbox" name="required" {% if it.required %}checked{% endif %}></td>
+          <td><input form="dcf-{{ it.id }}" type="checkbox" name="requires_hardcopy" {% if it.requires_hardcopy %}checked{% endif %}></td>
+          <td><input form="dcf-{{ it.id }}" type="checkbox" name="active" {% if it.active %}checked{% endif %}></td>
+          <td><button form="dcf-{{ it.id }}" type="submit" class="btn ghost sm">Save</button></td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <p class="hint" style="margin-bottom:0">Seeded from the office's existing MPhil/PhD required-document lists. GS codes were taken from the list names themselves; entries without a code are marked — until DAS assigns one.</p>
+</div>
+{% endblock %}

@@ -1,0 +1,37 @@
+{% extends "admin_base.html" %}
+{% block container_extra %} wide{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <h2>{{ s.name }}</h2>
+    <p>{{ s.reg_no }} &middot; {{ s.degree or '—' }} &middot; Session {{ s.session or '—' }} &middot; {{ s.status }}</p>
+  </div>
+  <a class="btn ghost" href="{{ url_for('admin_students') }}">&larr; Student List</a>
+</div>
+{% set tab_active = 'timeline' %}{% include "_profile_tabs.html" %}
+
+<div class="card section">
+  <div class="section-head">
+    <span class="section-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></span>
+    <h3>Timeline <span class="hint">({{ events|length }} events)</span></h3>
+  </div>
+  {% if events %}
+  <div class="table-scroll">
+    <table class="data-table">
+      <thead><tr><th>When</th><th>Type</th><th>Event</th></tr></thead>
+      <tbody>
+        {% for e in events %}
+        <tr>
+          <td class="nowrap">{{ e.when }}</td>
+          <td><span class="pill">{{ e.kind }}</span></td>
+          <td>{{ e.text }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="empty"><p>No events recorded yet.</p></div>
+  {% endif %}
+</div>
+{% endblock %}

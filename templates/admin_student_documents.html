@@ -1,0 +1,125 @@
+{% extends "admin_base.html" %}
+{% block container_extra %} wide{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <h2>{{ s.name }}</h2>
+    <p>{{ s.reg_no }} &middot; {{ s.degree or '—' }} &middot; Session {{ s.session or '—' }} &middot; {{ s.status }}</p>
+  </div>
+  <a class="btn ghost" href="{{ url_for('admin_students') }}">&larr; Student List</a>
+</div>
+{% set tab_active = 'documents' %}{% include "_profile_tabs.html" %}
+
+<div class="card section">
+  <div class="section-head">
+    <span class="section-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg></span>
+    <h3>Required Documents — Hard-Copy Checklist</h3>
+  </div>
+  <p class="hint" style="margin-top:0">This checklist tracks the <strong>physical file</strong> only. A digital upload never marks a hard copy as received — record the receipt here when the paper document actually arrives.</p>
+  {% if checklist %}
+  <div class="table-scroll">
+    <table class="data-table">
+      <thead><tr><th>Code</th><th>Document</th><th>Hard Copy</th><th>Receipt Detail</th></tr></thead>
+      <tbody>
+        {% for it in checklist %}
+        <tr>
+          <td class="nowrap">{{ it.code or '—' }}</td>
+          <td>{{ it.name }}{% if not it.required %} <span class="hint">(if required)</span>{% endif %}</td>
+          <td>{% if it.receipt %}<span class="pill q">Received</span>{% elif it.requires_hardcopy %}<span class="pill warn">Not Received</span>{% else %}<span class="pill">Not Required</span>{% endif %}</td>
+          <td>{% if it.receipt %}{{ it.receipt.received_date }} &middot; {{ it.receipt.office or 'DAS' }}{% if it.receipt.received_by %} &middot; {{ it.receipt.received_by }}{% endif %} &middot; Diary {{ it.receipt.diary_no or '—' }}{% else %}—{% endif %}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="empty"><p>No catalogue entries apply to this student yet — set them up on the Document Catalogue page.</p></div>
+  {% endif %}
+
+  <div class="row" style="gap:16px;flex-wrap:wrap;margin-top:18px;align-items:flex-start">
+    <form method="post" action="{{ url_for('admin_student_gs_receipt_all', sid=s.id) }}" class="card" style="padding:14px;flex:1;min-width:280px">
+      <h4 style="margin:0 0 8px">Complete file arrived?</h4>
+      <p class="hint" style="margin:0 0 10px">Mark every outstanding hard-copy item received at once.</p>
+      <div class="row" style="gap:8px;flex-wrap:wrap">
+        <input type="date" name="received_date" value="{{ today }}" required>
+        <input type="text" name="received_by" placeholder="Received by (name)">
+        <input type="text" name="office" placeholder="Office" value="DAS">
+        <input type="text" name="diary_no" placeholder="Diary No.">
+        <button type="submit" class="btn primary sm">Mark All Received</button>
+      </div>
+    </form>
+    <form method="post" action="{{ url_for('admin_student_gs_receipt', sid=s.id) }}" class="card" style="padding:14px;flex:1;min-width:280px">
+      <h4 style="margin:0 0 8px">Single document received</h4>
+      <div class="row" style="gap:8px;flex-wrap:wrap">
+        <select name="doc_type_id" class="no-icon" required>
+          {% for it in checklist %}<option value="{{ it.id }}">{{ it.code ~ ' — ' if it.code }}{{ it.name }}</option>{% endfor %}
+        </select>
+        <input type="date" name="received_date" value="{{ today }}" required>
+        <input type="text" name="received_by" placeholder="Received by (name)">
+        <input type="text" name="office" placeholder="Office" value="DAS">
+        <input type="text" name="diary_no" placeholder="Diary No.">
+        <input type="text" name="remarks" placeholder="Remarks (optional)">
+        <button type="submit" class="btn primary sm">Record Receipt</button>
+      </div>
+    </form>
+  </div>
+
+  {% if receipts %}
+  <h4 style="margin:18px 0 8px">Receipt History</h4>
+  <div class="table-scroll">
+    <table class="data-table">
+      <thead><tr><th>Document</th><th>Received</th><th>By / Office</th><th>Diary No.</th><th>Recorded By</th><th></th></tr></thead>
+      <tbody>
+        {% for r in receipts %}
+        <tr>
+          <td>{{ r.doc_label }}</td>
+          <td class="nowrap">{{ r.received_date }}</td>
+          <td>{{ r.received_by or '—' }} / {{ r.office or 'DAS' }}</td>
+          <td>{{ r.diary_no or '—' }}</td>
+          <td>{{ r.recorded_by or '—' }}</td>
+          <td><form method="post" action="{{ url_for('admin_gs_receipt_delete', rid=r.id) }}" style="margin:0"><button type="submit" class="btn danger sm" data-confirm="Remove this receipt entry?">Remove</button></form></td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% endif %}
+</div>
+
+<div class="card section">
+  <div class="section-head">
+    <span class="section-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg></span>
+    <h3>Digital Uploads <span class="hint">({{ docs|length }})</span></h3>
+  </div>
+  <p class="hint" style="margin-top:0">Digital copies only — verifying a file here does <strong>not</strong> mark its hard copy as received.</p>
+  {% if docs %}
+  <div class="doc-list">
+    {% for d in docs %}
+    <div class="doc-row">
+      <span class="doc-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg></span>
+      <div class="doc-meta">
+        <div class="doc-name">{{ d.doc_label }} — {{ d.file_name }} <span class="pill">v{{ d.version or 1 }}</span></div>
+        <div class="doc-sub">Uploaded by {{ d.uploaded_by }} &middot; {{ d.uploaded_at }}{% if d.size %} &middot; {{ (d.size/1024)|round(1) }} KB{% endif %}{% if d.checksum %} &middot; SHA-256 {{ d.checksum[:12] }}…{% endif %} &middot; {% if d.status == 'Verified' %}<span class="pill q">Verified</span>{% elif d.status == 'Returned' %}<span class="pill nq">Returned</span>{% else %}<span class="pill warn">Pending</span>{% endif %}{% if d.remark %} &middot; Remark: {{ d.remark }}{% endif %}</div>
+        <form class="doc-verify" method="post" action="{{ url_for('admin_doc_verify', doc_id=d.id) }}">
+          <input type="hidden" name="back" value="documents">
+          <select name="status" class="no-icon" aria-label="Document status">
+            <option value="Pending" {% if d.status not in ('Verified', 'Returned') %}selected{% endif %}>Pending</option>
+            <option value="Verified" {% if d.status == 'Verified' %}selected{% endif %}>Verified</option>
+            <option value="Returned" {% if d.status == 'Returned' %}selected{% endif %}>Returned</option>
+          </select>
+          <input type="text" name="remark" class="no-icon" placeholder="Remark (required when returning)" value="{{ d.remark or '' }}">
+          <button type="submit" class="btn ghost sm">Save</button>
+        </form>
+      </div>
+      <a class="btn ghost sm" href="{{ url_for('admin_doc_download', doc_id=d.id) }}">Download</a>
+      <form method="post" action="{{ url_for('admin_doc_delete', doc_id=d.id) }}" style="margin:0">
+        <button type="submit" class="btn danger sm" data-confirm="Delete this document?">Delete</button>
+      </form>
+    </div>
+    {% endfor %}
+  </div>
+  {% else %}
+  <div class="empty"><p>No digital uploads yet.</p></div>
+  {% endif %}
+</div>
+{% endblock %}

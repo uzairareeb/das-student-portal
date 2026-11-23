@@ -17,6 +17,7 @@ import os
 import re
 import sqlite3
 import time
+import hashlib
 from datetime import datetime, date, timedelta, timezone
 from functools import wraps
 from urllib.parse import urlencode
@@ -359,6 +360,7 @@ def init_db():
     _migrate_add_dept_faculty(db)
     _seed_reference_data(db)
     _create_intake_tables(db)
+    _create_document_tables(db)
     # Admin password: the env var is the source of truth. Only overwrite
     # the stored hash when the env var is actually set, so a missing env
     # var can never silently downgrade the live password to a fallback.
@@ -822,6 +824,143 @@ def _intake_error_workbook(uid):
     buf = io.BytesIO()
     wb.save(buf)
     return buf.getvalue()
+
+
+def _create_document_tables(db):
+    """Phase 3 (Central System): document catalogue, upload versioning
+    fields, and GS hard-copy receipts.
+
+    The catalogue is seeded from the office's existing required-document
+    lists (MPHIL_DOCS / PHD_DOCS). Codes are taken from the list names
+    themselves (GS-01…GS-07); anything the lists do not carry stays
+    unconfigured for DAS to set on the Document Catalogue page.
+    """
+    id_def = "id SERIAL PRIMARY KEY" if USE_PG else \
+        "id INTEGER PRIMARY KEY AUTOINCREMENT"
+    db.execute(f"""
+        CREATE TABLE IF NOT EXISTS document_types (
+            {id_def}, code TEXT, name TEXT NOT NULL,
+            applies_to TEXT DEFAULT 'All', stage TEXT DEFAULT 'General',
+            required INTEGER DEFAULT 1, requires_hardcopy INTEGER DEFAULT 1,
+            active INTEGER DEFAULT 1, sort INTEGER DEFAULT 0,
+            created_at TEXT
+        )
+    """)
+    db.execute(f"""
+        CREATE TABLE IF NOT EXISTS gs_receipts (
+            {id_def},
+            student_id INTEGER NOT NULL REFERENCES students(id),
+            doc_type_id INTEGER, doc_label TEXT,
+            received_date TEXT, received_by TEXT, office TEXT,
+            diary_no TEXT, remarks TEXT, recorded_by TEXT, created_at TEXT
+        )
+    """)
+    _add_column_if_missing(db, "documents", "doc_type_id", "INTEGER")
+    _add_column_if_missing(db, "documents", "version", "INTEGER DEFAULT 1")
+    _add_column_if_missing(db, "documents", "checksum", "TEXT")
+    try:
+        n = db.fetchone("SELECT COUNT(*) AS n FROM document_types")
+        if not (n["n"] if isinstance(n, dict) else n[0]):
+            _seed_document_types(db)
+    except Exception:
+        pass
+
+
+def _seed_document_types(db):
+    import re as _re
+    seen = {}
+    order = [0]
+
+    def _add(name, level):
+        m = _re.search(r"(GS-\d+)", name or "")
+        code = m.group(1) if m else ""
+        key = code or (name or "").strip().lower()
+        if key in seen:
+            row = seen[key]
+            if level != row["applies_to"]:
+                row["applies_to"] = "All"
+            if len(name) > len(row["name"]):
+                row["name"] = name
+            return
+        order[0] += 1
+        seen[key] = {"code": code, "name": name, "applies_to": level,
+                     "sort": order[0]}
+
+    for nm in MPHIL_DOCS:
+        _add(nm, "MPhil")
+    for nm in PHD_DOCS:
+        _add(nm, "PhD")
+    now = datetime.now().strftime("%Y-%m-%d %H:%M")
+    for row in sorted(seen.values(), key=lambda r: r["sort"]):
+        required = 0 if "if required" in row["name"].lower() else 1
+        db.execute(
+            "INSERT INTO document_types (code, name, applies_to, stage,"
+            " required, requires_hardcopy, active, sort, created_at)"
+            " VALUES (?, ?, ?, 'General', ?, 1, 1, ?, ?)",
+            (row["code"], row["name"], row["applies_to"], required,
+             row["sort"], now))
+
+
+def _doc_level(degree):
+    return "PhD" if "phd" in (degree or "").lower() else "MPhil"
+
+
+def catalogue_for(db, degree):
+    """Active catalogue entries that apply to this student's level."""
+    level = _doc_level(degree)
+    rows = db.execute(
+        "SELECT * FROM document_types WHERE active=1"
+        " AND (applies_to='All' OR applies_to=?)"
+        " ORDER BY sort, id", (level,)).fetchall()
+    return [dict(r) for r in rows]
+
+
+def student_doc_checklist(db, s):
+    """Catalogue entries for a student, each with its latest GS
+    hard-copy receipt (or None). Digital uploads never appear here —
+    a scan does not mark a hard copy received."""
+    items = catalogue_for(db, s.get("degree"))
+    receipts = {}
+    for r in db.execute(
+            "SELECT * FROM gs_receipts WHERE student_id=?"
+            " ORDER BY id DESC", (s["id"],)).fetchall():
+        d = dict(r)
+        if d.get("doc_type_id") and d["doc_type_id"] not in receipts:
+            receipts[d["doc_type_id"]] = d
+    for it in items:
+        it["receipt"] = receipts.get(it["id"])
+    return items
+
+
+def _store_document(db, sid, doc_label, file_name, data, uploaded_by,
+                    doc_type_id=None):
+    """Insert one uploaded document with the next version number for
+    its label and a SHA-256 checksum. Old versions are kept."""
+    row = db.fetchone(
+        "SELECT MAX(version) AS v FROM documents"
+        " WHERE student_id=? AND doc_label=?", (sid, doc_label))
+    last = (row["v"] if isinstance(row, dict) else row[0]) if row else None
+    version = (last or 0) + 1
+    checksum = hashlib.sha256(data).hexdigest()
+    now = datetime.now().strftime("%Y-%m-%d %H:%M")
+    if USE_PG:
+        new_id = db.fetchone(
+            "INSERT INTO documents (student_id, doc_label, file_name,"
+            " mime_type, file_data, uploaded_by, uploaded_at,"
+            " doc_type_id, version, checksum)"
+            " VALUES (?, ?, ?, 'application/pdf', ?, ?, ?, ?, ?, ?)"
+            " RETURNING id",
+            (sid, doc_label, file_name, data, uploaded_by, now,
+             doc_type_id, version, checksum))["id"]
+    else:
+        new_id = db.execute(
+            "INSERT INTO documents (student_id, doc_label, file_name,"
+            " mime_type, file_data, uploaded_by, uploaded_at,"
+            " doc_type_id, version, checksum)"
+            " VALUES (?, ?, ?, 'application/pdf', ?, ?, ?, ?, ?, ?)",
+            (sid, doc_label, file_name, data, uploaded_by, now,
+             doc_type_id, version, checksum)).lastrowid
+    return new_id, version
 
 
 def _migrate_add_archived(db):
@@ -5525,7 +5664,8 @@ def get_student(sid):
 def get_docs(sid):
     rows = get_db().fetchall(
         "SELECT id, student_id, doc_label, file_name, mime_type, status, remark, uploaded_by,"
-        " uploaded_at, LENGTH(file_data) AS size FROM documents"
+        " uploaded_at, version, checksum, doc_type_id,"
+        " LENGTH(file_data) AS size FROM documents"
         " WHERE student_id=? ORDER BY uploaded_at DESC, id DESC", (sid,))
     return [dict(r) for r in rows]
 
@@ -6097,16 +6237,29 @@ def admin_doc_verify(doc_id):
         flash("Document not found.")
         return redirect(url_for("admin_students"))
     status = request.form.get("status", "Pending")
-    if status not in ("Pending", "Verified"):
+    if status not in ("Pending", "Verified", "Returned"):
         status = "Pending"
     remark = (request.form.get("remark") or "").strip()
     db.execute("UPDATE documents SET status=?, remark=? WHERE id=?",
                (status, remark, doc_id))
     db.commit()
     sid = row["student_id"] if isinstance(row, dict) else row[1]
-    log_activity("admin", "doc_verify",
-                 f"doc #{doc_id} -> {status} (student id={sid})")
+    log_activity(current_admin()["name"], "doc_verify",
+                 f"doc #{doc_id} -> {status} (student id={sid})",
+                 entity_type="document", entity_id=doc_id,
+                 new_value=status)
+    if status in ("Verified", "Returned"):
+        d = dict(row)
+        notify_student(
+            sid, "document",
+            f"Document {status.lower()}: {d.get('doc_label')}",
+            (f"Your uploaded document '{d.get('doc_label')}'"
+             f" ({d.get('file_name')}) has been marked {status}."
+             + (f" Office remark: {remark}" if remark else "")),
+            url_for("student_upload"))
     flash(f"Document marked as {status}.")
+    if request.form.get("back") == "documents":
+        return redirect(url_for("admin_student_documents", sid=sid))
     return redirect(url_for("admin_student_profile", sid=sid))
 
 
@@ -6121,6 +6274,310 @@ def admin_doc_delete(doc_id):
     flash("Document deleted.")
     return redirect(url_for("admin_student_profile", sid=sid)) if sid \
         else redirect(url_for("admin_students"))
+
+
+
+# ==================== DOCUMENT CATALOGUE (Phase 3) ====================
+
+@app.route("/admin/doc-catalogue", methods=["GET", "POST"])
+@admin_required
+def admin_doc_catalogue():
+    db = get_db()
+    if request.method == "POST":
+        name = (request.form.get("name") or "").strip()
+        if not name:
+            flash("Document name is required.")
+            return redirect(url_for("admin_doc_catalogue"))
+        mx = db.fetchone("SELECT MAX(sort) AS m FROM document_types")
+        next_sort = ((mx["m"] if isinstance(mx, dict) else mx[0]) or 0) + 1
+        db.execute(
+            "INSERT INTO document_types (code, name, applies_to, stage,"
+            " required, requires_hardcopy, active, sort, created_at)"
+            " VALUES (?, ?, ?, ?, ?, ?, 1, ?, ?)",
+            ((request.form.get("code") or "").strip(), name,
+             pick(request.form.get("applies_to"),
+                  ["All", "MPhil", "PhD"], "All"),
+             (request.form.get("stage") or "General").strip(),
+             1 if request.form.get("required") else 0,
+             1 if request.form.get("requires_hardcopy") else 0,
+             next_sort, datetime.now().strftime("%Y-%m-%d %H:%M")))
+        db.commit()
+        log_activity(current_admin()["name"], "doc_catalogue_add",
+                     name, entity_type="document_type")
+        flash(f"Catalogue entry added: {name}")
+        return redirect(url_for("admin_doc_catalogue"))
+    items = [dict(r) for r in db.execute(
+        "SELECT * FROM document_types ORDER BY sort, id").fetchall()]
+    return render_template("admin_doc_catalogue.html", uni=UNI_NAME,
+                           title=PORTAL_TITLE, items=items)
+
+
+@app.route("/admin/doc-catalogue/<int:tid>/save", methods=["POST"])
+@admin_required
+def admin_doc_catalogue_save(tid):
+    db = get_db()
+    db.execute(
+        "UPDATE document_types SET code=?, name=?, applies_to=?,"
+        " stage=?, required=?, requires_hardcopy=?, active=?"
+        " WHERE id=?",
+        ((request.form.get("code") or "").strip(),
+         (request.form.get("name") or "").strip(),
+         pick(request.form.get("applies_to"),
+              ["All", "MPhil", "PhD"], "All"),
+         (request.form.get("stage") or "General").strip(),
+         1 if request.form.get("required") else 0,
+         1 if request.form.get("requires_hardcopy") else 0,
+         1 if request.form.get("active") else 0, tid))
+    db.commit()
+    log_activity(current_admin()["name"], "doc_catalogue_save",
+                 f"entry #{tid}", entity_type="document_type",
+                 entity_id=tid)
+    flash("Catalogue entry updated.")
+    return redirect(url_for("admin_doc_catalogue"))
+
+
+# ==================== STUDENT PROFILE TABS (Phase 3) ====================
+
+def _tab_student(sid):
+    s = get_student(sid)
+    if s:
+        try:
+            _db = get_db()
+            wf.sync_student_dimensions(_db, sid, actor="system",
+                                       actor_role="System")
+            _db.commit()
+            s = get_student(sid)
+        except Exception:
+            pass
+    return s
+
+
+@app.route("/admin/student/<int:sid>/documents")
+@admin_required
+def admin_student_documents(sid):
+    s = _tab_student(sid)
+    if not s:
+        return render_template("notfound.html", uni=UNI_NAME,
+                               title=PORTAL_TITLE,
+                               message="Student not found."), 404
+    db = get_db()
+    receipts = [dict(r) for r in db.execute(
+        "SELECT * FROM gs_receipts WHERE student_id=? ORDER BY id DESC",
+        (sid,)).fetchall()]
+    return render_template(
+        "admin_student_documents.html", uni=UNI_NAME, title=PORTAL_TITLE,
+        s=s, checklist=student_doc_checklist(db, s), docs=get_docs(sid),
+        receipts=receipts,
+        today=datetime.now().strftime("%Y-%m-%d"))
+
+
+@app.route("/admin/student/<int:sid>/gs-receipt", methods=["POST"])
+@admin_required
+def admin_student_gs_receipt(sid):
+    """Record a GS hard-copy receipt. This is the ONLY way a hard copy
+    becomes 'received' — a digital upload never creates one."""
+    db = get_db()
+    s = get_student(sid)
+    if not s:
+        return redirect(url_for("admin_students"))
+    try:
+        doc_type_id = int(request.form.get("doc_type_id") or 0) or None
+    except ValueError:
+        doc_type_id = None
+    label = ""
+    if doc_type_id:
+        trow = db.fetchone("SELECT name FROM document_types WHERE id=?",
+                           (doc_type_id,))
+        label = (trow["name"] if isinstance(trow, dict)
+                 else trow[0]) if trow else ""
+    if not label:
+        label = (request.form.get("doc_label") or "").strip()
+    received_date = (request.form.get("received_date") or "").strip() \
+        or datetime.now().strftime("%Y-%m-%d")
+    db.execute(
+        "INSERT INTO gs_receipts (student_id, doc_type_id, doc_label,"
+        " received_date, received_by, office, diary_no, remarks,"
+        " recorded_by, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        (sid, doc_type_id, label, received_date,
+         (request.form.get("received_by") or "").strip(),
+         (request.form.get("office") or "DAS").strip(),
+         (request.form.get("diary_no") or "").strip(),
+         (request.form.get("remarks") or "").strip(),
+         current_admin()["name"],
+         datetime.now().strftime("%Y-%m-%d %H:%M")))
+    wf.record_event(db, sid, "document", "", f"Hard copy received: {label}",
+                    current_admin()["name"], current_admin()["role"],
+                    f"Diary {request.form.get('diary_no') or '—'}")
+    db.commit()
+    log_activity(current_admin()["name"], "gs_receipt",
+                 f"{label} hard copy received for {s.get('name')}"
+                 f" ({s.get('reg_no')})",
+                 entity_type="student", entity_id=sid)
+    notify_student(sid, "document", f"Hard copy received: {label}",
+                   f"The DAS office recorded the hard copy of"
+                   f" '{label}' as received on {received_date}"
+                   f" (Diary No. {request.form.get('diary_no') or '—'}).",
+                   url_for("student_upload"))
+    flash(f"Hard-copy receipt recorded for {label}.")
+    return redirect(url_for("admin_student_documents", sid=sid))
+
+
+@app.route("/admin/student/<int:sid>/gs-receipt-all", methods=["POST"])
+@admin_required
+def admin_student_gs_receipt_all(sid):
+    """Mark every outstanding catalogue item received at once (the
+    usual case: the student's complete physical file arrives)."""
+    db = get_db()
+    s = get_student(sid)
+    if not s:
+        return redirect(url_for("admin_students"))
+    received_date = (request.form.get("received_date") or "").strip() \
+        or datetime.now().strftime("%Y-%m-%d")
+    diary = (request.form.get("diary_no") or "").strip()
+    now = datetime.now().strftime("%Y-%m-%d %H:%M")
+    added = 0
+    for item in student_doc_checklist(db, s):
+        if item.get("receipt") or not item.get("requires_hardcopy"):
+            continue
+        db.execute(
+            "INSERT INTO gs_receipts (student_id, doc_type_id, doc_label,"
+            " received_date, received_by, office, diary_no, remarks,"
+            " recorded_by, created_at)"
+            " VALUES (?, ?, ?, ?, ?, ?, ?, '', ?, ?)",
+            (sid, item["id"], item["name"], received_date,
+             (request.form.get("received_by") or "").strip(),
+             (request.form.get("office") or "DAS").strip(), diary,
+             current_admin()["name"], now))
+        added += 1
+    if added:
+        wf.record_event(db, sid, "document", "",
+                        f"Hard-copy file received ({added} items)",
+                        current_admin()["name"], current_admin()["role"],
+                        f"Diary {diary or '—'}")
+        db.commit()
+        notify_student(sid, "document", "Hard-copy file received",
+                       f"The DAS office recorded your hard-copy file"
+                       f" ({added} documents) as received on"
+                       f" {received_date} (Diary No. {diary or '—'}).",
+                       url_for("student_upload"))
+    log_activity(current_admin()["name"], "gs_receipt_all",
+                 f"{added} hard-copy item(s) marked received for"
+                 f" {s.get('name')} ({s.get('reg_no')})",
+                 entity_type="student", entity_id=sid)
+    flash(f"{added} item(s) marked as hard-copy received.")
+    return redirect(url_for("admin_student_documents", sid=sid))
+
+
+@app.route("/admin/gs-receipt/<int:rid>/delete", methods=["POST"])
+@admin_required
+def admin_gs_receipt_delete(rid):
+    db = get_db()
+    row = db.fetchone("SELECT * FROM gs_receipts WHERE id=?", (rid,))
+    if not row:
+        return redirect(url_for("admin_students"))
+    r = dict(row)
+    db.execute("DELETE FROM gs_receipts WHERE id=?", (rid,))
+    db.commit()
+    log_activity(current_admin()["name"], "gs_receipt_delete",
+                 f"receipt #{rid} ({r.get('doc_label')}) removed",
+                 entity_type="student", entity_id=r["student_id"])
+    flash("Receipt entry removed.")
+    return redirect(url_for("admin_student_documents",
+                            sid=r["student_id"]))
+
+
+@app.route("/admin/student/<int:sid>/viva")
+@admin_required
+def admin_student_viva(sid):
+    s = _tab_student(sid)
+    if not s:
+        return render_template("notfound.html", uni=UNI_NAME,
+                               title=PORTAL_TITLE,
+                               message="Student not found."), 404
+    vivas = [dict(r) for r in get_db().fetchall(
+        "SELECT * FROM viva_records WHERE student_id=? ORDER BY id DESC",
+        (sid,))]
+    return render_template("admin_student_viva.html", uni=UNI_NAME,
+                           title=PORTAL_TITLE, s=s, vivas=vivas)
+
+
+@app.route("/admin/student/<int:sid>/progress")
+@admin_required
+def admin_student_progress(sid):
+    s = _tab_student(sid)
+    if not s:
+        return render_template("notfound.html", uni=UNI_NAME,
+                               title=PORTAL_TITLE,
+                               message="Student not found."), 404
+    db = get_db()
+    vivas = [dict(r) for r in db.fetchall(
+        "SELECT * FROM viva_records WHERE student_id=?", (sid,))]
+    checks = [
+        ("Folder / File (With GS-Forms) completed",
+         s.get("folder_file") == "Completed"),
+        ("Synopsis received", s.get("synopsis") == "Received"),
+        ("Semi-Final Thesis received",
+         s.get("semi_final_thesis") == "Received"),
+        ("Final Thesis received", s.get("final_thesis") == "Received"),
+        ("Thesis forwarded to Controller (COE)",
+         bool(parse_coe(s.get("thesis_forward_coe")))),
+        ("Viva passed", any(v.get("result") == "Pass" for v in vivas)),
+    ]
+    dims = [(wf.DIMENSIONS[c][0], s.get(c)) for c in wf.DIMENSIONS]
+    return render_template("admin_student_progress.html", uni=UNI_NAME,
+                           title=PORTAL_TITLE, s=s, checks=checks,
+                           dims=dims)
+
+
+@app.route("/admin/student/<int:sid>/timeline")
+@admin_required
+def admin_student_timeline(sid):
+    s = _tab_student(sid)
+    if not s:
+        return render_template("notfound.html", uni=UNI_NAME,
+                               title=PORTAL_TITLE,
+                               message="Student not found."), 404
+    db = get_db()
+    events = []
+
+    def add(when, kind, text):
+        if when:
+            events.append({"when": str(when), "kind": kind, "text": text})
+
+    add(s.get("created_at"), "Record", "Student record created")
+    add(s.get("folder_file_at"), "Submission",
+        "Folder / File (With GS-Forms) completed")
+    add(s.get("synopsis_at"), "Submission", "Synopsis received")
+    add(s.get("semi_final_thesis_at"), "Submission",
+        "Semi-Final Thesis received")
+    add(s.get("final_thesis_at"), "Submission", "Final Thesis received")
+    coe = parse_coe(s.get("thesis_forward_coe"))
+    if coe:
+        add(coe, "Forwarding", "Thesis forwarded to Controller (COE)")
+    for v in db.execute("SELECT * FROM viva_records WHERE student_id=?",
+                        (sid,)).fetchall():
+        v = dict(v)
+        add(v.get("viva_date") or v.get("created_at"), "Viva",
+            f"Viva voce — {v.get('examiner_name') or 'examiner n/a'}"
+            f" — result: {v.get('result') or 'Pending'}")
+    for d in get_docs(sid):
+        add(d.get("uploaded_at"), "Document",
+            f"Uploaded: {d.get('doc_label')} v{d.get('version') or 1}"
+            f" (by {d.get('uploaded_by')}) — {d.get('status') or 'Pending'}")
+    for r in db.execute("SELECT * FROM gs_receipts WHERE student_id=?",
+                        (sid,)).fetchall():
+        r = dict(r)
+        add(r.get("created_at") or r.get("received_date"), "Hard copy",
+            f"Hard copy received: {r.get('doc_label')}"
+            f" (Diary {r.get('diary_no') or '—'})")
+    for e in wf.student_timeline(db, sid):
+        label = wf.DIMENSIONS.get(e["dimension"], (e["dimension"],))[0]
+        add(e["created_at"], "Status",
+            f"{label}: {e['from_value'] or '—'} → {e['to_value']}"
+            f" (by {e['actor']})")
+    events.sort(key=lambda x: x["when"], reverse=True)
+    return render_template("admin_student_timeline.html", uni=UNI_NAME,
+                           title=PORTAL_TITLE, s=s, events=events)
 
 
 # ---------------- student portal ----------------
@@ -6815,22 +7272,24 @@ def student_upload():
                 flash("File is too large — maximum 25 MB.")
             else:
                 db = get_db()
-                db.execute(
-                    """INSERT INTO documents (student_id, doc_label, file_name,
-                       mime_type, file_data, uploaded_by, uploaded_at)
-                       VALUES (?, ?, ?, 'application/pdf', ?, 'student', ?)""",
-                    (s["id"], doc_type, secure_filename(file.filename), data,
-                     datetime.now().strftime("%Y-%m-%d %H:%M")))
+                _, version = _store_document(
+                    db, s["id"], doc_type, secure_filename(file.filename),
+                    data, "student")
                 db.commit()
                 log_activity(f"student:{s['reg_no']}", "doc_upload",
-                             f"{doc_type} uploaded by student")
-                flash(f"Your {doc_type.lower()} has been uploaded and saved"
-                      " to your office record. You can upload again if"
-                      " needed \u2014 old versions are kept.")
+                             f"{doc_type} uploaded by student"
+                             f" (version {version})",
+                             entity_type="document")
+                flash(f"Your {doc_type.lower()} has been uploaded and"
+                      f" saved to your office record as version"
+                      f" {version}. You can upload again if needed"
+                      " \u2014 old versions are kept.")
         return redirect(url_for("student_upload"))
     uploads = [d for d in get_docs(s["id"]) if d.get("uploaded_by") == "student"]
+    checklist = student_doc_checklist(get_db(), s)
     return render_template("student_upload.html", uni=UNI_NAME, title=PORTAL_TITLE,
-                           s=s, doc_list=doc_list, is_phd=is_phd, uploads=uploads)
+                           s=s, doc_list=doc_list, is_phd=is_phd,
+                           uploads=uploads, checklist=checklist)
 
 
 @app.route("/student/doc/<int:doc_id>/download")

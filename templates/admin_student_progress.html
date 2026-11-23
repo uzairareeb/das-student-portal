@@ -1,0 +1,36 @@
+{% extends "admin_base.html" %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <h2>{{ s.name }}</h2>
+    <p>{{ s.reg_no }} &middot; {{ s.degree or '—' }} &middot; Session {{ s.session or '—' }} &middot; {{ s.status }}</p>
+  </div>
+  <a class="btn ghost" href="{{ url_for('admin_students') }}">&larr; Student List</a>
+</div>
+{% set tab_active = 'progress' %}{% include "_profile_tabs.html" %}
+
+<div class="card section">
+  <h3 style="margin-top:0">Status Dimensions</h3>
+  <p class="hint" style="margin-top:0">Each dimension moves only when the responsible office records the event — forwarding is not receipt, a conducted viva is not an approved result, and an approved result is not an issued degree.</p>
+  <div class="row" style="gap:10px;flex-wrap:wrap">
+    {% for label, val in dims %}
+    <span class="sp-chip">{{ label }}: <strong>{{ val or '—' }}</strong></span>
+    {% endfor %}
+  </div>
+</div>
+
+<div class="card section">
+  <h3 style="margin-top:0">Progress Summary</h3>
+  <div class="table-scroll">
+    <table class="data-table">
+      <thead><tr><th>Milestone</th><th>State</th></tr></thead>
+      <tbody>
+        {% for label, done in checks %}
+        <tr><td>{{ label }}</td><td>{% if done %}<span class="pill q">Done</span>{% else %}<span class="pill warn">Pending</span>{% endif %}</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <p class="hint" style="margin-bottom:0">This is a progress summary drawn from the recorded facts. The official degree-completion checklist — where an authorized officer marks the degree Issued — arrives in Phase 6. Nothing here marks a degree as issued.</p>
+</div>
+{% endblock %}

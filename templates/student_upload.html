@@ -26,9 +26,27 @@
     <span class="section-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg></span>
     <h3>Required Documents — {% if is_phd %}PhD{% else %}MPhil{% endif %} ({{ doc_list|length }} items, in sequence)</h3>
   </div>
+  {% if checklist %}
+  <div class="table-scroll">
+    <table class="data-table">
+      <thead><tr><th>#</th><th>Document</th><th>Hard Copy at DAS</th></tr></thead>
+      <tbody>
+        {% for it in checklist %}
+        <tr>
+          <td>{{ loop.index }}</td>
+          <td>{{ it.name }}</td>
+          <td>{% if it.receipt %}<span class="pill q">Received</span> <span class="hint">{{ it.receipt.received_date }} &middot; Diary {{ it.receipt.diary_no or '—' }}</span>{% elif it.requires_hardcopy %}<span class="pill warn">Not Received Yet</span>{% else %}<span class="pill">—</span>{% endif %}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <p class="hint" style="margin-bottom:0">The hard-copy column changes only when the DAS office records your physical file — uploading the merged PDF does not change it.</p>
+  {% else %}
   <ol class="checklist">
     {% for item in doc_list %}<li>{{ item }}</li>{% endfor %}
   </ol>
+  {% endif %}
 </div>
 
 {% for up in [('Complete File (Merged PDF)', 'complete', 'Upload your merged PDF — all required documents in one file'),
@@ -79,8 +97,8 @@
     <div class="doc-row">
       <span class="doc-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg></span>
       <div class="doc-meta">
-        <div class="doc-name">{{ d.doc_label }} — {{ d.file_name }}</div>
-        <div class="doc-sub">{{ d.uploaded_at }}{% if d.size %} &middot; {{ (d.size/1024)|round(1) }} KB{% endif %} &middot; {% if d.status == 'Verified' %}<span class="pill q">Verified</span>{% else %}<span class="pill warn">Pending</span>{% endif %}</div>
+        <div class="doc-name">{{ d.doc_label }} — {{ d.file_name }} <span class="pill">v{{ d.version or 1 }}</span></div>
+        <div class="doc-sub">{{ d.uploaded_at }}{% if d.size %} &middot; {{ (d.size/1024)|round(1) }} KB{% endif %} &middot; {% if d.status == 'Verified' %}<span class="pill q">Verified</span>{% elif d.status == 'Returned' %}<span class="pill nq">Returned — please re-upload</span>{% else %}<span class="pill warn">Pending</span>{% endif %}</div>
         {% if d.remark %}<div class="doc-sub">Office remark: {{ d.remark }}</div>{% endif %}
       </div>
       <a class="btn ghost sm" href="{{ url_for('student_doc_download', doc_id=d.id) }}">Download</a>
