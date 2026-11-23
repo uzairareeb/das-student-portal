@@ -90,6 +90,14 @@
           Notifications
           {% if admin_unread %}<span class="notif-badge">{{ admin_unread }}</span>{% endif %}
         </a>
+        <a href="{{ url_for('admin_users') }}" class="{% if request.endpoint == 'admin_users' %}active{% endif %}">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+          Users
+        </a>
+        <a href="{{ url_for('admin_backup') }}" class="{% if request.endpoint in ('admin_backup', 'admin_backup_download') %}active{% endif %}">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          Backup
+        </a>
       </div>
     </div>
   </nav>
@@ -98,8 +106,8 @@
       <button type="button" id="profileBtn" class="sp-head-btn" aria-haspopup="true" aria-expanded="false">
         <span class="sp-avatar">A</span>
         <span class="min-w-0 flex-1">
-          <span class="sp-name block">Administrator</span>
-          <span class="sp-sub block">Admin Portal</span>
+          <span class="sp-name block">{{ admin_name or 'Administrator' }}</span>
+          <span class="sp-sub block">{{ admin_role or 'Admin Portal' }}</span>
         </span>
         <svg class="sp-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
       </button>

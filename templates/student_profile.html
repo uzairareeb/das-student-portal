@@ -17,6 +17,16 @@
       {% if s.status in ['Continue', 'Viva Done', 'Pass Out', 'Sent to COE'] %}<span class="pill q">{{ s.status }}</span>
       {% elif s.status in ['Viva Pending', 'Defense Pending'] %}<span class="pill warn">{{ s.status }}</span>
       {% else %}<span class="pill nq">{{ s.status }}</span>{% endif %}
+      {% if s.academic_status %}
+      <div class="sp-chips" style="margin-top:8px">
+        <span class="sp-chip">Academic: <strong>{{ s.academic_status }}</strong></span>
+        <span class="sp-chip">DAS: <strong>{{ s.das_status }}</strong></span>
+        <span class="sp-chip">Thesis: <strong>{{ s.thesis_status }}</strong></span>
+        <span class="sp-chip">Viva: <strong>{{ s.viva_status }}</strong></span>
+        <span class="sp-chip">Result: <strong>{{ s.result_status }}</strong></span>
+        <span class="sp-chip">Degree: <strong>{{ s.degree_status }}</strong></span>
+      </div>
+      {% endif %}
     </div>
     <div class="sp-ring">
       <div class="ring-wrap">

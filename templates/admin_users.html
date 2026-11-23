@@ -1,0 +1,76 @@
+{% extends "admin_base.html" %}
+{% block container_extra %} wide{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <h2>Admin Users</h2>
+    <p>Officer accounts for the DAS office — each officer signs in with their own email and password. The shared admin password keeps working when the email is left blank.</p>
+  </div>
+</div>
+
+<div class="card section">
+  <h3 style="margin-top:0">Add officer account</h3>
+  <form method="post" class="form-grid">
+    <div>
+      <label class="f-label" for="u-name">Full name</label>
+      <input id="u-name" name="name" required placeholder="e.g. Muhammad Ahmad">
+    </div>
+    <div>
+      <label class="f-label" for="u-email">Email</label>
+      <input id="u-email" name="email" type="email" required placeholder="officer@cuvas.edu.pk">
+    </div>
+    <div>
+      <label class="f-label" for="u-pw">Password</label>
+      <input id="u-pw" name="password" type="password" required minlength="6" placeholder="Minimum 6 characters">
+    </div>
+    <div>
+      <label class="f-label" for="u-role">Role</label>
+      <select id="u-role" name="role" class="no-icon">
+        <option value="DAS Officer">DAS Officer</option>
+        <option value="Super Admin">Super Admin</option>
+      </select>
+    </div>
+    <div>
+      <button type="submit" class="btn primary">Create account</button>
+    </div>
+  </form>
+</div>
+
+<div class="card section">
+  <h3 style="margin-top:0">Officer accounts ({{ users|length }})</h3>
+  {% if users %}
+  <div class="table-scroll">
+    <table class="data-table">
+      <thead>
+        <tr><th>Name</th><th>Email</th><th>Role</th><th>Status</th><th>Created</th><th>Last sign-in</th><th>Actions</th></tr>
+      </thead>
+      <tbody>
+        {% for u in users %}
+        <tr>
+          <td><strong>{{ u.name }}</strong>{% if me == u.id %} <span class="pill q">You</span>{% endif %}</td>
+          <td>{{ u.email }}</td>
+          <td>{{ u.role }}</td>
+          <td>{% if u.is_active %}<span class="pill q">Active</span>{% else %}<span class="pill nq">Inactive</span>{% endif %}</td>
+          <td class="nowrap">{{ u.created_at or '—' }}</td>
+          <td class="nowrap">{{ u.last_login_at or 'Never' }}</td>
+          <td>
+            <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+              <form method="post" action="{{ url_for('admin_user_toggle', uid=u.id) }}">
+                <button type="submit" class="btn ghost">{{ 'Deactivate' if u.is_active else 'Activate' }}</button>
+              </form>
+              <form method="post" action="{{ url_for('admin_user_password', uid=u.id) }}" style="display:flex;gap:6px;align-items:center">
+                <input name="password" type="password" minlength="6" placeholder="New password" style="max-width:150px">
+                <button type="submit" class="btn primary">Reset</button>
+              </form>
+            </div>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <p class="muted">No officer accounts yet. Create the first one above — until then, the shared admin password is the only way in.</p>
+  {% endif %}
+</div>
+{% endblock %}

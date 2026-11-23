@@ -1,0 +1,25 @@
+{% extends "admin_base.html" %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <h2>Backup</h2>
+    <p>One-click full backup of the whole system — every table, including uploaded files. Keep the downloaded file somewhere safe.</p>
+  </div>
+  <a class="btn primary" href="{{ url_for('admin_backup_download') }}">Download backup (JSON)</a>
+</div>
+
+<div class="card section">
+  <h3 style="margin-top:0">What is inside ({{ total }} records)</h3>
+  <div class="table-scroll">
+    <table class="data-table">
+      <thead><tr><th>Table</th><th>Records</th></tr></thead>
+      <tbody>
+        {% for tbl, n in counts.items() %}
+        <tr><td><code>{{ tbl }}</code></td><td>{{ n if n is not none else '—' }}</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <p class="muted" style="margin-bottom:0">The shared admin password hash is excluded on purpose — the live password always comes from the server environment. Department and officer password hashes are included so accounts can be restored exactly. Recommended: download a backup before every big change and at least once a week.</p>
+</div>
+{% endblock %}

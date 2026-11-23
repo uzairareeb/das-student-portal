@@ -16,6 +16,7 @@ import io
 import os
 import re
 import sqlite3
+import time
 from datetime import datetime, date, timedelta, timezone
 from functools import wraps
 from urllib.parse import urlencode
@@ -25,6 +26,7 @@ from flask import (Flask, Response, flash, g, redirect, render_template,
 from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.utils import secure_filename
 from viva_pdf import build_viva_pdf
+import workflow as wf
 from academic_schedule import (RULES as SCHEDULE_RULES,
                                build_schedule, deserialize_rows,
                                display_row,
@@ -339,6 +341,7 @@ def init_db():
             created_at TEXT
         )
     """)
+    _create_foundation_tables(db)
     _migrate_drop_unique_constraints(db)
     _migrate_add_department_column(db)
     _migrate_add_viva_admin_seen(db)
@@ -350,16 +353,37 @@ def init_db():
     _fix_department_rows(db)
     _migrate_add_saved_schedules(db)
     _migrate_add_schedule_extensions(db)
-    # Admin password comes from the env var (source of truth), stored hashed.
-    pw_hash = generate_password_hash(
-        os.environ.get("ADMIN_PASSWORD", "admin123") or "admin123")
-    if USE_PG:
-        db.execute("INSERT INTO settings(key, value) VALUES (?, ?)"
-                   " ON CONFLICT(key) DO UPDATE SET value=EXCLUDED.value",
-                   ("admin_pw", pw_hash))
+    _migrate_add_status_dimensions(db)
+    _migrate_add_audit_columns(db)
+    _migrate_add_dept_faculty(db)
+    _seed_reference_data(db)
+    # Admin password: the env var is the source of truth. Only overwrite
+    # the stored hash when the env var is actually set, so a missing env
+    # var can never silently downgrade the live password to a fallback.
+    _env_pw = os.environ.get("ADMIN_PASSWORD")
+    if _env_pw:
+        pw_hash = generate_password_hash(_env_pw)
+        if USE_PG:
+            db.execute("INSERT INTO settings(key, value) VALUES (?, ?)"
+                       " ON CONFLICT(key) DO UPDATE SET value=EXCLUDED.value",
+                       ("admin_pw", pw_hash))
+        else:
+            db.execute("INSERT OR REPLACE INTO settings(key, value)"
+                       " VALUES (?, ?)", ("admin_pw", pw_hash))
     else:
-        db.execute("INSERT OR REPLACE INTO settings(key, value) VALUES (?, ?)",
-                   ("admin_pw", pw_hash))
+        _existing_pw = db.fetchone(
+            "SELECT value FROM settings WHERE key='admin_pw'")
+        if not _existing_pw:
+            # First boot with no env var (local development only): seed
+            # the documented default so the local login works.
+            pw_hash = generate_password_hash("admin123")
+            if USE_PG:
+                db.execute("INSERT INTO settings(key, value) VALUES (?, ?)"
+                           " ON CONFLICT(key) DO NOTHING",
+                           ("admin_pw", pw_hash))
+            else:
+                db.execute("INSERT OR IGNORE INTO settings(key, value)"
+                           " VALUES (?, ?)", ("admin_pw", pw_hash))
     db.commit()
     db.close()
 
@@ -530,6 +554,141 @@ def _migrate_add_saved_schedules(db):
         f"CREATE TABLE IF NOT EXISTS saved_schedules ({id_def},"
         " session TEXT UNIQUE, commencement TEXT, termination TEXT,"
         " rows_json TEXT, created_at TEXT, updated_at TEXT)")
+
+
+
+def _create_foundation_tables(db):
+    """Phase 1 (Central System): new foundation tables. Additive only."""
+    id_def = "id SERIAL PRIMARY KEY" if USE_PG else \
+        "id INTEGER PRIMARY KEY AUTOINCREMENT"
+    db.execute(f"""
+        CREATE TABLE IF NOT EXISTS faculties (
+            {id_def}, name TEXT UNIQUE NOT NULL, created_at TEXT
+        )
+    """)
+    db.execute(f"""
+        CREATE TABLE IF NOT EXISTS programs (
+            {id_def}, name TEXT UNIQUE NOT NULL, created_at TEXT
+        )
+    """)
+    db.execute(f"""
+        CREATE TABLE IF NOT EXISTS sessions (
+            {id_def}, name TEXT UNIQUE NOT NULL, created_at TEXT
+        )
+    """)
+    db.execute(f"""
+        CREATE TABLE IF NOT EXISTS admin_users (
+            {id_def}, name TEXT NOT NULL, email TEXT UNIQUE NOT NULL,
+            password_hash TEXT NOT NULL,
+            role TEXT DEFAULT 'DAS Officer',
+            is_active INTEGER DEFAULT 1,
+            created_at TEXT, last_login_at TEXT
+        )
+    """)
+    db.execute(f"""
+        CREATE TABLE IF NOT EXISTS workflow_events (
+            {id_def},
+            student_id INTEGER NOT NULL REFERENCES students(id),
+            dimension TEXT, from_value TEXT, to_value TEXT,
+            actor TEXT, actor_role TEXT, remarks TEXT, created_at TEXT
+        )
+    """)
+    db.execute(f"""
+        CREATE TABLE IF NOT EXISTS workflow_tasks (
+            {id_def},
+            student_id INTEGER, responsible_role TEXT,
+            responsible_ref TEXT, action TEXT, title TEXT,
+            due_date TEXT, priority TEXT DEFAULT 'Normal',
+            status TEXT DEFAULT 'Pending',
+            created_by TEXT, created_at TEXT,
+            completed_at TEXT, completed_by TEXT
+        )
+    """)
+
+
+def _add_column_if_missing(db, table, column, decl):
+    if USE_PG:
+        db.execute(f"ALTER TABLE {table} ADD COLUMN IF NOT EXISTS"
+                   f" {column} {decl}")
+    else:
+        cols = [r[1] for r in
+                db.execute(f"PRAGMA table_info({table})").fetchall()]
+        if column not in cols:
+            db.execute(f"ALTER TABLE {table} ADD COLUMN {column} {decl}")
+
+
+def _migrate_add_status_dimensions(db):
+    """Separate status dimensions on students + one-time backfill.
+
+    The legacy ``status`` column is untouched and stays authoritative;
+    dimensions are derived from the recorded facts (see workflow.py).
+    Backfill only fills rows whose dimensions are still NULL, so later
+    values are never overwritten by a re-run.
+    """
+    for col in ("academic_status", "das_status", "thesis_status",
+                "viva_status", "result_status", "degree_status"):
+        _add_column_if_missing(db, "students", col, "TEXT")
+    _sync_missing_dimensions(db)
+
+
+def _sync_missing_dimensions(db):
+    """Fill dimensions for any student that does not have them yet
+    (initial backfill + students inserted by bulk import paths)."""
+    try:
+        rows = db.execute(
+            "SELECT id FROM students WHERE academic_status IS NULL"
+        ).fetchall()
+        for r in rows:
+            sid = r["id"] if isinstance(r, dict) else r[0]
+            try:
+                wf.sync_student_dimensions(db, sid, actor="system",
+                                           write_events=False)
+            except Exception:
+                pass
+    except Exception:
+        pass
+
+
+def _migrate_add_audit_columns(db):
+    """Activity log gains entity + old/new value columns (nullable)."""
+    _add_column_if_missing(db, "activity_log", "entity_type", "TEXT")
+    _add_column_if_missing(db, "activity_log", "entity_id", "INTEGER")
+    _add_column_if_missing(db, "activity_log", "old_value", "TEXT")
+    _add_column_if_missing(db, "activity_log", "new_value", "TEXT")
+
+
+def _migrate_add_dept_faculty(db):
+    _add_column_if_missing(db, "departments", "faculty_id", "INTEGER")
+
+
+def _seed_reference_data(db):
+    """Seed programs/sessions reference tables from existing distinct
+    values. Faculties stay empty until DAS supplies the master list."""
+    def _distinct(col):
+        try:
+            rows = db.execute(
+                f"SELECT DISTINCT {col} FROM students"
+                f" WHERE {col} IS NOT NULL AND {col}<>''").fetchall()
+            return [r[col] if isinstance(r, dict) else r[0] for r in rows]
+        except Exception:
+            return []
+
+    def _insert(table, name):
+        name = (name or "").strip()
+        if not name:
+            return
+        if not db.fetchone(f"SELECT id FROM {table} WHERE name=?", (name,)):
+            db.execute(
+                f"INSERT INTO {table} (name, created_at) VALUES (?, ?)",
+                (name, datetime.now().strftime("%Y-%m-%d %H:%M")))
+
+    try:
+        for deg in _distinct("degree"):
+            _insert("programs", deg)
+        for ses in _distinct("session"):
+            _insert("sessions", ses)
+    except Exception:
+        pass
 
 
 def _migrate_add_archived(db):
@@ -1031,12 +1190,53 @@ def admin_login():
         return redirect(url_for("admin_dashboard"))
     error = None
     if request.method == "POST":
-        if check_admin_password(request.form.get("password")):
-            session["admin"] = True
-            session.permanent = bool(request.form.get("remember"))
-            log_activity("admin", "login", "admin portal sign-in")
-            return redirect(url_for("admin_dashboard"))
-        error = "Wrong password."
+        if _login_blocked("admin"):
+            error = ("Too many failed attempts. Please wait a few"
+                     " minutes and try again.")
+        else:
+            email = (request.form.get("email") or "").strip().lower()
+            pw = request.form.get("password")
+            user = None
+            if email:
+                row = get_db().fetchone(
+                    "SELECT * FROM admin_users WHERE email=?"
+                    " AND is_active=1", (email,))
+                if row and check_password_hash(
+                        dict(row)["password_hash"], pw or ""):
+                    user = dict(row)
+            if user:
+                session["admin"] = True
+                session["admin_user_id"] = user["id"]
+                session["admin_name"] = user["name"]
+                session["admin_role"] = user["role"]
+                session.permanent = bool(request.form.get("remember"))
+                db = get_db()
+                db.execute("UPDATE admin_users SET last_login_at=?"
+                           " WHERE id=?",
+                           (datetime.now().strftime("%Y-%m-%d %H:%M"),
+                            user["id"]))
+                db.commit()
+                _login_ok("admin")
+                log_activity(user["name"], "login",
+                             "admin portal sign-in (officer account)",
+                             entity_type="admin_user",
+                             entity_id=user["id"])
+                return redirect(url_for("admin_dashboard"))
+            elif not email and check_admin_password(pw):
+                session["admin"] = True
+                session.pop("admin_user_id", None)
+                session["admin_name"] = "Administrator"
+                session["admin_role"] = "Super Admin"
+                session.permanent = bool(request.form.get("remember"))
+                _login_ok("admin")
+                log_activity("admin", "login", "admin portal sign-in")
+                return redirect(url_for("admin_dashboard"))
+            _login_fail("admin")
+            log_activity("unknown", "login_failed",
+                         "admin portal failed sign-in"
+                         + (f" for {email}" if email else ""))
+            error = "Wrong email or password." if email \
+                else "Wrong password."
     return render_template("admin_login.html", uni=UNI_NAME, title=PORTAL_TITLE,
                            error=error)
 
@@ -1044,6 +1244,9 @@ def admin_login():
 @app.route("/admin/logout")
 def admin_logout():
     session.pop("admin", None)
+    session.pop("admin_user_id", None)
+    session.pop("admin_name", None)
+    session.pop("admin_role", None)
     return redirect(url_for("admin_login"))
 
 
@@ -1699,18 +1902,49 @@ def dept_unread_count(department_id):
     return (row["n"] if isinstance(row, dict) else row[0]) if row else 0
 
 
-def log_activity(actor, action, detail=""):
+def log_activity(actor, action, detail="", entity_type="",
+                 entity_id=None, old_value="", new_value=""):
     """Append to the activity log. Never breaks the request."""
     try:
         db = get_db()
         now = datetime.now().strftime("%Y-%m-%d %H:%M")
         db.execute(
-            "INSERT INTO activity_log (actor, action, detail, created_at)"
-            " VALUES (?, ?, ?, ?)",
-            (actor, action, (detail or "")[:500], now))
+            "INSERT INTO activity_log (actor, action, detail, created_at,"
+            " entity_type, entity_id, old_value, new_value)"
+            " VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+            (actor, action, (detail or "")[:500], now, entity_type or "",
+             entity_id, (old_value or "")[:500], (new_value or "")[:500]))
         db.commit()
     except Exception:
         pass
+
+
+def current_admin():
+    """Identity of the signed-in admin (officer account or shared login)."""
+    return {"user_id": session.get("admin_user_id"),
+            "name": session.get("admin_name") or "Administrator",
+            "role": session.get("admin_role") or "Super Admin"}
+
+
+# ---- login rate limiting (per portal + IP, in-memory) ----
+_LOGIN_FAILS = {}
+
+
+def _login_blocked(portal):
+    key = (portal, request.remote_addr or "?")
+    now = time.time()
+    fails = [x for x in _LOGIN_FAILS.get(key, []) if now - x < 600]
+    _LOGIN_FAILS[key] = fails
+    return len(fails) >= 5
+
+
+def _login_fail(portal):
+    key = (portal, request.remote_addr or "?")
+    _LOGIN_FAILS.setdefault(key, []).append(time.time())
+
+
+def _login_ok(portal):
+    _LOGIN_FAILS.pop((portal, request.remote_addr or "?"), None)
 
 
 _STATUS_ORDER = {"Continue": 0, "Complete": 1, "Sent to COE": 2,
@@ -1822,6 +2056,12 @@ def _apply_auto_rules(sid, old=None):
             db.execute("UPDATE students SET archived=0 WHERE id=?",
                        (sid,))
             db.commit()
+        try:
+            wf.sync_student_dimensions(db, sid, actor="system",
+                                       actor_role="System")
+            db.commit()
+        except Exception:
+            pass
     except Exception:
         pass
 
@@ -2135,6 +2375,7 @@ def admin_upload_approve(uid):
         return redirect(url_for("admin_uploads"))
     added, _, _, _ = insert_student_records(db, records,
                                             department=u["dept_name"])
+    _sync_missing_dimensions(db)
     db.execute("UPDATE dept_uploads SET status='approved', reviewed_at=?"
                " WHERE id=?",
                (datetime.now().strftime("%Y-%m-%d %H:%M"), uid))
@@ -2181,6 +2422,169 @@ def admin_upload_reject(uid):
     flash(f"Rejected with your comment — {u['dept_name']} will see it on"
           f" their portal and can fix and re-upload.")
     return redirect(url_for("admin_uploads"))
+
+
+
+# ==================== ADMIN USERS (Phase 1) ====================
+
+@app.route("/admin/users", methods=["GET", "POST"])
+@admin_required
+def admin_users():
+    db = get_db()
+    if request.method == "POST":
+        name = (request.form.get("name") or "").strip()
+        email = (request.form.get("email") or "").strip().lower()
+        pw = request.form.get("password") or ""
+        role = pick(request.form.get("role"),
+                    ["Super Admin", "DAS Officer"], "DAS Officer")
+        if not name or not email or "@" not in email:
+            flash("Name and a valid email are required.")
+        elif len(pw) < 6:
+            flash("Password must be at least 6 characters.")
+        elif db.fetchone("SELECT id FROM admin_users WHERE email=?",
+                         (email,)):
+            flash("An account with this email already exists.")
+        else:
+            db.execute(
+                "INSERT INTO admin_users (name, email, password_hash,"
+                " role, is_active, created_at) VALUES (?, ?, ?, ?, 1, ?)",
+                (name, email, generate_password_hash(pw), role,
+                 datetime.now().strftime("%Y-%m-%d %H:%M")))
+            db.commit()
+            row = db.fetchone("SELECT id FROM admin_users WHERE email=?",
+                              (email,))
+            log_activity(current_admin()["name"], "user_create",
+                         f"{name} ({email}) — {role}",
+                         entity_type="admin_user",
+                         entity_id=row["id"] if row else None)
+            flash(f"Officer account created for {name}.")
+        return redirect(url_for("admin_users"))
+    users = [dict(r) for r in db.execute(
+        "SELECT id, name, email, role, is_active, created_at,"
+        " last_login_at FROM admin_users ORDER BY id").fetchall()]
+    return render_template("admin_users.html", uni=UNI_NAME,
+                           title=PORTAL_TITLE, users=users,
+                           me=session.get("admin_user_id"))
+
+
+@app.route("/admin/users/<int:uid>/toggle", methods=["POST"])
+@admin_required
+def admin_user_toggle(uid):
+    if session.get("admin_user_id") == uid:
+        flash("You cannot deactivate your own account.")
+        return redirect(url_for("admin_users"))
+    db = get_db()
+    row = db.fetchone("SELECT * FROM admin_users WHERE id=?", (uid,))
+    if row:
+        u = dict(row)
+        new_state = 0 if u["is_active"] else 1
+        db.execute("UPDATE admin_users SET is_active=? WHERE id=?",
+                   (new_state, uid))
+        db.commit()
+        log_activity(current_admin()["name"], "user_toggle",
+                     f"{u['name']} ({u['email']}) ->"
+                     f" {'active' if new_state else 'inactive'}",
+                     entity_type="admin_user", entity_id=uid,
+                     old_value=str(u["is_active"]),
+                     new_value=str(new_state))
+        flash(f"{u['name']} is now"
+              f" {'active' if new_state else 'inactive'}.")
+    return redirect(url_for("admin_users"))
+
+
+@app.route("/admin/users/<int:uid>/password", methods=["POST"])
+@admin_required
+def admin_user_password(uid):
+    pw = request.form.get("password") or ""
+    if len(pw) < 6:
+        flash("New password must be at least 6 characters.")
+        return redirect(url_for("admin_users"))
+    db = get_db()
+    row = db.fetchone("SELECT * FROM admin_users WHERE id=?", (uid,))
+    if row:
+        u = dict(row)
+        db.execute("UPDATE admin_users SET password_hash=? WHERE id=?",
+                   (generate_password_hash(pw), uid))
+        db.commit()
+        log_activity(current_admin()["name"], "user_password_reset",
+                     f"Password reset for {u['name']} ({u['email']})",
+                     entity_type="admin_user", entity_id=uid)
+        flash(f"Password updated for {u['name']}.")
+    return redirect(url_for("admin_users"))
+
+
+# ==================== BACKUP (Phase 1) ====================
+
+_BACKUP_TABLES = ["students", "deleted_students", "documents",
+                  "departments", "dept_uploads", "viva_records",
+                  "student_notifications", "admin_notifications",
+                  "dept_notifications", "activity_log", "saved_schedules",
+                  "faculties", "programs", "sessions", "admin_users",
+                  "workflow_events", "workflow_tasks", "settings"]
+
+
+def _backup_counts():
+    db = get_db()
+    counts = {}
+    for tbl in _BACKUP_TABLES:
+        try:
+            row = db.fetchone(f"SELECT COUNT(*) AS n FROM {tbl}")
+            counts[tbl] = row["n"] if isinstance(row, dict) else row[0]
+        except Exception:
+            counts[tbl] = None
+    return counts
+
+
+def _backup_payload():
+    import base64 as b64
+    db = get_db()
+    payload = {"system": "DAS Student Portal — CUVAS",
+               "exported_at": datetime.now().strftime("%Y-%m-%d %H:%M"),
+               "note": "Full data backup. settings.admin_pw is excluded"
+                       " (the live password comes from the server"
+                       " environment). File bytes are base64.",
+               "tables": {}}
+    for tbl in _BACKUP_TABLES:
+        try:
+            rows = db.execute(f"SELECT * FROM {tbl}").fetchall()
+        except Exception:
+            payload["tables"][tbl] = []
+            continue
+        out = []
+        for r in rows:
+            d = dict(r)
+            if tbl == "settings" and d.get("key") == "admin_pw":
+                d["value"] = "(excluded)"
+            for k, v in list(d.items()):
+                if isinstance(v, (bytes, memoryview)):
+                    d[k] = {"__b64__": b64.b64encode(bytes(v)).decode()}
+                elif isinstance(v, (datetime, date)):
+                    d[k] = v.isoformat()
+            out.append(d)
+        payload["tables"][tbl] = out
+    return payload
+
+
+@app.route("/admin/backup")
+@admin_required
+def admin_backup():
+    counts = _backup_counts()
+    total = sum(v for v in counts.values() if v)
+    return render_template("admin_backup.html", uni=UNI_NAME,
+                           title=PORTAL_TITLE, counts=counts, total=total)
+
+
+@app.route("/admin/backup/download")
+@admin_required
+def admin_backup_download():
+    payload = _backup_payload()
+    log_activity(current_admin()["name"], "backup_download",
+                 "Full JSON backup downloaded")
+    fname = "das-backup-" + datetime.now().strftime("%Y%m%d-%H%M") + ".json"
+    return Response(_json.dumps(payload, indent=1),
+                    mimetype="application/json",
+                    headers={"Content-Disposition":
+                             f"attachment; filename={fname}"})
 
 
 # ==================== ACTIVITY LOG (admin) ====================
@@ -3767,11 +4171,16 @@ def inject_admin_counts():
             except Exception:
                 ac = 0
             return {"pending_uploads": n, "new_vivas": nv,
-                    "trash_count": tc, "archive_count": ac}
+                    "trash_count": tc, "archive_count": ac,
+                    "admin_name": session.get("admin_name")
+                    or "Administrator",
+                    "admin_role": session.get("admin_role")
+                    or "Admin Portal"}
         except Exception:
             pass
     return {"pending_uploads": 0, "new_vivas": 0, "trash_count": 0,
-            "archive_count": 0}
+            "archive_count": 0, "admin_name": "Administrator",
+            "admin_role": "Admin Portal"}
 
 
 # ==================== DEPARTMENT PORTAL ====================
@@ -3808,15 +4217,24 @@ def dept_login():
     if request.method == "POST":
         email = request.form.get("email", "").strip().lower()
         password = request.form.get("password", "")
+        if _login_blocked("dept"):
+            return render_template(
+                "dept_login.html", uni=UNI_NAME, title=PORTAL_TITLE,
+                error="Too many failed attempts. Please wait a few"
+                      " minutes and try again.")
         row = get_db().fetchone(
             "SELECT * FROM departments WHERE email=?", (email,))
         if row and check_password_hash(dict(row)["password_hash"], password):
             d = dict(row)
             session["dept_id"] = d["id"]
             session.permanent = bool(request.form.get("remember"))
+            _login_ok("dept")
             log_activity(f"dept:{d['name']}", "login",
                          "department portal sign-in")
             return redirect(url_for("dept_dashboard"))
+        _login_fail("dept")
+        log_activity("unknown", "login_failed",
+                     f"department portal failed sign-in for {email}")
         return render_template("dept_login.html", uni=UNI_NAME,
                                title=PORTAL_TITLE,
                                error="Invalid email or password.")
@@ -4765,6 +5183,8 @@ def admin_import_upload():
         msg += "." if skipped <= len(skip_notes) else "..."
     if first_error and skipped:
         msg += f" (first error: {first_error})"
+    _sync_missing_dimensions(db)
+    db.commit()
     log_activity("admin", "import",
                  f"{added} added, {skipped} skipped via admin import")
     flash(msg)
@@ -4847,6 +5267,13 @@ def admin_student_new():
 @app.route("/admin/student/<int:sid>")
 @admin_required
 def admin_student_profile(sid):
+    try:
+        _db = get_db()
+        wf.sync_student_dimensions(_db, sid, actor="system",
+                                   actor_role="System")
+        _db.commit()
+    except Exception:
+        pass
     s = get_student(sid)
     if not s:
         return render_template("notfound.html", uni=UNI_NAME, title=PORTAL_TITLE,
@@ -5389,6 +5816,11 @@ def student_login():
     if session.get("student_id"):
         return redirect(url_for("student_dashboard"))
     error = None
+    if request.method == "POST" and _login_blocked("student"):
+        error = ("Too many failed attempts. Please wait a few minutes"
+                 " and try again.")
+        return render_template("student_login.html", uni=UNI_NAME,
+                               title=PORTAL_TITLE, error=error)
     if request.method == "POST":
         reg_no = request.form.get("reg_no", "").strip()
         pw = request.form.get("password", "")
@@ -5411,7 +5843,11 @@ def student_login():
         if ok:
             session["student_id"] = s["id"]
             session.permanent = bool(request.form.get("remember"))
+            _login_ok("student")
             return redirect(url_for("student_dashboard"))
+        _login_fail("student")
+        log_activity("unknown", "login_failed",
+                     f"student portal failed sign-in for {reg_no}")
         error = "Wrong Registration No. or password."
     return render_template("student_login.html", uni=UNI_NAME, title=PORTAL_TITLE,
                            error=error)
