@@ -55,7 +55,7 @@
           <td>{{ u.dept_name }}</td>
           <td>{{ u.file_name }}</td>
           <td>{{ u.row_count }}</td>
-          <td>{% if u.status == 'approved' %}<span class="pill q">Approved</span> <span class="hint">{{ u.imported_count or 0 }} imported</span>{% else %}<span class="pill nq">Returned</span>{% endif %}{% if u.reviewed_by %}<br><span class="hint">by {{ u.reviewed_by }}</span>{% endif %}</td>
+          <td>{% if u.status == 'approved' %}<span class="pill q">Approved</span> {% if u.imported_count is not none %}<span class="hint">{{ u.imported_count }} imported</span>{% endif %}{% else %}<span class="pill nq">Returned</span>{% endif %}{% if u.reviewed_by %}<br><span class="hint">by {{ u.reviewed_by }}</span>{% endif %}</td>
           <td>{{ u.admin_comment or '—' }}</td>
           <td class="nowrap">{{ u.reviewed_at or '—' }}</td>
         </tr>

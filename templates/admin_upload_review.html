@@ -19,7 +19,7 @@
     <span class="sp-chip">Errors: <strong>{{ summary.errors }}</strong></span>
     <span class="sp-chip">Possible duplicates: <strong>{{ summary.dups }}</strong></span>
     {% if u.status == 'pending' %}<span class="sp-chip">Decisions pending: <strong>{{ summary.pending }}</strong></span>{% endif %}
-    {% if u.status == 'approved' %}<span class="sp-chip">Imported: <strong>{{ u.imported_count or 0 }}</strong></span>
+    {% if u.status == 'approved' and u.imported_count is not none %}<span class="sp-chip">Imported: <strong>{{ u.imported_count }}</strong></span>
     <span class="sp-chip">Reviewed by: <strong>{{ u.reviewed_by or '—' }}</strong></span>{% endif %}
   </div>
   {% if u.parse_error %}<p class="form-error" style="margin-top:12px">Parse problem: {{ u.parse_error }}</p>{% endif %}
@@ -80,7 +80,7 @@
     </table>
   </div>
   {% else %}
-  <div class="empty"><p>No parsed rows for this batch.</p></div>
+  <div class="empty"><p>No parsed rows for this batch.{% if u.status == 'pending' %} This file arrived before row-level review existed — press <strong>Approve &amp; Import</strong> once below and its rows will be parsed for your review before anything is imported.{% else %} This batch was reviewed before row-level records were kept, so no row details are stored for it.{% endif %}</p></div>
   {% endif %}
   {% if u.status == 'pending' %}
   <div class="row" style="margin-top:14px">
