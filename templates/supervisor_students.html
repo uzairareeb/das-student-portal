@@ -1,0 +1,34 @@
+{% extends "supervisor_base.html" %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <h2>My Students</h2>
+    <p>Students currently assigned to you by the DAS office</p>
+  </div>
+</div>
+<div class="card section">
+  {% if students %}
+  <div class="table-scroll">
+    <table class="data-table">
+      <thead><tr><th>Student</th><th>Reg. No.</th><th>Degree</th><th>Session</th><th>Department</th><th>Your Role</th><th>Status</th><th></th></tr></thead>
+      <tbody>
+        {% for st in students %}
+        <tr>
+          <td>{{ st.name }}</td>
+          <td class="nowrap">{{ st.reg_no }}</td>
+          <td>{{ st.degree or '—' }}</td>
+          <td>{{ st.session or '—' }}</td>
+          <td>{{ st.department or '—' }}</td>
+          <td>{{ st.assignment_role }}</td>
+          <td>{{ st.status or '—' }}</td>
+          <td><a class="btn ghost sm" href="{{ url_for('supervisor_student', sid=st.id) }}">Open</a></td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="empty"><p>No students are assigned to you yet.</p></div>
+  {% endif %}
+</div>
+{% endblock %}

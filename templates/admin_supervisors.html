@@ -1,0 +1,75 @@
+{% extends "admin_base.html" %}
+{% block container_extra %} wide{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <h2>Supervisors</h2>
+    <p>Supervisor and co-supervisor accounts for the Supervisor Portal. Assignments are made from each student's Supervisor tab.</p>
+  </div>
+</div>
+
+<div class="card section">
+  <h3 style="margin-top:0">Add supervisor account</h3>
+  <form method="post" class="form-grid">
+    <div>
+      <label class="f-label" for="sv-name">Full name</label>
+      <input id="sv-name" name="name" required placeholder="e.g. Dr. Ayesha Khan">
+    </div>
+    <div>
+      <label class="f-label" for="sv-email">Email (login)</label>
+      <input id="sv-email" name="email" type="email" required placeholder="name@cuvas.edu.pk">
+    </div>
+    <div>
+      <label class="f-label" for="sv-pass">Password (min 6)</label>
+      <input id="sv-pass" name="password" type="text" required placeholder="Temporary password">
+    </div>
+    <div>
+      <label class="f-label" for="sv-desig">Designation</label>
+      <input id="sv-desig" name="designation" placeholder="e.g. Associate Professor">
+    </div>
+    <div>
+      <label class="f-label" for="sv-dept">Department</label>
+      <input id="sv-dept" name="department" list="deptNames" placeholder="Department">
+      <datalist id="deptNames">{% for d in departments %}<option value="{{ d }}">{% endfor %}</datalist>
+    </div>
+    <div>
+      <label class="f-label" for="sv-phone">Phone</label>
+      <input id="sv-phone" name="phone" placeholder="Optional">
+    </div>
+    <div>
+      <button type="submit" class="btn primary">Create Account</button>
+    </div>
+  </form>
+</div>
+
+<div class="card section">
+  <h3 style="margin-top:0">Supervisor Accounts ({{ sups|length }})</h3>
+  {% if sups %}
+  {% for sp in sups %}
+  <div class="card" style="padding:14px;margin-bottom:12px">
+    <div class="row" style="justify-content:space-between;flex-wrap:wrap;gap:8px">
+      <div><strong>{{ sp.name }}</strong> <span class="hint">{{ sp.email }}</span>
+        <span class="hint">&middot; {{ sp.students_n }} current student(s)</span>
+        {% if not sp.is_active %}<span class="pill nq">Inactive</span>{% endif %}
+        <div class="hint">Last login: {{ sp.last_login_at or 'never' }}</div>
+      </div>
+    </div>
+    <form method="post" action="{{ url_for('admin_supervisor_save', spid=sp.id) }}" class="row" style="gap:8px;flex-wrap:wrap;margin-top:10px">
+      <input name="name" value="{{ sp.name }}" required>
+      <input name="designation" value="{{ sp.designation or '' }}" placeholder="Designation">
+      <input name="department" value="{{ sp.department or '' }}" placeholder="Department" list="deptNames">
+      <input name="phone" value="{{ sp.phone or '' }}" placeholder="Phone">
+      <label class="f-label" style="margin:0"><input type="checkbox" name="is_active" {% if sp.is_active %}checked{% endif %}> Active</label>
+      <button type="submit" class="btn ghost sm">Save</button>
+    </form>
+    <form method="post" action="{{ url_for('admin_supervisor_password', spid=sp.id) }}" class="row" style="gap:8px;margin-top:8px">
+      <input name="password" type="text" placeholder="New password (min 6)" required>
+      <button type="submit" class="btn ghost sm">Set Password</button>
+    </form>
+  </div>
+  {% endfor %}
+  {% else %}
+  <div class="empty"><p>No supervisor accounts yet — create the first one above.</p></div>
+  {% endif %}
+</div>
+{% endblock %}

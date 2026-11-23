@@ -361,6 +361,7 @@ def init_db():
     _seed_reference_data(db)
     _create_intake_tables(db)
     _create_document_tables(db)
+    _create_phase4_tables(db)
     # Admin password: the env var is the source of truth. Only overwrite
     # the stored hash when the env var is actually set, so a missing env
     # var can never silently downgrade the live password to a fallback.
@@ -961,6 +962,136 @@ def _store_document(db, sid, doc_label, file_name, data, uploaded_by,
             (sid, doc_label, file_name, data, uploaded_by, now,
              doc_type_id, version, checksum)).lastrowid
     return new_id, version
+
+
+ASRB_STATUSES = ["Not Submitted", "Submitted to ASRB", "Scheduled",
+                 "Approved", "Approved with Changes", "Deferred",
+                 "Rejected"]
+
+
+def _create_phase4_tables(db):
+    """Phase 4 (Central System): academic records, supervisors and
+    their assignments, progress reports, and synopsis/ASRB records."""
+    id_def = "id SERIAL PRIMARY KEY" if USE_PG else \
+        "id INTEGER PRIMARY KEY AUTOINCREMENT"
+    db.execute(f"""
+        CREATE TABLE IF NOT EXISTS supervisors (
+            {id_def}, name TEXT NOT NULL, email TEXT UNIQUE NOT NULL,
+            password_hash TEXT NOT NULL, designation TEXT, department TEXT,
+            phone TEXT, is_active INTEGER DEFAULT 1, created_at TEXT,
+            last_login_at TEXT
+        )
+    """)
+    db.execute(f"""
+        CREATE TABLE IF NOT EXISTS supervisor_assignments (
+            {id_def},
+            student_id INTEGER NOT NULL REFERENCES students(id),
+            supervisor_id INTEGER NOT NULL REFERENCES supervisors(id),
+            role TEXT DEFAULT 'Supervisor', assigned_date TEXT,
+            ended_date TEXT, is_current INTEGER DEFAULT 1,
+            assigned_by TEXT, remarks TEXT, created_at TEXT
+        )
+    """)
+    db.execute(f"""
+        CREATE TABLE IF NOT EXISTS supervisor_notifications (
+            {id_def},
+            supervisor_id INTEGER NOT NULL REFERENCES supervisors(id),
+            kind TEXT, title TEXT, message TEXT, link TEXT,
+            is_read INTEGER DEFAULT 0, created_at TEXT
+        )
+    """)
+    db.execute(f"""
+        CREATE TABLE IF NOT EXISTS academic_records (
+            {id_def},
+            student_id INTEGER NOT NULL REFERENCES students(id),
+            semester_no INTEGER, term TEXT, status TEXT DEFAULT 'Enrolled',
+            gpa REAL, cgpa REAL, remarks TEXT, recorded_by TEXT,
+            created_at TEXT
+        )
+    """)
+    db.execute(f"""
+        CREATE TABLE IF NOT EXISTS comprehensive_exams (
+            {id_def},
+            student_id INTEGER NOT NULL REFERENCES students(id),
+            exam_date TEXT, result TEXT DEFAULT 'Pending', remarks TEXT,
+            recorded_by TEXT, created_at TEXT
+        )
+    """)
+    db.execute(f"""
+        CREATE TABLE IF NOT EXISTS progress_reports (
+            {id_def},
+            student_id INTEGER NOT NULL REFERENCES students(id),
+            supervisor_id INTEGER REFERENCES supervisors(id),
+            period TEXT, report_date TEXT,
+            progress TEXT DEFAULT 'Satisfactory', remarks TEXT,
+            status TEXT DEFAULT 'Submitted', das_remarks TEXT,
+            created_at TEXT, reviewed_at TEXT
+        )
+    """)
+    db.execute(f"""
+        CREATE TABLE IF NOT EXISTS synopsis_records (
+            {id_def},
+            student_id INTEGER NOT NULL REFERENCES students(id),
+            title TEXT, submitted_date TEXT,
+            endorsed_by TEXT, endorsed_at TEXT,
+            asrb_status TEXT DEFAULT 'Not Submitted',
+            meeting_no TEXT, meeting_date TEXT, decision TEXT,
+            minutes_ref TEXT, approval_letter_ref TEXT, remarks TEXT,
+            created_at TEXT, updated_at TEXT
+        )
+    """)
+
+
+def notify_supervisor(supervisor_id, kind, title, message="", link=""):
+    """Create an in-portal notification for a supervisor."""
+    try:
+        get_db().execute(
+            "INSERT INTO supervisor_notifications (supervisor_id, kind,"
+            " title, message, link, created_at) VALUES (?,?,?,?,?,?)",
+            (supervisor_id, kind, title, message, link,
+             datetime.now().strftime("%Y-%m-%d %H:%M")))
+        get_db().commit()
+    except Exception:
+        pass
+
+
+def supervisor_unread_count(supervisor_id):
+    try:
+        row = get_db().fetchone(
+            "SELECT COUNT(*) AS n FROM supervisor_notifications"
+            " WHERE supervisor_id=? AND COALESCE(is_read,0)=0",
+            (supervisor_id,))
+        return (row["n"] if isinstance(row, dict) else row[0]) if row else 0
+    except Exception:
+        return 0
+
+
+def current_assignments(db, student_id):
+    """Current supervisor assignments for a student, with names."""
+    return [dict(r) for r in db.execute(
+        "SELECT a.*, s.name AS supervisor_name, s.designation,"
+        " s.department AS supervisor_department, s.email AS supervisor_email"
+        " FROM supervisor_assignments a"
+        " JOIN supervisors s ON s.id = a.supervisor_id"
+        " WHERE a.student_id=? AND a.is_current=1 ORDER BY a.role DESC",
+        (student_id,)).fetchall()]
+
+
+def supervisor_students(db, supervisor_id):
+    """Students currently assigned to a supervisor."""
+    return [dict(r) for r in db.execute(
+        "SELECT st.*, a.role AS assignment_role"
+        " FROM supervisor_assignments a"
+        " JOIN students st ON st.id = a.student_id"
+        " WHERE a.supervisor_id=? AND a.is_current=1"
+        " ORDER BY st.name", (supervisor_id,)).fetchall()]
+
+
+def synopsis_of(db, student_id):
+    row = db.fetchone(
+        "SELECT * FROM synopsis_records WHERE student_id=?"
+        " ORDER BY id DESC", (student_id,))
+    return dict(row) if row else None
 
 
 def _migrate_add_archived(db):
@@ -4538,6 +4669,15 @@ def _inject_dept_notif():
                 " FROM admin_notifications ORDER BY id DESC LIMIT 8")]
             return {"admin_unread": admin_unread_count(),
                     "admin_recent_notes": notes}
+        if request.path.startswith("/supervisor") \
+                and session.get("supervisor_id"):
+            spnotes = [dict(r) for r in get_db().fetchall(
+                "SELECT id, kind, title, message, link, created_at"
+                " FROM supervisor_notifications WHERE supervisor_id=?"
+                " ORDER BY id DESC LIMIT 8", (session["supervisor_id"],))]
+            return {"supervisor_unread":
+                    supervisor_unread_count(session["supervisor_id"]),
+                    "supervisor_recent_notes": spnotes}
         if request.path.startswith("/student") and session.get("student_id"):
             snotes = [dict(r) for r in get_db().fetchall(
                 "SELECT id, kind, title, message, link, created_at"
@@ -6580,6 +6720,646 @@ def admin_student_timeline(sid):
                            title=PORTAL_TITLE, s=s, events=events)
 
 
+
+# ==================== SUPERVISORS + ACADEMIC (Phase 4) ====================
+
+@app.route("/admin/supervisors", methods=["GET", "POST"])
+@admin_required
+def admin_supervisors():
+    db = get_db()
+    if request.method == "POST":
+        name = (request.form.get("name") or "").strip()
+        email = (request.form.get("email") or "").strip().lower()
+        password = request.form.get("password") or ""
+        if not name or not email or len(password) < 6:
+            flash("Name, email and a password of at least 6 characters"
+                  " are required.")
+            return redirect(url_for("admin_supervisors"))
+        if db.fetchone("SELECT id FROM supervisors WHERE email=?",
+                       (email,)):
+            flash("A supervisor with this email already exists.")
+            return redirect(url_for("admin_supervisors"))
+        db.execute(
+            "INSERT INTO supervisors (name, email, password_hash,"
+            " designation, department, phone, is_active, created_at)"
+            " VALUES (?, ?, ?, ?, ?, ?, 1, ?)",
+            (name, email, generate_password_hash(password),
+             (request.form.get("designation") or "").strip(),
+             (request.form.get("department") or "").strip(),
+             (request.form.get("phone") or "").strip(),
+             datetime.now().strftime("%Y-%m-%d %H:%M")))
+        db.commit()
+        log_activity(current_admin()["name"], "supervisor_add",
+                     f"{name} <{email}>", entity_type="supervisor")
+        flash(f"Supervisor account created for {name}.")
+        return redirect(url_for("admin_supervisors"))
+    sups = []
+    for r in db.execute("SELECT * FROM supervisors ORDER BY name").fetchall():
+        d = dict(r)
+        n = db.fetchone(
+            "SELECT COUNT(*) AS n FROM supervisor_assignments"
+            " WHERE supervisor_id=? AND is_current=1", (d["id"],))
+        d["students_n"] = (n["n"] if isinstance(n, dict) else n[0]) or 0
+        sups.append(d)
+    return render_template("admin_supervisors.html", uni=UNI_NAME,
+                           title=PORTAL_TITLE, sups=sups,
+                           departments=dept_names())
+
+
+@app.route("/admin/supervisors/<int:spid>/save", methods=["POST"])
+@admin_required
+def admin_supervisor_save(spid):
+    db = get_db()
+    db.execute(
+        "UPDATE supervisors SET name=?, designation=?, department=?,"
+        " phone=?, is_active=? WHERE id=?",
+        ((request.form.get("name") or "").strip(),
+         (request.form.get("designation") or "").strip(),
+         (request.form.get("department") or "").strip(),
+         (request.form.get("phone") or "").strip(),
+         1 if request.form.get("is_active") else 0, spid))
+    db.commit()
+    log_activity(current_admin()["name"], "supervisor_save",
+                 f"supervisor #{spid}", entity_type="supervisor",
+                 entity_id=spid)
+    flash("Supervisor updated.")
+    return redirect(url_for("admin_supervisors"))
+
+
+@app.route("/admin/supervisors/<int:spid>/password", methods=["POST"])
+@admin_required
+def admin_supervisor_password(spid):
+    pw = request.form.get("password") or ""
+    if len(pw) < 6:
+        flash("Password must be at least 6 characters.")
+        return redirect(url_for("admin_supervisors"))
+    get_db().execute("UPDATE supervisors SET password_hash=? WHERE id=?",
+                     (generate_password_hash(pw), spid))
+    get_db().commit()
+    log_activity(current_admin()["name"], "supervisor_password",
+                 f"password reset for supervisor #{spid}",
+                 entity_type="supervisor", entity_id=spid)
+    flash("Supervisor password updated.")
+    return redirect(url_for("admin_supervisors"))
+
+
+@app.route("/admin/student/<int:sid>/academic")
+@admin_required
+def admin_student_academic(sid):
+    s = _tab_student(sid)
+    if not s:
+        return render_template("notfound.html", uni=UNI_NAME,
+                               title=PORTAL_TITLE,
+                               message="Student not found."), 404
+    db = get_db()
+    semesters = [dict(r) for r in db.execute(
+        "SELECT * FROM academic_records WHERE student_id=?"
+        " ORDER BY semester_no, id", (sid,)).fetchall()]
+    comps = [dict(r) for r in db.execute(
+        "SELECT * FROM comprehensive_exams WHERE student_id=?"
+        " ORDER BY id DESC", (sid,)).fetchall()]
+    return render_template(
+        "admin_student_academic.html", uni=UNI_NAME, title=PORTAL_TITLE,
+        s=s, semesters=semesters, comps=comps, syn=synopsis_of(db, sid),
+        asrb_statuses=ASRB_STATUSES,
+        today=datetime.now().strftime("%Y-%m-%d"))
+
+
+@app.route("/admin/student/<int:sid>/semester", methods=["POST"])
+@admin_required
+def admin_student_semester_add(sid):
+    db = get_db()
+    try:
+        sem_no = int(request.form.get("semester_no") or 0) or None
+    except ValueError:
+        sem_no = None
+
+    def _num(key):
+        try:
+            return float(request.form.get(key)) \
+                if (request.form.get(key) or "").strip() else None
+        except ValueError:
+            return None
+
+    db.execute(
+        "INSERT INTO academic_records (student_id, semester_no, term,"
+        " status, gpa, cgpa, remarks, recorded_by, created_at)"
+        " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        (sid, sem_no, (request.form.get("term") or "").strip(),
+         pick(request.form.get("status"),
+              ["Enrolled", "Completed", "Repeat", "Dropped"], "Enrolled"),
+         _num("gpa"), _num("cgpa"),
+         (request.form.get("remarks") or "").strip(),
+         current_admin()["name"],
+         datetime.now().strftime("%Y-%m-%d %H:%M")))
+    db.commit()
+    log_activity(current_admin()["name"], "semester_add",
+                 f"semester {sem_no} for student id={sid}",
+                 entity_type="student", entity_id=sid)
+    flash("Semester record added.")
+    return redirect(url_for("admin_student_academic", sid=sid))
+
+
+@app.route("/admin/semester/<int:rid>/delete", methods=["POST"])
+@admin_required
+def admin_semester_delete(rid):
+    db = get_db()
+    row = db.fetchone("SELECT student_id FROM academic_records"
+                      " WHERE id=?", (rid,))
+    if not row:
+        return redirect(url_for("admin_students"))
+    sid = row["student_id"] if isinstance(row, dict) else row[0]
+    db.execute("DELETE FROM academic_records WHERE id=?", (rid,))
+    db.commit()
+    flash("Semester record removed.")
+    return redirect(url_for("admin_student_academic", sid=sid))
+
+
+@app.route("/admin/student/<int:sid>/comprehensive", methods=["POST"])
+@admin_required
+def admin_student_comprehensive_add(sid):
+    db = get_db()
+    db.execute(
+        "INSERT INTO comprehensive_exams (student_id, exam_date, result,"
+        " remarks, recorded_by, created_at) VALUES (?, ?, ?, ?, ?, ?)",
+        (sid, (request.form.get("exam_date") or "").strip(),
+         pick(request.form.get("result"),
+              ["Pending", "Pass", "Fail"], "Pending"),
+         (request.form.get("remarks") or "").strip(),
+         current_admin()["name"],
+         datetime.now().strftime("%Y-%m-%d %H:%M")))
+    db.commit()
+    log_activity(current_admin()["name"], "comprehensive_add",
+                 f"comprehensive exam for student id={sid}",
+                 entity_type="student", entity_id=sid)
+    flash("Comprehensive exam record added.")
+    return redirect(url_for("admin_student_academic", sid=sid))
+
+
+@app.route("/admin/student/<int:sid>/synopsis", methods=["POST"])
+@admin_required
+def admin_student_synopsis_save(sid):
+    """Create/update the student's synopsis record (title + submission).
+    ASRB outcomes are recorded separately — saving a title never
+    implies an ASRB decision."""
+    db = get_db()
+    syn = synopsis_of(db, sid)
+    now = datetime.now().strftime("%Y-%m-%d %H:%M")
+    title = (request.form.get("title") or "").strip()
+    submitted = (request.form.get("submitted_date") or "").strip()
+    status = pick(request.form.get("asrb_status"), ASRB_STATUSES,
+                  syn["asrb_status"] if syn else "Not Submitted")
+    if syn:
+        db.execute(
+            "UPDATE synopsis_records SET title=?, submitted_date=?,"
+            " asrb_status=?, updated_at=? WHERE id=?",
+            (title, submitted, status, now, syn["id"]))
+    else:
+        db.execute(
+            "INSERT INTO synopsis_records (student_id, title,"
+            " submitted_date, asrb_status, created_at, updated_at)"
+            " VALUES (?, ?, ?, ?, ?, ?)",
+            (sid, title, submitted, status, now, now))
+    db.commit()
+    log_activity(current_admin()["name"], "synopsis_save",
+                 f"synopsis for student id={sid} ({status})",
+                 entity_type="student", entity_id=sid)
+    flash("Synopsis record saved.")
+    return redirect(url_for("admin_student_academic", sid=sid))
+
+
+@app.route("/admin/synopsis/<int:synid>/asrb", methods=["POST"])
+@admin_required
+def admin_synopsis_asrb(synid):
+    """Record the ASRB meeting outcome for a synopsis."""
+    db = get_db()
+    row = db.fetchone("SELECT * FROM synopsis_records WHERE id=?",
+                      (synid,))
+    if not row:
+        flash("Synopsis record not found.")
+        return redirect(url_for("admin_asrb"))
+    syn = dict(row)
+    status = pick(request.form.get("asrb_status"), ASRB_STATUSES,
+                  syn["asrb_status"])
+    db.execute(
+        "UPDATE synopsis_records SET asrb_status=?, meeting_no=?,"
+        " meeting_date=?, decision=?, minutes_ref=?,"
+        " approval_letter_ref=?, remarks=?, updated_at=? WHERE id=?",
+        (status, (request.form.get("meeting_no") or "").strip(),
+         (request.form.get("meeting_date") or "").strip(),
+         (request.form.get("decision") or "").strip(),
+         (request.form.get("minutes_ref") or "").strip(),
+         (request.form.get("approval_letter_ref") or "").strip(),
+         (request.form.get("remarks") or "").strip(),
+         datetime.now().strftime("%Y-%m-%d %H:%M"), synid))
+    wf.record_event(db, syn["student_id"], "thesis", "",
+                    f"ASRB: {status}", current_admin()["name"],
+                    current_admin()["role"],
+                    request.form.get("decision") or "")
+    db.commit()
+    sid = syn["student_id"]
+    log_activity(current_admin()["name"], "asrb_outcome",
+                 f"synopsis #{synid} -> {status} (student id={sid})",
+                 entity_type="student", entity_id=sid, new_value=status)
+    s = get_student(sid)
+    if status in ("Approved", "Approved with Changes", "Deferred",
+                  "Rejected"):
+        notify_student(
+            sid, "synopsis", f"Synopsis {status}",
+            f"ASRB meeting {(request.form.get('meeting_no') or '').strip()}"
+            f" decided: {status}."
+            + (f" Decision: {request.form.get('decision')}" if
+               (request.form.get("decision") or "").strip() else ""),
+            url_for("student_dashboard"))
+        for a in current_assignments(db, sid):
+            notify_supervisor(
+                a["supervisor_id"], "synopsis",
+                f"Synopsis {status} — {s.get('name') if s else sid}",
+                f"ASRB outcome for {s.get('name') if s else 'student'}"
+                f" ({s.get('reg_no') if s else ''}): {status}.",
+                url_for("supervisor_student", sid=sid))
+    flash(f"ASRB outcome recorded: {status}.")
+    if request.form.get("back") == "academic":
+        return redirect(url_for("admin_student_academic", sid=sid))
+    return redirect(url_for("admin_asrb"))
+
+
+@app.route("/admin/asrb")
+@admin_required
+def admin_asrb():
+    db = get_db()
+    rows = [dict(r) for r in db.execute(
+        "SELECT sr.*, st.name AS student_name, st.reg_no, st.degree,"
+        " st.session AS student_session FROM synopsis_records sr"
+        " JOIN students st ON st.id = sr.student_id"
+        " ORDER BY sr.updated_at DESC, sr.id DESC").fetchall()]
+    return render_template("admin_asrb.html", uni=UNI_NAME,
+                           title=PORTAL_TITLE, rows=rows,
+                           asrb_statuses=ASRB_STATUSES)
+
+
+@app.route("/admin/student/<int:sid>/supervisor")
+@admin_required
+def admin_student_supervisor(sid):
+    s = _tab_student(sid)
+    if not s:
+        return render_template("notfound.html", uni=UNI_NAME,
+                               title=PORTAL_TITLE,
+                               message="Student not found."), 404
+    db = get_db()
+    history = [dict(r) for r in db.execute(
+        "SELECT a.*, sp.name AS supervisor_name"
+        " FROM supervisor_assignments a"
+        " JOIN supervisors sp ON sp.id = a.supervisor_id"
+        " WHERE a.student_id=? ORDER BY a.is_current DESC, a.id DESC",
+        (sid,)).fetchall()]
+    sups = [dict(r) for r in db.execute(
+        "SELECT * FROM supervisors WHERE is_active=1 ORDER BY name"
+    ).fetchall()]
+    reports = [dict(r) for r in db.execute(
+        "SELECT pr.*, sp.name AS supervisor_name FROM progress_reports pr"
+        " LEFT JOIN supervisors sp ON sp.id = pr.supervisor_id"
+        " WHERE pr.student_id=? ORDER BY pr.id DESC", (sid,)).fetchall()]
+    return render_template(
+        "admin_student_supervisor.html", uni=UNI_NAME, title=PORTAL_TITLE,
+        s=s, current=current_assignments(db, sid), history=history,
+        sups=sups, reports=reports, syn=synopsis_of(db, sid),
+        today=datetime.now().strftime("%Y-%m-%d"))
+
+
+@app.route("/admin/student/<int:sid>/assign", methods=["POST"])
+@admin_required
+def admin_student_assign(sid):
+    """Assign (or change) a supervisor. The previous assignment for the
+    same role is ended, never deleted — history is preserved."""
+    db = get_db()
+    try:
+        sup_id = int(request.form.get("supervisor_id") or 0)
+    except ValueError:
+        sup_id = 0
+    sup = db.fetchone("SELECT * FROM supervisors WHERE id=?", (sup_id,))
+    if not sup:
+        flash("Please choose a supervisor.")
+        return redirect(url_for("admin_student_supervisor", sid=sid))
+    sup = dict(sup)
+    role = pick(request.form.get("role"),
+                ["Supervisor", "Co-supervisor"], "Supervisor")
+    assigned_date = (request.form.get("assigned_date") or "").strip() \
+        or datetime.now().strftime("%Y-%m-%d")
+    db.execute(
+        "UPDATE supervisor_assignments SET is_current=0, ended_date=?"
+        " WHERE student_id=? AND role=? AND is_current=1",
+        (assigned_date, sid, role))
+    db.execute(
+        "INSERT INTO supervisor_assignments (student_id, supervisor_id,"
+        " role, assigned_date, is_current, assigned_by, remarks,"
+        " created_at) VALUES (?, ?, ?, ?, 1, ?, ?, ?)",
+        (sid, sup_id, role, assigned_date, current_admin()["name"],
+         (request.form.get("remarks") or "").strip(),
+         datetime.now().strftime("%Y-%m-%d %H:%M")))
+    wf.record_event(db, sid, "academic", "",
+                    f"{role} assigned: {sup['name']}",
+                    current_admin()["name"], current_admin()["role"])
+    db.commit()
+    s = get_student(sid)
+    log_activity(current_admin()["name"], "supervisor_assign",
+                 f"{role} {sup['name']} -> {s.get('name') if s else sid}",
+                 entity_type="student", entity_id=sid)
+    notify_supervisor(sup_id, "assignment",
+                      f"New {role.lower()} assignment",
+                      f"You are now {role} of "
+                      f"{s.get('name') if s else 'a student'}"
+                      f" ({s.get('reg_no') if s else ''}).",
+                      url_for("supervisor_student", sid=sid))
+    notify_student(sid, "supervisor", f"{role} assigned",
+                   f"Your {role.lower()} is {sup['name']}"
+                   f" ({sup.get('designation') or 'Supervisor'}).",
+                   url_for("student_dashboard"))
+    flash(f"{role} assigned: {sup['name']}.")
+    return redirect(url_for("admin_student_supervisor", sid=sid))
+
+
+@app.route("/admin/assignment/<int:aid>/end", methods=["POST"])
+@admin_required
+def admin_assignment_end(aid):
+    db = get_db()
+    row = db.fetchone("SELECT * FROM supervisor_assignments WHERE id=?",
+                      (aid,))
+    if not row:
+        return redirect(url_for("admin_students"))
+    a = dict(row)
+    db.execute(
+        "UPDATE supervisor_assignments SET is_current=0, ended_date=?"
+        " WHERE id=?",
+        (datetime.now().strftime("%Y-%m-%d"), aid))
+    db.commit()
+    log_activity(current_admin()["name"], "supervisor_end",
+                 f"assignment #{aid} ended (student id={a['student_id']})",
+                 entity_type="student", entity_id=a["student_id"])
+    flash("Assignment ended.")
+    return redirect(url_for("admin_student_supervisor",
+                            sid=a["student_id"]))
+
+
+@app.route("/admin/progress-report/<int:rid>/review", methods=["POST"])
+@admin_required
+def admin_progress_review(rid):
+    db = get_db()
+    row = db.fetchone("SELECT * FROM progress_reports WHERE id=?", (rid,))
+    if not row:
+        return redirect(url_for("admin_students"))
+    r = dict(row)
+    status = pick(request.form.get("status"),
+                  ["Reviewed", "Returned"], "Reviewed")
+    db.execute(
+        "UPDATE progress_reports SET status=?, das_remarks=?,"
+        " reviewed_at=? WHERE id=?",
+        (status, (request.form.get("das_remarks") or "").strip(),
+         datetime.now().strftime("%Y-%m-%d %H:%M"), rid))
+    db.commit()
+    log_activity(current_admin()["name"], "progress_review",
+                 f"progress report #{rid} -> {status}",
+                 entity_type="student", entity_id=r["student_id"],
+                 new_value=status)
+    if r.get("supervisor_id"):
+        notify_supervisor(r["supervisor_id"], "progress",
+                          f"Progress report {status.lower()}",
+                          f"Your progress report ({r.get('period')}) was"
+                          f" marked {status} by DAS.",
+                          url_for("supervisor_student",
+                                  sid=r["student_id"]))
+    notify_student(r["student_id"], "progress",
+                   f"Progress report {status.lower()}",
+                   f"Your progress report for {r.get('period')} was"
+                   f" marked {status} by DAS.",
+                   url_for("student_dashboard"))
+    flash(f"Progress report marked {status}.")
+    return redirect(url_for("admin_student_supervisor",
+                            sid=r["student_id"]))
+
+
+
+# ==================== SUPERVISOR PORTAL (Phase 4) ====================
+
+def supervisor_required(f):
+    @wraps(f)
+    def wrapper(*a, **kw):
+        if not session.get("supervisor_id"):
+            return redirect(url_for("supervisor_login"))
+        return f(*a, **kw)
+    return wrapper
+
+
+def current_supervisor():
+    row = get_db().fetchone("SELECT * FROM supervisors WHERE id=?",
+                            (session.get("supervisor_id"),))
+    return dict(row) if row else None
+
+
+@app.route("/supervisor", methods=["GET", "POST"])
+def supervisor_login():
+    if session.get("supervisor_id"):
+        return redirect(url_for("supervisor_dashboard"))
+    if request.method == "POST":
+        email = request.form.get("email", "").strip().lower()
+        password = request.form.get("password", "")
+        if _login_blocked("supervisor"):
+            return render_template(
+                "supervisor_login.html", uni=UNI_NAME, title=PORTAL_TITLE,
+                error="Too many failed attempts. Please wait a few"
+                      " minutes and try again.")
+        row = get_db().fetchone(
+            "SELECT * FROM supervisors WHERE email=? AND is_active=1",
+            (email,))
+        if row and check_password_hash(dict(row)["password_hash"],
+                                       password):
+            sp = dict(row)
+            session["supervisor_id"] = sp["id"]
+            session.permanent = bool(request.form.get("remember"))
+            _login_ok("supervisor")
+            get_db().execute(
+                "UPDATE supervisors SET last_login_at=? WHERE id=?",
+                (datetime.now().strftime("%Y-%m-%d %H:%M"), sp["id"]))
+            get_db().commit()
+            log_activity(f"supervisor:{sp['name']}", "login",
+                         "supervisor portal sign-in",
+                         entity_type="supervisor", entity_id=sp["id"])
+            return redirect(url_for("supervisor_dashboard"))
+        _login_fail("supervisor")
+        log_activity("unknown", "login_failed",
+                     f"supervisor portal failed sign-in for {email}")
+        return render_template("supervisor_login.html", uni=UNI_NAME,
+                               title=PORTAL_TITLE,
+                               error="Invalid email or password.")
+    return render_template("supervisor_login.html", uni=UNI_NAME,
+                           title=PORTAL_TITLE)
+
+
+@app.route("/supervisor/logout")
+def supervisor_logout():
+    session.pop("supervisor_id", None)
+    return redirect(url_for("supervisor_login"))
+
+
+@app.route("/supervisor/dashboard")
+@supervisor_required
+def supervisor_dashboard():
+    sp = current_supervisor()
+    db = get_db()
+    students = supervisor_students(db, sp["id"])
+    pending = db.fetchone(
+        "SELECT COUNT(*) AS n FROM progress_reports"
+        " WHERE supervisor_id=? AND status='Submitted'", (sp["id"],))
+    stats = {
+        "students": len(students),
+        "reports_submitted": (pending["n"] if isinstance(pending, dict)
+                              else pending[0]) if pending else 0,
+    }
+    recent = [dict(r) for r in db.execute(
+        "SELECT pr.*, st.name AS student_name FROM progress_reports pr"
+        " JOIN students st ON st.id = pr.student_id"
+        " WHERE pr.supervisor_id=? ORDER BY pr.id DESC LIMIT 5",
+        (sp["id"],)).fetchall()]
+    return render_template("supervisor_dashboard.html", uni=UNI_NAME,
+                           title=PORTAL_TITLE, sp=sp, students=students,
+                           stats=stats, recent=recent)
+
+
+@app.route("/supervisor/students")
+@supervisor_required
+def supervisor_students_page():
+    sp = current_supervisor()
+    students = supervisor_students(get_db(), sp["id"])
+    return render_template("supervisor_students.html", uni=UNI_NAME,
+                           title=PORTAL_TITLE, sp=sp, students=students)
+
+
+def _own_student_or_none(db, sp_id, sid):
+    row = db.fetchone(
+        "SELECT st.* FROM supervisor_assignments a"
+        " JOIN students st ON st.id = a.student_id"
+        " WHERE a.supervisor_id=? AND a.student_id=? AND a.is_current=1",
+        (sp_id, sid))
+    return dict(row) if row else None
+
+
+@app.route("/supervisor/student/<int:sid>")
+@supervisor_required
+def supervisor_student(sid):
+    sp = current_supervisor()
+    db = get_db()
+    s = _own_student_or_none(db, sp["id"], sid)
+    if not s:
+        return render_template("notfound.html", uni=UNI_NAME,
+                               title=PORTAL_TITLE,
+                               message="This student is not assigned to"
+                                       " you."), 404
+    reports = [dict(r) for r in db.execute(
+        "SELECT * FROM progress_reports WHERE student_id=?"
+        " ORDER BY id DESC", (sid,)).fetchall()]
+    semesters = [dict(r) for r in db.execute(
+        "SELECT * FROM academic_records WHERE student_id=?"
+        " ORDER BY semester_no, id", (sid,)).fetchall()]
+    dims = [(wf.DIMENSIONS[c][0], s.get(c)) for c in wf.DIMENSIONS]
+    return render_template(
+        "supervisor_student.html", uni=UNI_NAME, title=PORTAL_TITLE,
+        sp=sp, s=s, syn=synopsis_of(db, sid), reports=reports,
+        semesters=semesters, dims=dims,
+        today=datetime.now().strftime("%Y-%m-%d"))
+
+
+@app.route("/supervisor/student/<int:sid>/endorse", methods=["POST"])
+@supervisor_required
+def supervisor_endorse(sid):
+    sp = current_supervisor()
+    db = get_db()
+    if not _own_student_or_none(db, sp["id"], sid):
+        return render_template("notfound.html", uni=UNI_NAME,
+                               title=PORTAL_TITLE,
+                               message="This student is not assigned to"
+                                       " you."), 404
+    syn = synopsis_of(db, sid)
+    if not syn:
+        flash("No synopsis record exists for this student yet.")
+        return redirect(url_for("supervisor_student", sid=sid))
+    if syn.get("endorsed_at"):
+        flash("This synopsis is already endorsed.")
+        return redirect(url_for("supervisor_student", sid=sid))
+    now = datetime.now().strftime("%Y-%m-%d %H:%M")
+    db.execute(
+        "UPDATE synopsis_records SET endorsed_by=?, endorsed_at=?,"
+        " updated_at=? WHERE id=?",
+        (sp["name"], now, now, syn["id"]))
+    if syn["asrb_status"] == "Not Submitted":
+        db.execute("UPDATE synopsis_records SET asrb_status=?"
+                   " WHERE id=?", ("Submitted to ASRB", syn["id"]))
+    wf.record_event(db, sid, "thesis", "",
+                    f"Synopsis endorsed by {sp['name']}",
+                    sp["name"], "Supervisor")
+    db.commit()
+    log_activity(f"supervisor:{sp['name']}", "synopsis_endorse",
+                 f"synopsis endorsed for student id={sid}",
+                 entity_type="student", entity_id=sid)
+    notify_admin("synopsis", "Synopsis endorsed",
+                 f"{sp['name']} endorsed the synopsis of student"
+                 f" id={sid}.", url_for("admin_asrb"))
+    notify_student(sid, "synopsis", "Synopsis endorsed",
+                   f"Your supervisor {sp['name']} has endorsed your"
+                   " synopsis.", url_for("student_dashboard"))
+    flash("Synopsis endorsed and forwarded to ASRB.")
+    return redirect(url_for("supervisor_student", sid=sid))
+
+
+@app.route("/supervisor/student/<int:sid>/progress", methods=["POST"])
+@supervisor_required
+def supervisor_progress_submit(sid):
+    sp = current_supervisor()
+    db = get_db()
+    if not _own_student_or_none(db, sp["id"], sid):
+        return render_template("notfound.html", uni=UNI_NAME,
+                               title=PORTAL_TITLE,
+                               message="This student is not assigned to"
+                                       " you."), 404
+    db.execute(
+        "INSERT INTO progress_reports (student_id, supervisor_id,"
+        " period, report_date, progress, remarks, status, created_at)"
+        " VALUES (?, ?, ?, ?, ?, ?, 'Submitted', ?)",
+        (sid, sp["id"], (request.form.get("period") or "").strip(),
+         (request.form.get("report_date") or "").strip()
+         or datetime.now().strftime("%Y-%m-%d"),
+         pick(request.form.get("progress"),
+              ["Excellent", "Satisfactory", "Unsatisfactory"],
+              "Satisfactory"),
+         (request.form.get("remarks") or "").strip(),
+         datetime.now().strftime("%Y-%m-%d %H:%M")))
+    db.commit()
+    s = get_student(sid)
+    log_activity(f"supervisor:{sp['name']}", "progress_submit",
+                 f"progress report for {s.get('name') if s else sid}",
+                 entity_type="student", entity_id=sid)
+    notify_admin("progress", "Progress report submitted",
+                 f"{sp['name']} submitted a progress report for"
+                 f" {s.get('name') if s else 'a student'}.",
+                 url_for("admin_student_supervisor", sid=sid))
+    flash("Progress report submitted to DAS.")
+    return redirect(url_for("supervisor_student", sid=sid))
+
+
+@app.route("/supervisor/notifications")
+@supervisor_required
+def supervisor_notifications():
+    sp = current_supervisor()
+    db = get_db()
+    notes = [dict(r) for r in db.fetchall(
+        "SELECT * FROM supervisor_notifications WHERE supervisor_id=?"
+        " ORDER BY id DESC LIMIT 50", (sp["id"],))]
+    db.execute("UPDATE supervisor_notifications SET is_read=1"
+               " WHERE supervisor_id=?", (sp["id"],))
+    db.commit()
+    return render_template("supervisor_notifications.html", uni=UNI_NAME,
+                           title=PORTAL_TITLE, sp=sp, notes=notes)
+
+
 # ---------------- student portal ----------------
 def student_required(f):
     @wraps(f)
@@ -6673,6 +7453,18 @@ def student_dashboard():
         {"label": "Viva Passed",
          "done": any(v.get("result") == "Pass" for v in vivas)},
     ]
+    _db = get_db()
+    _syn = synopsis_of(_db, s["id"])
+    research = {
+        "synopsis": _syn,
+        "supervisors": current_assignments(_db, s["id"]),
+        "latest_report": None,
+    }
+    _lr = _db.fetchone(
+        "SELECT * FROM progress_reports WHERE student_id=?"
+        " ORDER BY id DESC", (s["id"],))
+    if _lr:
+        research["latest_report"] = dict(_lr)
     sched_rec = _saved_schedule_for_session(s.get("session"))
     if sched_rec is None:
         _summ = _list_saved_schedules()
@@ -6681,7 +7473,8 @@ def student_dashboard():
     sched = _portal_schedule(sched_rec) if sched_rec else None
     return render_template("student_dashboard.html", uni=UNI_NAME,
                            title=PORTAL_TITLE, s=s, docs=docs, vivas=vivas,
-                           timeline=timeline, sched=sched)
+                           timeline=timeline, sched=sched,
+                           research=research)
 
 
 @app.route("/student/record")

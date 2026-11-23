@@ -1,0 +1,64 @@
+{% extends "supervisor_base.html" %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <h2>Welcome, {{ sp.name }}</h2>
+    <p>{{ sp.designation or 'Supervisor' }}{% if sp.department %} &middot; {{ sp.department }}{% endif %}</p>
+  </div>
+</div>
+
+<div class="sp-stats">
+  <div class="sp-stat"><div class="k">My Students</div><div class="v">{{ stats.students }}</div></div>
+  <div class="sp-stat"><div class="k">Reports Awaiting DAS Review</div><div class="v">{{ stats.reports_submitted }}</div></div>
+</div>
+
+<div class="card section">
+  <div class="section-head">
+    <span class="section-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></span>
+    <h3>My Students</h3>
+  </div>
+  {% if students %}
+  <div class="table-scroll">
+    <table class="data-table">
+      <thead><tr><th>Student</th><th>Reg. No.</th><th>Degree</th><th>Session</th><th>Your Role</th><th>Status</th><th></th></tr></thead>
+      <tbody>
+        {% for st in students %}
+        <tr>
+          <td>{{ st.name }}</td>
+          <td class="nowrap">{{ st.reg_no }}</td>
+          <td>{{ st.degree or '—' }}</td>
+          <td>{{ st.session or '—' }}</td>
+          <td>{{ st.assignment_role }}</td>
+          <td>{{ st.status or '—' }}</td>
+          <td><a class="btn ghost sm" href="{{ url_for('supervisor_student', sid=st.id) }}">Open</a></td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="empty"><p>No students are assigned to you yet. DAS assigns supervisors from the admin portal.</p></div>
+  {% endif %}
+</div>
+
+<div class="card section">
+  <div class="section-head">
+    <span class="section-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></span>
+    <h3>Recent Progress Reports</h3>
+  </div>
+  {% if recent %}
+  <div class="table-scroll">
+    <table class="data-table">
+      <thead><tr><th>Student</th><th>Period</th><th>Progress</th><th>Status</th><th>Date</th></tr></thead>
+      <tbody>
+        {% for r in recent %}
+        <tr><td>{{ r.student_name }}</td><td>{{ r.period }}</td><td>{{ r.progress }}</td><td>{% if r.status == 'Reviewed' %}<span class="pill q">Reviewed</span>{% elif r.status == 'Returned' %}<span class="pill nq">Returned</span>{% else %}<span class="pill warn">Submitted</span>{% endif %}</td><td class="nowrap">{{ r.report_date }}</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="empty"><p>No progress reports yet — submit one from a student's page.</p></div>
+  {% endif %}
+</div>
+{% endblock %}

@@ -1,0 +1,117 @@
+{% extends "admin_base.html" %}
+{% block container_extra %} wide{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <h2>{{ s.name }}</h2>
+    <p>{{ s.reg_no }} &middot; {{ s.degree or '—' }} &middot; Session {{ s.session or '—' }} &middot; {{ s.status }}</p>
+  </div>
+  <a class="btn ghost" href="{{ url_for('admin_students') }}">&larr; Student List</a>
+</div>
+{% set tab_active = 'supervisor' %}{% include "_profile_tabs.html" %}
+
+<div class="card section">
+  <div class="section-head">
+    <span class="section-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 10L12 5 2 10l10 5 10-5z"/><path d="M6 12v5c0 1.7 2.7 3 6 3s6-1.3 6-3v-5"/></svg></span>
+    <h3>Current Supervision</h3>
+  </div>
+  {% if current %}
+  <div class="table-scroll">
+    <table class="data-table">
+      <thead><tr><th>Role</th><th>Supervisor</th><th>Designation</th><th>Department</th><th>Assigned</th><th></th></tr></thead>
+      <tbody>
+        {% for a in current %}
+        <tr>
+          <td>{{ a.role }}</td>
+          <td>{{ a.supervisor_name }}</td>
+          <td>{{ a.designation or '—' }}</td>
+          <td>{{ a.supervisor_department or '—' }}</td>
+          <td class="nowrap">{{ a.assigned_date or '—' }}</td>
+          <td><form method="post" action="{{ url_for('admin_assignment_end', aid=a.id) }}" style="margin:0"><button type="submit" class="btn danger sm" data-confirm="End this assignment? It stays in the history.">End</button></form></td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="empty"><p>No supervisor assigned yet.</p></div>
+  {% endif %}
+  <form method="post" action="{{ url_for('admin_student_assign', sid=s.id) }}" class="row" style="gap:8px;flex-wrap:wrap;margin-top:14px">
+    <select name="supervisor_id" class="no-icon" required>
+      <option value="">Choose supervisor…</option>
+      {% for sp in sups %}<option value="{{ sp.id }}">{{ sp.name }}{% if sp.designation %} — {{ sp.designation }}{% endif %}</option>{% endfor %}
+    </select>
+    <select name="role" class="no-icon">
+      <option value="Supervisor">Supervisor</option>
+      <option value="Co-supervisor">Co-supervisor</option>
+    </select>
+    <input type="date" name="assigned_date" value="{{ today }}">
+    <input type="text" name="remarks" placeholder="Remarks (e.g. notification ref.)">
+    <button type="submit" class="btn primary sm">Assign</button>
+  </form>
+  {% if not sups %}<p class="hint" style="margin-bottom:0">No active supervisor accounts exist yet — create them on the <a href="{{ url_for('admin_supervisors') }}">Supervisors page</a>.</p>{% endif %}
+  <p class="hint" style="margin-bottom:0">Assigning a new supervisor for a role ends the previous assignment for that role — the history below is never deleted. Maximum-students-per-supervisor limits are set by DAS regulations: <strong>Not configured</strong>.</p>
+</div>
+
+<div class="card section">
+  <h3 style="margin-top:0">Assignment History</h3>
+  {% if history %}
+  <div class="table-scroll">
+    <table class="data-table">
+      <thead><tr><th>Role</th><th>Supervisor</th><th>From</th><th>To</th><th>Assigned By</th><th>Remarks</th></tr></thead>
+      <tbody>
+        {% for a in history %}
+        <tr>
+          <td>{{ a.role }}</td>
+          <td>{{ a.supervisor_name }}</td>
+          <td class="nowrap">{{ a.assigned_date or '—' }}</td>
+          <td class="nowrap">{% if a.is_current %}<span class="pill q">Current</span>{% else %}{{ a.ended_date or '—' }}{% endif %}</td>
+          <td>{{ a.assigned_by or '—' }}</td>
+          <td>{{ a.remarks or '—' }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="empty"><p>No assignments recorded yet.</p></div>
+  {% endif %}
+</div>
+
+<div class="card section">
+  <div class="section-head">
+    <span class="section-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg></span>
+    <h3>Progress Reports <span class="hint">({{ reports|length }})</span></h3>
+  </div>
+  {% if reports %}
+  <div class="table-scroll">
+    <table class="data-table">
+      <thead><tr><th>Period</th><th>Supervisor</th><th>Progress</th><th>Remarks</th><th>Status</th><th>DAS Review</th></tr></thead>
+      <tbody>
+        {% for r in reports %}
+        <tr>
+          <td>{{ r.period }}<div class="hint">{{ r.report_date }}</div></td>
+          <td>{{ r.supervisor_name or '—' }}</td>
+          <td>{{ r.progress }}</td>
+          <td>{{ r.remarks or '—' }}</td>
+          <td>{% if r.status == 'Reviewed' %}<span class="pill q">Reviewed</span>{% elif r.status == 'Returned' %}<span class="pill nq">Returned</span>{% else %}<span class="pill warn">Submitted</span>{% endif %}</td>
+          <td>
+            <form method="post" action="{{ url_for('admin_progress_review', rid=r.id) }}" class="row" style="gap:6px">
+              <select name="status" class="no-icon">
+                <option value="Reviewed">Reviewed</option>
+                <option value="Returned">Returned</option>
+              </select>
+              <input type="text" name="das_remarks" placeholder="DAS remarks" value="{{ r.das_remarks or '' }}">
+              <button type="submit" class="btn ghost sm">Save</button>
+            </form>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="empty"><p>No progress reports yet — supervisors submit them from the Supervisor Portal.</p></div>
+  {% endif %}
+</div>
+{% endblock %}

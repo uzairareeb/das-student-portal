@@ -83,6 +83,31 @@
   </div>
 </div>
 
+{% if research and (research.synopsis or research.supervisors) %}
+<div class="card section">
+  <div class="section-head">
+    <span class="section-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg></span>
+    <h3>My Research</h3>
+  </div>
+  <div class="table-scroll">
+    <table class="data-table">
+      <tbody>
+        {% if research.synopsis %}
+        <tr><th style="width:190px">Research Title</th><td>{{ research.synopsis.title or '—' }}</td></tr>
+        <tr><th>Synopsis / ASRB</th><td><span class="pill">{{ research.synopsis.asrb_status }}</span>{% if research.synopsis.endorsed_at %} &middot; endorsed by {{ research.synopsis.endorsed_by }}{% endif %}</td></tr>
+        {% endif %}
+        {% for a in research.supervisors %}
+        <tr><th>{{ a.role }}</th><td>{{ a.supervisor_name }}{% if a.designation %} &middot; {{ a.designation }}{% endif %}</td></tr>
+        {% endfor %}
+        {% if research.latest_report %}
+        <tr><th>Latest Progress Report</th><td>{{ research.latest_report.period }} — {{ research.latest_report.progress }} <span class="pill">{{ research.latest_report.status }}</span></td></tr>
+        {% endif %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endif %}
+
 <div class="sp-stats five">
   <div class="sp-stat">
     <div class="k">Documents</div>

@@ -1,0 +1,46 @@
+{% extends "admin_base.html" %}
+{% block container_extra %} wide{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <h2>Synopsis &amp; ASRB</h2>
+    <p>Every synopsis on record, its supervisor endorsement and its ASRB state. Outcomes are recorded from the actual meeting — saving a record here never invents a decision.</p>
+  </div>
+</div>
+
+<div class="card section">
+  {% if rows %}
+  <div class="table-scroll">
+    <table class="data-table">
+      <thead><tr><th>Student</th><th>Title</th><th>Endorsed</th><th>ASRB Status</th><th>Meeting</th><th>Record Outcome</th></tr></thead>
+      <tbody>
+        {% for r in rows %}
+        <tr>
+          <td><a href="{{ url_for('admin_student_academic', sid=r.student_id) }}">{{ r.student_name }}</a><div class="hint">{{ r.reg_no }} &middot; {{ r.degree or '' }}</div></td>
+          <td>{{ r.title or '—' }}</td>
+          <td>{% if r.endorsed_at %}{{ r.endorsed_by }}<div class="hint">{{ r.endorsed_at }}</div>{% else %}<span class="pill warn">Not yet</span>{% endif %}</td>
+          <td><span class="pill">{{ r.asrb_status }}</span></td>
+          <td class="nowrap">{{ r.meeting_no or '' }} {{ r.meeting_date or '' }}</td>
+          <td>
+            <form method="post" action="{{ url_for('admin_synopsis_asrb', synid=r.id) }}" class="row" style="gap:6px;flex-wrap:wrap">
+              <select name="asrb_status" class="no-icon">
+                {% for st in asrb_statuses %}<option value="{{ st }}" {% if r.asrb_status == st %}selected{% endif %}>{{ st }}</option>{% endfor %}
+              </select>
+              <input type="text" name="meeting_no" placeholder="Meeting No." value="{{ r.meeting_no or '' }}" style="max-width:110px">
+              <input type="date" name="meeting_date" value="{{ r.meeting_date or '' }}">
+              <input type="text" name="decision" placeholder="Decision" value="{{ r.decision or '' }}">
+              <input type="text" name="minutes_ref" placeholder="Minutes ref." value="{{ r.minutes_ref or '' }}">
+              <input type="text" name="approval_letter_ref" placeholder="Approval letter ref." value="{{ r.approval_letter_ref or '' }}">
+              <button type="submit" class="btn ghost sm">Save</button>
+            </form>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="empty"><p>No synopsis records yet — they are created from each student's Academic tab when a synopsis is submitted.</p></div>
+  {% endif %}
+</div>
+{% endblock %}

@@ -1,0 +1,135 @@
+{% extends "admin_base.html" %}
+{% block container_extra %} wide{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <h2>{{ s.name }}</h2>
+    <p>{{ s.reg_no }} &middot; {{ s.degree or '—' }} &middot; Session {{ s.session or '—' }} &middot; {{ s.status }}</p>
+  </div>
+  <a class="btn ghost" href="{{ url_for('admin_students') }}">&larr; Student List</a>
+</div>
+{% set tab_active = 'academic' %}{% include "_profile_tabs.html" %}
+
+<div class="card section">
+  <div class="section-head">
+    <span class="section-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 10L12 5 2 10l10 5 10-5z"/><path d="M6 12v5c0 1.7 2.7 3 6 3s6-1.3 6-3v-5"/></svg></span>
+    <h3>Semester Record</h3>
+  </div>
+  {% if semesters %}
+  <div class="table-scroll">
+    <table class="data-table">
+      <thead><tr><th>Semester</th><th>Term</th><th>Status</th><th>GPA</th><th>CGPA</th><th>Remarks</th><th>Recorded By</th><th></th></tr></thead>
+      <tbody>
+        {% for r in semesters %}
+        <tr>
+          <td>{{ r.semester_no or '—' }}</td>
+          <td>{{ r.term or '—' }}</td>
+          <td>{{ r.status }}</td>
+          <td>{{ r.gpa if r.gpa is not none else '—' }}</td>
+          <td>{{ r.cgpa if r.cgpa is not none else '—' }}</td>
+          <td>{{ r.remarks or '—' }}</td>
+          <td class="nowrap">{{ r.recorded_by or '—' }}</td>
+          <td><form method="post" action="{{ url_for('admin_semester_delete', rid=r.id) }}" style="margin:0"><button type="submit" class="btn danger sm" data-confirm="Remove this semester record?">Remove</button></form></td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="empty"><p>No semester records yet.</p></div>
+  {% endif %}
+  <form method="post" action="{{ url_for('admin_student_semester_add', sid=s.id) }}" class="row" style="gap:8px;flex-wrap:wrap;margin-top:14px">
+    <input type="number" name="semester_no" min="1" max="12" placeholder="Semester #" required style="max-width:120px">
+    <input type="text" name="term" placeholder="Term (e.g. Fall 2026)">
+    <select name="status" class="no-icon">
+      <option value="Enrolled">Enrolled</option>
+      <option value="Completed">Completed</option>
+      <option value="Repeat">Repeat</option>
+      <option value="Dropped">Dropped</option>
+    </select>
+    <input type="number" name="gpa" step="0.01" min="0" max="4" placeholder="GPA" style="max-width:100px">
+    <input type="number" name="cgpa" step="0.01" min="0" max="4" placeholder="CGPA" style="max-width:100px">
+    <input type="text" name="remarks" placeholder="Remarks">
+    <button type="submit" class="btn primary sm">Add Semester</button>
+  </form>
+  <p class="hint" style="margin-bottom:0">Required semester counts, CGPA thresholds and coursework rules are set by DAS regulations — until DAS supplies them they stay <strong>Not configured</strong> and nothing here enforces them.</p>
+</div>
+
+<div class="card section">
+  <div class="section-head">
+    <span class="section-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9 12l2 2 4-4"/></svg></span>
+    <h3>Comprehensive Exam</h3>
+  </div>
+  {% if comps %}
+  <div class="table-scroll">
+    <table class="data-table">
+      <thead><tr><th>Exam Date</th><th>Result</th><th>Remarks</th><th>Recorded By</th></tr></thead>
+      <tbody>
+        {% for c in comps %}
+        <tr><td class="nowrap">{{ c.exam_date or '—' }}</td><td>{% if c.result == 'Pass' %}<span class="pill q">Pass</span>{% elif c.result == 'Fail' %}<span class="pill nq">Fail</span>{% else %}<span class="pill warn">Pending</span>{% endif %}</td><td>{{ c.remarks or '—' }}</td><td class="nowrap">{{ c.recorded_by or '—' }}</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="empty"><p>No comprehensive exam record yet.</p></div>
+  {% endif %}
+  <form method="post" action="{{ url_for('admin_student_comprehensive_add', sid=s.id) }}" class="row" style="gap:8px;flex-wrap:wrap;margin-top:14px">
+    <input type="date" name="exam_date" value="{{ today }}">
+    <select name="result" class="no-icon">
+      <option value="Pending">Pending</option>
+      <option value="Pass">Pass</option>
+      <option value="Fail">Fail</option>
+    </select>
+    <input type="text" name="remarks" placeholder="Remarks">
+    <button type="submit" class="btn primary sm">Add Exam Record</button>
+  </form>
+</div>
+
+<div class="card section">
+  <div class="section-head">
+    <span class="section-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg></span>
+    <h3>Synopsis &amp; ASRB</h3>
+  </div>
+  <form method="post" action="{{ url_for('admin_student_synopsis_save', sid=s.id) }}">
+    <div class="form-grid">
+      <div style="grid-column:1/-1">
+        <label class="f-label" for="syn-title">Research title</label>
+        <input id="syn-title" name="title" value="{{ syn.title if syn else '' }}" placeholder="Thesis / synopsis title">
+      </div>
+      <div>
+        <label class="f-label" for="syn-date">Submitted on</label>
+        <input id="syn-date" type="date" name="submitted_date" value="{{ syn.submitted_date if syn else '' }}">
+      </div>
+      <div>
+        <label class="f-label" for="syn-status">ASRB status</label>
+        <select id="syn-status" name="asrb_status" class="no-icon">
+          {% for st in asrb_statuses %}<option value="{{ st }}" {% if syn and syn.asrb_status == st %}selected{% endif %}>{{ st }}</option>{% endfor %}
+        </select>
+      </div>
+    </div>
+    <button type="submit" class="btn primary sm" style="margin-top:10px">Save Synopsis</button>
+  </form>
+  {% if syn %}
+  <div class="hint" style="margin:12px 0 0">
+    Endorsement: {% if syn.endorsed_at %}Endorsed by {{ syn.endorsed_by }} on {{ syn.endorsed_at }}{% else %}Not endorsed yet — the supervisor endorses from the Supervisor Portal.{% endif %}
+  </div>
+  <form method="post" action="{{ url_for('admin_synopsis_asrb', synid=syn.id) }}" class="card" style="padding:14px;margin-top:14px">
+    <input type="hidden" name="back" value="academic">
+    <h4 style="margin:0 0 10px">Record ASRB meeting outcome</h4>
+    <div class="row" style="gap:8px;flex-wrap:wrap">
+      <select name="asrb_status" class="no-icon">
+        {% for st in asrb_statuses %}<option value="{{ st }}" {% if syn.asrb_status == st %}selected{% endif %}>{{ st }}</option>{% endfor %}
+      </select>
+      <input type="text" name="meeting_no" placeholder="Meeting No." value="{{ syn.meeting_no or '' }}">
+      <input type="date" name="meeting_date" value="{{ syn.meeting_date or '' }}">
+      <input type="text" name="decision" placeholder="Decision" value="{{ syn.decision or '' }}" style="min-width:200px">
+      <input type="text" name="minutes_ref" placeholder="Minutes ref." value="{{ syn.minutes_ref or '' }}">
+      <input type="text" name="approval_letter_ref" placeholder="Approval letter ref." value="{{ syn.approval_letter_ref or '' }}">
+      <input type="text" name="remarks" placeholder="Remarks" value="{{ syn.remarks or '' }}">
+      <button type="submit" class="btn primary sm">Record Outcome</button>
+    </div>
+  </form>
+  {% endif %}
+</div>
+{% endblock %}
