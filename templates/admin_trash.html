@@ -7,11 +7,18 @@
     <p>Deleted students stay here for 30 days, then are permanently removed. Restoring brings back the student record, their documents and viva records.</p>
   </div>
   {% if rows %}
+  <a class="btn light sm" href="{{ url_for('admin_trash_export') }}">Export All (Excel)</a>
   <form method="post" action="{{ url_for('admin_trash_empty') }}">
     <button type="submit" class="btn danger sm" data-confirm="Empty the entire Recycle Bin? Everything in it will be permanently deleted.">Empty Trash</button>
   </form>
   {% endif %}
 </div>
+
+{% if expiring %}
+<div class="card section" style="border-color:#f0c869;background:#fffaf0">
+  <p style="margin:0"><strong>{{ expiring }} record(s) will be permanently deleted within 7 days.</strong> Once the 30 days pass, the record is gone for good — export a copy now if you may need it later.</p>
+</div>
+{% endif %}
 
 <div class="card section">
   <div class="section-head">

@@ -259,7 +259,10 @@
         </div>
         <div>
           <label class="f-label" for="e_session">Session</label>
-          <input class="no-icon" type="text" id="e_session" name="session">
+          <select class="no-icon" id="e_session" name="session">
+            <option value="">— Unassigned —</option>
+            {% for v in session_opts %}<option value="{{ v }}">{{ v }}</option>{% endfor %}
+          </select>
         </div>
         <div>
           <label class="f-label" for="e_department">Department</label>
@@ -379,7 +382,7 @@
           setVal('e_cnic', d.cnic);
           setVal('e_gender', d.gender);
           setVal('e_degree', d.degree);
-          setVal('e_session', d.session);
+          setDept('e_session', d.session);
           setDept('e_department', d.department);
           setVal('e_status', d.status);
           setVal('e_folder_file', d.folder_file);

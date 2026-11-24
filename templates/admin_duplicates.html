@@ -1,0 +1,59 @@
+{% extends "admin_base.html" %}
+{% block container_extra %} wide{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <h2>Duplicate Finder</h2>
+    <p>Students recorded more than once — the same person entered through Add Student, an import and a department upload can quietly become two records. Open each record, keep the complete one, and delete the other (it stays restorable in the Recycle Bin for 30 days).</p>
+  </div>
+</div>
+
+{% macro dup_table(groups, key_label) %}
+  {% if groups %}
+  {% for g in groups %}
+  <p class="hint" style="margin:14px 0 6px"><strong>{{ key_label }}: {{ g.key }}</strong> — {{ g.rows|length }} records</p>
+  <div class="table-scroll">
+    <table class="data-table">
+      <thead><tr><th>Name</th><th>Reg. No.</th><th>CNIC</th><th>Degree</th><th>Session</th><th>Status</th><th></th></tr></thead>
+      <tbody>
+        {% for r in g.rows %}
+        <tr>
+          <td>{{ r.name }}</td><td>{{ r.reg_no }}</td><td>{{ r.cnic }}</td>
+          <td>{{ r.degree or '—' }}</td><td>{{ r.session or '—' }}</td><td>{{ r.status or '—' }}</td>
+          <td><a class="btn light sm" href="{{ url_for('admin_student_profile', sid=r.id) }}">View Profile</a></td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% endfor %}
+  {% else %}
+  <div class="empty"><p>None found.</p></div>
+  {% endif %}
+{% endmacro %}
+
+<div class="card section">
+  <div class="section-head">
+    <span class="section-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg></span>
+    <h3>Same CNIC ({{ by_cnic|length }})</h3>
+  </div>
+  {{ dup_table(by_cnic, 'CNIC') }}
+</div>
+
+<div class="card section">
+  <div class="section-head">
+    <span class="section-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg></span>
+    <h3>Same Registration No. ({{ by_reg|length }})</h3>
+  </div>
+  {{ dup_table(by_reg, 'Reg. No.') }}
+</div>
+
+<div class="card section">
+  <div class="section-head">
+    <span class="section-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg></span>
+    <h3>Probable Duplicates — same name &amp; father name ({{ probable|length }})</h3>
+  </div>
+  <p class="hint" style="margin-top:0">These share a name and father name but carry different CNICs — often the same student typed twice with a CNIC mistake. Verify against the student's card before merging.</p>
+  {{ dup_table(probable, 'Name') }}
+</div>
+{% endblock %}

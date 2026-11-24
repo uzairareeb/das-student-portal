@@ -1,0 +1,51 @@
+{% extends "admin_base.html" %}
+{% block container_extra %} wide{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <h2>Data Safai — Incomplete Records</h2>
+    <p>Records with a missing or invalid field quietly fall out of reports, schedules and portal logins. Fix them here — open the profile, complete the field, and the student leaves this list on the next visit.</p>
+  </div>
+</div>
+
+<div class="card section">
+  <div class="section-head">
+    <span class="section-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg></span>
+    <h3>Summary</h3>
+  </div>
+  <div class="row" style="flex-wrap:wrap;gap:8px">
+    {% for s in sections %}
+    <span class="pill{% if s.total %} q{% endif %}">{{ s.label }}: {{ s.total }}</span>
+    {% endfor %}
+  </div>
+</div>
+
+{% for s in sections %}
+<div class="card section">
+  <div class="section-head">
+    <span class="section-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg></span>
+    <h3>{{ s.label }} ({{ s.total }})</h3>
+  </div>
+  <p class="hint" style="margin-top:0">{{ s.note }}</p>
+  {% if s.rows %}
+  <div class="table-scroll">
+    <table class="data-table">
+      <thead><tr><th>Name</th><th>Reg. No.</th><th>CNIC</th><th>Degree</th><th>Session</th><th>Status</th><th></th></tr></thead>
+      <tbody>
+        {% for r in s.rows %}
+        <tr>
+          <td>{{ r.name }}</td><td>{{ r.reg_no }}</td><td>{{ r.cnic or '—' }}</td>
+          <td>{{ r.degree or '—' }}</td><td>{{ r.session or '—' }}</td><td>{{ r.status or '—' }}</td>
+          <td><a class="btn light sm" href="{{ url_for('admin_student_profile', sid=r.id) }}">View Profile</a></td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% if s.total > s.rows|length %}<p class="hint">Showing the first {{ s.rows|length }} of {{ s.total }}.</p>{% endif %}
+  {% else %}
+  <div class="empty"><p>All clear — no records with this problem.</p></div>
+  {% endif %}
+</div>
+{% endfor %}
+{% endblock %}

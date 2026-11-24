@@ -243,13 +243,19 @@ check("legacy batch parsed into intake rows", n["c"] == 1)
 admin.post(f"/admin/uploads/{u['id']}/approve")
 check("legacy batch imports after review", students_count() == before + 1)
 
-# ---- 9. admin direct import still works (parse refactor regression) ----
+# ---- 9. admin import travels the review flow (Advanced #8) ----
 before = students_count()
 data = wb_bytes([row("3520288888888", "Direct One", "F D", "24-DAS-9050")])
-admin.post("/admin/import/upload",
-           data={"file": (io.BytesIO(data), "direct.xlsx")},
-           content_type="multipart/form-data")
-check("admin import adds the student", students_count() == before + 1)
+r = admin.post("/admin/import/upload",
+               data={"file": (io.BytesIO(data), "direct.xlsx")},
+               content_type="multipart/form-data")
+check("admin import goes to review, nothing added yet",
+      r.status_code == 302 and "/review" in r.headers["Location"]
+      and students_count() == before)
+uid = int(r.headers["Location"].rstrip("/").split("/")[-2])
+admin.post(f"/admin/uploads/{uid}/approve")
+check("admin import adds the student after approval",
+      students_count() == before + 1)
 s = db.fetchone("SELECT * FROM students WHERE reg_no='24-DAS-9050'")
 check("admin-imported student has dimensions",
       s is not None and s["academic_status"] == "Active")

@@ -48,6 +48,11 @@ app.config["MAX_CONTENT_LENGTH"] = 26 * 1024 * 1024  # 26 MB (PDF uploads up to 
 app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
 app.config["SESSION_COOKIE_HTTPONLY"] = True
 
+# Pseudo-department that owns DAS-side (admin) import batches, so admin
+# imports travel through the same Phase 2 review flow as department
+# uploads. It is not a real login account (random unusable password).
+IMPORT_DEPT_EMAIL = "das-office@import.local"
+
 
 @app.before_request
 def _csrf_guard():
@@ -384,6 +389,9 @@ def init_db():
     _create_phase5_tables(db)
     _create_phase6_tables(db)
     _create_indexes(db)
+    _add_column_if_missing(db, "sessions", "status",
+                           "TEXT DEFAULT 'Active'")
+    _ensure_import_department(db)
     # Admin password: the env var is the source of truth. Only overwrite
     # the stored hash when the env var is actually set, so a missing env
     # var can never silently downgrade the live password to a fallback.
@@ -1263,6 +1271,39 @@ def _create_indexes(db):
             pass
 
 
+def _ensure_import_department(db):
+    if not db.fetchone("SELECT id FROM departments WHERE email=?",
+                       (IMPORT_DEPT_EMAIL,)):
+        db.execute(
+            "INSERT INTO departments (name, email, password_hash,"
+            " created_at) VALUES (?, ?, ?, ?)",
+            ("DAS Office (Admin Import)", IMPORT_DEPT_EMAIL,
+             generate_password_hash(os.urandom(24).hex()),
+             datetime.now().strftime("%Y-%m-%d %H:%M")))
+
+
+def active_session_names(db):
+    """Sessions offered in forms: Active ones only (Advanced #6/#20).
+    A student's existing value is always grandfathered by the form
+    itself, so closing a session never hides a current record."""
+    rows = db.fetchall(
+        "SELECT name FROM sessions WHERE COALESCE(status, 'Active')"
+        "='Active' ORDER BY name")
+    return [r["name"] if isinstance(r, dict) else r[0] for r in rows]
+
+
+def find_student_duplicate(db, cnic, reg_no):
+    """An existing student with the same CNIC or Registration No."""
+    row = None
+    if cnic:
+        row = db.fetchone("SELECT * FROM students WHERE cnic=?",
+                          (cnic,))
+    if not row and reg_no:
+        row = db.fetchone("SELECT * FROM students WHERE reg_no=?",
+                          (reg_no,))
+    return dict(row) if row else None
+
+
 def _create_phase6_tables(db):
     """Phase 6 (Central System): degree completion checklist, degree
     issuance records and the correspondence register."""
@@ -1815,7 +1856,9 @@ def dept_names():
     """Department names from the departments table. Student rows may carry
     either this name or the degree-derived 'Department of X' form; all
     department matching below accepts both forms."""
-    rows = get_db().fetchall("SELECT name FROM departments ORDER BY name")
+    rows = get_db().fetchall(
+        "SELECT name FROM departments WHERE email<>? ORDER BY name",
+        (IMPORT_DEPT_EMAIL,))
     return [(r["name"] if isinstance(r, dict) else r[0]) for r in rows]
 
 
@@ -2204,6 +2247,7 @@ def admin_students():
         sessions=distinct_values("session"), degrees=distinct_values("degree"),
         genders=GENDER_OPTS, folders=FOLDER_OPTS, status_list=STATUS_LIST,
         received=RECEIVED_OPTS, departments=dept_names(),
+        session_opts=active_session_names(get_db()),
         f=request.args, export_url=export_url,
         export_pdf_url=export_pdf_url)
 
@@ -3194,8 +3238,12 @@ def admin_upload_approve(uid):
                 _rec_values(r["data"], now)) for r in import_rows]
     added = 0
     if records:
+        _drow = db.fetchone("SELECT email FROM departments WHERE id=?",
+                            (u["department_id"],))
+        _dept_arg = None if (_drow and _drow["email"]
+                             == IMPORT_DEPT_EMAIL) else u["dept_name"]
         added, _, _, _ = insert_student_records(
-            db, records, department=u["dept_name"])
+            db, records, department=_dept_arg)
     linked = skipped = errored = 0
     for r in rows:
         if r["decision"] == "link" and r["matches"]:
@@ -3220,6 +3268,8 @@ def admin_upload_approve(uid):
                " imported_count=?, reviewed_by=?, reviewed_at=?"
                " WHERE id=?",
                (added, current_admin()["name"], now, uid))
+    db.commit()
+    _sync_missing_dimensions(db)
     db.commit()
     log_activity(current_admin()["name"], "upload_approve",
                  f"{u['dept_name']}: {added} imported, {linked} linked,"
@@ -6142,6 +6192,10 @@ def read_xlsx(file_storage):
 @app.route("/admin/import/upload", methods=["POST"])
 @admin_required
 def admin_import_upload():
+    """Admin imports now travel the SAME review flow as department
+    uploads (Advanced #8): the file becomes a batch owned by the DAS
+    Office pseudo-department, rows are validated and matched, and
+    nothing enters the student master until DAS approves the batch."""
     file = request.files.get("file")
     if not file or not file.filename:
         flash("Please choose a file to upload.")
@@ -6149,30 +6203,48 @@ def admin_import_upload():
     if not file.filename.lower().endswith(".xlsx"):
         flash("Only Excel (.xlsx) files are allowed.")
         return redirect(url_for("admin_import"))
+    raw = file.read()
+    if not raw:
+        flash("The file is empty.")
+        return redirect(url_for("admin_import"))
     try:
-        records, skipped, skip_notes = parse_import_rows(file)
+        recs = parse_import_records(io.BytesIO(raw))
     except ValueError as e:
         flash(str(e))
         return redirect(url_for("admin_import"))
     db = get_db()
-    added, skipped2, skip_notes2, first_error = insert_student_records(db, records)
-    skipped += skipped2
-    skip_notes += skip_notes2
+    dept = db.fetchone("SELECT * FROM departments WHERE email=?",
+                       (IMPORT_DEPT_EMAIL,))
+    now = datetime.now().strftime("%Y-%m-%d %H:%M")
+    _vals = (dept["id"], file.filename, raw, len(recs),
+             intake.TEMPLATE_VERSION, now)
+    if USE_PG:
+        uid = db.fetchone(
+            "INSERT INTO dept_uploads (department_id, file_name,"
+            " file_data, row_count, status, template_version, created_at)"
+            " VALUES (?, ?, ?, ?, 'pending', ?, ?) RETURNING id",
+            _vals)["id"]
+    else:
+        uid = db.execute(
+            "INSERT INTO dept_uploads (department_id, file_name,"
+            " file_data, row_count, status, template_version, created_at)"
+            " VALUES (?, ?, ?, ?, 'pending', ?, ?)", _vals).lastrowid
+    counts = {"valid": 0, "errors": 0, "dups": 0}
+    try:
+        counts = _build_intake_rows(db, uid, recs)
+    except Exception as e:
+        db.execute("UPDATE dept_uploads SET parse_error=? WHERE id=?",
+                   (str(e)[:300], uid))
     db.commit()
-    msg = f"Import complete: {added} added, {skipped} skipped."
-    if skip_notes:
-        msg += " Skipped: " + "; ".join(skip_notes)
-        msg += "." if skipped <= len(skip_notes) else "..."
-    if first_error and skipped:
-        msg += f" (first error: {first_error})"
-    _sync_missing_dimensions(db)
-    db.commit()
-    log_activity("admin", "import",
-                 f"{added} added, {skipped} skipped via admin import")
-    flash(msg)
-    return redirect(url_for("admin_students"))
-
-
+    log_activity(current_admin()["name"], "import",
+                 f"admin import sent to review: {len(recs)} rows"
+                 f" ({file.filename})",
+                 entity_type="dept_upload", entity_id=uid)
+    flash(f"Import received: {len(recs)} row(s) — {counts['valid']}"
+          f" valid, {counts['errors']} with errors, {counts['dups']}"
+          " possible duplicate(s). Review the rows below, then"
+          " approve to add them to the student master.")
+    return redirect(url_for("admin_upload_review", uid=uid))
 def get_student(sid):
     row = get_db().fetchone("SELECT * FROM students WHERE id=?", (sid,))
     return row_dict(row)
@@ -6201,9 +6273,19 @@ def admin_student_new():
                                    title=PORTAL_TITLE, form=f,
                                    status_list=STATUS_LIST,
                                    genders=GENDER_OPTS, folders=FOLDER_OPTS,
-                                   received=RECEIVED_OPTS)
+                                   received=RECEIVED_OPTS,
+                                   session_opts=active_session_names(
+                                       get_db()))
         db = get_db()
         now = datetime.now().strftime("%Y-%m-%d %H:%M")
+        dup = find_student_duplicate(db, cnic, reg_no)
+        if dup and not f.get("force"):
+            return render_template("student_form.html", uni=UNI_NAME,
+                                   title=PORTAL_TITLE, form=f,
+                                   status_list=STATUS_LIST,
+                                   genders=GENDER_OPTS, folders=FOLDER_OPTS,
+                                   received=RECEIVED_OPTS, dup_warning=dup,
+                                   session_opts=active_session_names(db))
         if pick(f.get("status"), STATUS_LIST, "Continue") == "Pass Out":
             f = dict(f)
             f["folder_file"] = "Completed"
@@ -6234,7 +6316,8 @@ def admin_student_new():
                                    title=PORTAL_TITLE, form=f,
                                    status_list=STATUS_LIST,
                                    genders=GENDER_OPTS, folders=FOLDER_OPTS,
-                                   received=RECEIVED_OPTS)
+                                   received=RECEIVED_OPTS,
+                                   session_opts=active_session_names(db))
         log_activity("admin", "student_add", f"{name} ({reg_no})")
         flash(f"Student {name} added. Default portal password: CNIC digits.")
         row = db.fetchone("SELECT id FROM students WHERE reg_no=?", (reg_no,))
@@ -6244,7 +6327,8 @@ def admin_student_new():
     return render_template("student_form.html", uni=UNI_NAME, title=PORTAL_TITLE,
                            form={}, status_list=STATUS_LIST,
                            genders=GENDER_OPTS, folders=FOLDER_OPTS,
-                           received=RECEIVED_OPTS)
+                           received=RECEIVED_OPTS,
+                           session_opts=active_session_names(get_db()))
 
 
 @app.route("/admin/student/<int:sid>")
@@ -6478,6 +6562,143 @@ def _restore_trash_row(db, trash):
     return new_id
 
 
+@app.route("/admin/duplicates")
+@admin_required
+def admin_duplicates():
+    """Duplicate Finder (Advanced #4): exact CNIC / Reg. No. clashes
+    and probable duplicates (same name + father name)."""
+    db = get_db()
+
+    def groups(col):
+        out = []
+        for r in db.fetchall(
+                f"SELECT {col} AS k FROM students WHERE {col} IS NOT"
+                f" NULL AND {col}<>'' GROUP BY {col} HAVING COUNT(*)>1"):
+            key = r["k"]
+            members = [dict(x) for x in db.fetchall(
+                f"SELECT * FROM students WHERE {col}=? ORDER BY name",
+                (key,))]
+            out.append({"key": key, "rows": members})
+        return out
+
+    probable = []
+    seen = {}
+    for s in db.fetchall(
+            "SELECT * FROM students WHERE father_name IS NOT NULL"
+            " AND father_name<>'' ORDER BY name"):
+        s = dict(s)
+        key = ((s.get("name") or "").strip().lower() + "|"
+               + (s.get("father_name") or "").strip().lower())
+        seen.setdefault(key, []).append(s)
+    for key, members in seen.items():
+        cnics = {(m.get("cnic") or "") for m in members}
+        if len(members) > 1 and len(cnics) > 1:
+            probable.append({"key": members[0]["name"], "rows": members})
+    return render_template(
+        "admin_duplicates.html", uni=UNI_NAME, title=PORTAL_TITLE,
+        by_cnic=groups("cnic"), by_reg=groups("reg_no"),
+        probable=probable)
+
+
+@app.route("/admin/data-quality")
+@admin_required
+def admin_data_quality():
+    """Data Safai (Advanced #5): records with missing or invalid
+    fields that quietly break reports, schedules and logins."""
+    db = get_db()
+    checks = [
+        ("Missing CNIC", "cnic IS NULL OR cnic=''",
+         "The student cannot sign in — the portal password is the CNIC."),
+        ("Invalid CNIC (not 13 digits)",
+         "cnic IS NOT NULL AND cnic<>'' AND"
+         " LENGTH(REPLACE(cnic, '-', ''))<>13",
+         "Check the CNIC against the student's card and correct it."),
+        ("Missing father name", "father_name IS NULL OR father_name=''",
+         "Needed on official letters and duplicate matching."),
+        ("Missing session", "session IS NULL OR session=''",
+         "The student falls out of session schedules and reports."),
+        ("Missing degree / programme", "degree IS NULL OR degree=''",
+         "Department is derived from the degree — both stay unset."),
+        ("Missing department", "department IS NULL OR department=''",
+         "The department portal cannot see this student."),
+    ]
+    sections = []
+    for label, where, note in checks:
+        rows = [dict(r) for r in db.fetchall(
+            f"SELECT * FROM students WHERE {where} ORDER BY name"
+            " LIMIT 300")]
+        total = db.fetchone(
+            f"SELECT COUNT(*) AS n FROM students WHERE {where}")["n"]
+        sections.append({"label": label, "note": note, "rows": rows,
+                         "total": total})
+    return render_template("admin_data_quality.html", uni=UNI_NAME,
+                           title=PORTAL_TITLE, sections=sections)
+
+
+@app.route("/admin/sessions", methods=["GET", "POST"])
+@admin_required
+def admin_sessions():
+    """Session master list (Advanced #20): close a session to retire
+    it from form dropdowns without touching existing records."""
+    db = get_db()
+    if request.method == "POST":
+        name = (request.form.get("name") or "").strip()
+        if name and not db.fetchone(
+                "SELECT id FROM sessions WHERE name=?", (name,)):
+            db.execute("INSERT INTO sessions (name, created_at, status)"
+                       " VALUES (?, ?, 'Active')",
+                       (name, datetime.now().strftime("%Y-%m-%d %H:%M")))
+            db.commit()
+            flash(f"Session {name} added.")
+        return redirect(url_for("admin_sessions"))
+    rows = [dict(r) for r in db.fetchall(
+        "SELECT s.id, s.name, COALESCE(s.status, 'Active') AS status,"
+        " (SELECT COUNT(*) FROM students st WHERE st.session=s.name)"
+        " AS n FROM sessions s ORDER BY s.name")]
+    return render_template("admin_sessions.html", uni=UNI_NAME,
+                           title=PORTAL_TITLE, rows=rows)
+
+
+@app.route("/admin/sessions/<int:seid>/toggle", methods=["POST"])
+@admin_required
+def admin_session_toggle(seid):
+    db = get_db()
+    row = db.fetchone("SELECT * FROM sessions WHERE id=?", (seid,))
+    if row:
+        new = "Closed" if (row["status"] or "Active") == "Active" \
+            else "Active"
+        db.execute("UPDATE sessions SET status=? WHERE id=?",
+                   (new, seid))
+        db.commit()
+        flash(f"Session {row['name']} is now {new}.")
+    return redirect(url_for("admin_sessions"))
+
+
+@app.route("/admin/trash/export.xlsx")
+@admin_required
+def admin_trash_export():
+    """Export the whole Recycle Bin before anything is purged
+    (Advanced #15)."""
+    rows = []
+    for r in get_db().fetchall(
+            "SELECT * FROM deleted_students ORDER BY deleted_at"):
+        d = dict(r)
+        sess = None
+        try:
+            sess = json.loads(d.get("data_json") or "{}").get("session")
+        except Exception:
+            pass
+        rows.append([d.get("name"), d.get("reg_no"), d.get("cnic"),
+                     d.get("degree"), sess,
+                     d.get("status"), d.get("deleted_at"),
+                     d.get("deleted_by")])
+    return _report_excel(
+        "Recycle Bin Export", ["Deleted students (restorable 30 days)"],
+        ["Name", "Reg. No.", "CNIC", "Degree", "Session", "Status",
+         "Deleted On", "Deleted By"],
+        [26, 16, 18, 22, 12, 14, 18, 14], rows, "recycle-bin.xlsx")
+
+
 @app.route("/admin/trash")
 @admin_required
 def admin_trash():
@@ -6495,8 +6716,10 @@ def admin_trash():
             row["days_left"] = max(0, 30 - (now - gone).days)
         except Exception:
             row["days_left"] = 30
+    expiring = sum(1 for r in rows if r["days_left"] <= 7)
     return render_template("admin_trash.html", uni=UNI_NAME,
-                           title=PORTAL_TITLE, rows=rows)
+                           title=PORTAL_TITLE, rows=rows,
+                           expiring=expiring)
 
 
 @app.route("/admin/archive")
