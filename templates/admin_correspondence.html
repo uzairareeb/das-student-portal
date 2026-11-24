@@ -24,6 +24,7 @@
       {% for st in ['Received', 'Dispatched', 'Filed'] %}<option value="{{ st }}" {% if status == st %}selected{% endif %}>{{ st }}</option>{% endfor %}
     </select>
     <button type="submit" class="btn primary sm">Filter</button>
+    <a class="btn {% if awaiting %}primary{% else %}ghost{% endif %} sm" href="{{ url_for('admin_correspondence', awaiting='1') }}">Awaiting acknowledgment</a>
   </form>
   {% if rows %}
   <div class="table-scroll">
@@ -33,11 +34,11 @@
         {% for c in rows %}
         <tr>
           <td>{% if c.direction == 'Inward' %}<span class="pill q">Inward</span>{% else %}<span class="pill">Outward</span>{% endif %}</td>
-          <td>{{ c.subject }}{% if c.ref_no %}<div class="hint">Ref: {{ c.ref_no }}</div>{% endif %}</td>
+          <td>{{ c.subject }}{% if c.ref_no %}<div class="hint">Ref: {{ c.ref_no }}</div>{% endif %}{% if c.file_name %}<div><a href="{{ url_for('admin_correspondence_attachment', cid=c.id) }}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:13px;height:13px;vertical-align:-2px"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg> {{ c.file_name }}</a></div>{% endif %}</td>
           <td>{% if c.student_name %}{{ c.student_name }}<div class="hint">{{ c.reg_no }}</div>{% else %}<span class="hint">General</span>{% endif %}</td>
           <td>{{ c.party or '—' }}</td>
           <td>{% if c.direction == 'Inward' %}Diary {{ c.diary_no or '—' }}{% else %}Dispatch {{ c.dispatch_no or '—' }}{% endif %}</td>
-          <td><span class="pill">{{ c.status }}</span>{% if c.direction == 'Outward' and c.received_date %}<div class="hint">Received {{ c.received_date }}</div>{% endif %}</td>
+          <td><span class="pill">{{ c.status }}</span>{% if c.direction == 'Outward' and c.received_date %}<div class="hint">Received {{ c.received_date }}</div>{% endif %}{% if c.days_waiting is not none %}<div class="hint" style="color:#c0392b;font-weight:700">{{ c.days_waiting }} day(s) waiting</div>{% endif %}</td>
           <td>
             {% if c.direction == 'Outward' and c.status == 'Dispatched' %}
             <form method="post" action="{{ url_for('admin_correspondence_receive', cid=c.id) }}" class="row" style="gap:6px">
@@ -56,7 +57,7 @@
   <div class="empty"><p>No correspondence matches.</p></div>
   {% endif %}
 
-  <form method="post" action="{{ url_for('admin_correspondence_add', sid=0) }}" class="card" style="padding:14px;margin-top:16px">
+  <form method="post" enctype="multipart/form-data" action="{{ url_for('admin_correspondence_add', sid=0) }}" class="card" style="padding:14px;margin-top:16px">
     <input type="hidden" name="back" value="register">
     <h4 style="margin:0 0 10px">Record a letter (register)</h4>
     <div class="row" style="gap:8px;flex-wrap:wrap">
@@ -68,12 +69,20 @@
         <option value="">General — no student</option>
         {% for st in students %}<option value="{{ st.id }}">{{ st.name }} ({{ st.reg_no }})</option>{% endfor %}
       </select>
+      <select name="letter_template" class="no-icon letter-template">
+        <option value="">— Use a template —</option>
+        <option value="forward">Thesis Forwarding</option>
+        <option value="ack">Acknowledgment Reminder</option>
+        <option value="result">Result Notification</option>
+        <option value="docs">Document Submission Request</option>
+      </select>
       <input class="no-icon" type="text" name="subject" placeholder="Subject" required style="min-width:240px">
       <input class="no-icon" type="text" name="party" placeholder="From / To">
       <input class="no-icon" type="text" name="ref_no" placeholder="Letter No. / Ref">
       <input class="no-icon" type="text" name="diary_no" placeholder="Diary No. (inward)">
       <input class="no-icon" type="text" name="dispatch_no" placeholder="Dispatch No. (outward)">
       <input class="no-icon" type="date" name="letter_date" value="{{ today }}">
+      <input class="no-icon" type="file" name="attachment" accept=".pdf,.jpg,.jpeg,.png" title="Attach a scan (PDF / JPG / PNG)">
       <button type="submit" class="btn primary sm">Record</button>
     </div>
     <p class="hint" style="margin-bottom:0">To attach the letter to a student, open the student's Correspondence tab instead — or pick the student here and record it from the register; the entry appears on the student's tab either way.</p>

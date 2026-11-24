@@ -14,6 +14,12 @@
       <div class="t2">Student Management</div>
     </div>
   </div>
+  <div style="padding:0 14px 10px">
+    <button type="button" id="gsTrigger" class="gs-trigger">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+      <span style="flex:1;text-align:left">Search…</span><span class="gs-kbd">Ctrl K</span>
+    </button>
+  </div>
   <nav class="side-nav">
     <a id="nav-dashboard" href="{{ url_for('admin_dashboard') }}" class="{% if request.endpoint == 'admin_dashboard' %}active{% endif %}">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/></svg>
@@ -167,6 +173,90 @@
       </div>
     </div>
   </div>
+<div id="gsearch" hidden>
+  <div class="gs-box">
+    <input id="gsInput" type="text" placeholder="Search students, supervisors, thesis cases, letters…" autocomplete="off">
+    <div id="gsResults"></div>
+    <p class="gs-foot">Enter opens the highlighted result · Esc closes · Ctrl K toggles</p>
+  </div>
+</div>
+<style>
+.gs-trigger{display:flex;align-items:center;gap:8px;width:100%;padding:8px 10px;border:1px solid #E5EAF2;border-radius:10px;background:#F7F9FC;color:#64748b;font-size:13px;cursor:pointer}
+.gs-trigger:hover{background:#EAF2FF;color:#17365D}
+.gs-kbd{font-size:11px;font-weight:700;background:#fff;border:1px solid #E5EAF2;border-radius:6px;padding:1px 6px;color:#17365d}
+#gsearch{position:fixed;inset:0;z-index:300;background:rgba(23,54,93,.45);display:flex;align-items:flex-start;justify-content:center;padding:10vh 16px 16px}
+#gsearch[hidden]{display:none}
+.gs-box{background:#fff;border-radius:14px;box-shadow:0 18px 50px rgba(23,54,93,.35);width:640px;max-width:100%;overflow:hidden}
+#gsInput{width:100%;border:0;border-bottom:1px solid #E5EAF2;padding:16px 18px;font-size:16px;outline:none;color:#17365D}
+#gsResults{max-height:50vh;overflow-y:auto;padding:6px}
+.gs-item{display:flex;gap:10px;align-items:baseline;padding:9px 10px;border-radius:9px;text-decoration:none;color:#1e293b}
+.gs-item.sel{background:#EAF2FF}
+.gs-kind{flex:none;font-size:10px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;color:#1769E8;background:#EAF2FF;border-radius:20px;padding:2px 8px}
+.gs-item.sel .gs-kind{background:#fff}
+.gs-title{font-weight:600}
+.gs-sub{color:#64748b;font-size:12px;margin-left:auto;text-align:right}
+.gs-none{padding:14px 12px;color:#64748b;font-size:14px}
+.gs-foot{margin:0;padding:9px 14px;border-top:1px solid #E5EAF2;color:#94a3b8;font-size:11px}
+</style>
+<script>
+(function () {
+  var box = document.getElementById('gsearch');
+  var inp = document.getElementById('gsInput');
+  var res = document.getElementById('gsResults');
+  var trig = document.getElementById('gsTrigger');
+  var items = [], sel = 0, seq = 0, timer = null;
+  function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
+  function open() { box.hidden = false; inp.value = ''; items = []; res.innerHTML = ''; setTimeout(function () { inp.focus(); }, 10); }
+  function close() { box.hidden = true; }
+  if (trig) trig.addEventListener('click', open);
+  box.addEventListener('click', function (e) { if (e.target === box) close(); });
+  document.addEventListener('keydown', function (e) {
+    if ((e.ctrlKey || e.metaKey) && (e.key === 'k' || e.key === 'K')) { e.preventDefault(); if (box.hidden) open(); else close(); }
+    else if (e.key === 'Escape' && !box.hidden) close();
+  });
+  function render() {
+    if (!items.length) { res.innerHTML = '<p class="gs-none">No matches.</p>'; return; }
+    res.innerHTML = items.map(function (it, i) {
+      return '<a class="gs-item' + (i === sel ? ' sel' : '') + '" href="' + esc(it.url) + '"><span class="gs-kind">' + esc(it.kind) + '</span><span class="gs-title">' + esc(it.title) + '</span><span class="gs-sub">' + esc(it.sub) + '</span></a>';
+    }).join('');
+  }
+  inp.addEventListener('input', function () {
+    var v = inp.value.trim();
+    clearTimeout(timer);
+    if (v.length < 2) { items = []; res.innerHTML = ''; return; }
+    timer = setTimeout(function () {
+      var my = ++seq;
+      fetch('/admin/search.json?q=' + encodeURIComponent(v)).then(function (r) { return r.json(); }).then(function (d) {
+        if (my !== seq) return;
+        items = d.results || []; sel = 0; render();
+      }).catch(function () {});
+    }, 150);
+  });
+  inp.addEventListener('keydown', function (e) {
+    if (e.key === 'ArrowDown') { e.preventDefault(); if (items.length) { sel = Math.min(sel + 1, items.length - 1); render(); } }
+    else if (e.key === 'ArrowUp') { e.preventDefault(); if (items.length) { sel = Math.max(sel - 1, 0); render(); } }
+    else if (e.key === 'Enter') { if (items.length && items[sel]) window.location.href = items[sel].url; }
+  });
+  var LT = {
+    forward: { subject: 'Forwarding of thesis for evaluation', remarks: 'Thesis forwarded to the Controller of Examinations office for evaluation. Acknowledgment of receipt is requested.' },
+    ack: { subject: 'Reminder — acknowledgment awaited', remarks: 'Reference our earlier dispatch noted above; the acknowledgment of receipt is still awaited. Please confirm receipt.' },
+    result: { subject: 'Notification of thesis result', remarks: 'The thesis result has been declared by the Controller of Examinations office and is notified for record.' },
+    docs: { subject: 'Submission of required documents', remarks: 'The student is requested to submit the outstanding documents to the DAS office at the earliest.' }
+  };
+  document.querySelectorAll('select.letter-template').forEach(function (selEl) {
+    selEl.addEventListener('change', function () {
+      var tpl = LT[selEl.value];
+      if (!tpl) return;
+      var form = selEl.closest('form');
+      if (!form) return;
+      var subj = form.querySelector('input[name="subject"]');
+      if (subj) subj.value = tpl.subject;
+      var rem = form.querySelector('input[name="remarks"]');
+      if (rem) rem.value = tpl.remarks;
+    });
+  });
+})();
+</script>
 </aside>
 <button class="side-toggle" id="sideToggle" aria-label="Menu">
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>

@@ -24,11 +24,11 @@
         {% for c in rows %}
         <tr>
           <td>{% if c.direction == 'Inward' %}<span class="pill q">Inward</span>{% else %}<span class="pill">Outward</span>{% endif %}</td>
-          <td>{{ c.subject }}{% if c.ref_no %}<div class="hint">Ref: {{ c.ref_no }}</div>{% endif %}{% if c.remarks %}<div class="hint">{{ c.remarks }}</div>{% endif %}</td>
+          <td>{{ c.subject }}{% if c.ref_no %}<div class="hint">Ref: {{ c.ref_no }}</div>{% endif %}{% if c.remarks %}<div class="hint">{{ c.remarks }}</div>{% endif %}{% if c.file_name %}<div><a href="{{ url_for('admin_correspondence_attachment', cid=c.id) }}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:13px;height:13px;vertical-align:-2px"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg> {{ c.file_name }}</a></div>{% endif %}</td>
           <td>{{ c.party or '—' }}</td>
           <td>{% if c.direction == 'Inward' %}Diary {{ c.diary_no or '—' }}{% else %}Dispatch {{ c.dispatch_no or '—' }}{% endif %}</td>
           <td class="nowrap">{% if c.direction == 'Inward' %}Received {{ c.received_date or '—' }}{% else %}Sent {{ c.sent_date or '—' }}{% if c.received_date %}<br>Received {{ c.received_date }}{% endif %}{% endif %}</td>
-          <td><span class="pill">{{ c.status }}</span></td>
+          <td><span class="pill">{{ c.status }}</span>{% if c.days_waiting is not none %}<div class="hint" style="color:#c0392b;font-weight:700">{{ c.days_waiting }} day(s) waiting</div>{% endif %}</td>
           <td>
             <div class="row" style="gap:6px">
               {% if c.direction == 'Outward' and c.status == 'Dispatched' %}
@@ -55,12 +55,19 @@
   <div class="empty"><p>No correspondence recorded for this student yet.</p></div>
   {% endif %}
 
-  <form method="post" action="{{ url_for('admin_correspondence_add', sid=s.id) }}" class="card" style="padding:14px;margin-top:16px">
+  <form method="post" enctype="multipart/form-data" action="{{ url_for('admin_correspondence_add', sid=s.id) }}" class="card" style="padding:14px;margin-top:16px">
     <h4 style="margin:0 0 10px">Record a letter</h4>
     <div class="row" style="gap:8px;flex-wrap:wrap">
       <select name="direction" class="no-icon">
         <option value="Inward">Inward (received)</option>
         <option value="Outward">Outward (sent)</option>
+      </select>
+      <select name="letter_template" class="no-icon letter-template">
+        <option value="">— Use a template —</option>
+        <option value="forward">Thesis Forwarding</option>
+        <option value="ack">Acknowledgment Reminder</option>
+        <option value="result">Result Notification</option>
+        <option value="docs">Document Submission Request</option>
       </select>
       <input class="no-icon" type="text" name="subject" placeholder="Subject" required style="min-width:260px">
       <input class="no-icon" type="text" name="party" placeholder="From / To (office or person)">
@@ -69,6 +76,7 @@
       <input class="no-icon" type="text" name="dispatch_no" placeholder="Dispatch No. (outward)">
       <input class="no-icon" type="date" name="letter_date" value="{{ today }}">
       <input class="no-icon" type="text" name="remarks" placeholder="Remarks">
+      <input class="no-icon" type="file" name="attachment" accept=".pdf,.jpg,.jpeg,.png" title="Attach a scan (PDF / JPG / PNG)">
       <button type="submit" class="btn primary sm">Record</button>
     </div>
   </form>

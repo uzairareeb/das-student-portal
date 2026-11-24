@@ -22,8 +22,8 @@ from datetime import datetime, date, timedelta, timezone
 from functools import wraps
 from urllib.parse import urlencode
 
-from flask import (Flask, Response, flash, g, redirect, render_template,
-                   request, send_file, session, url_for)
+from flask import (Flask, Response, flash, g, jsonify, redirect,
+                   render_template, request, send_file, session, url_for)
 from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.utils import secure_filename
 from viva_pdf import build_viva_pdf
@@ -392,6 +392,14 @@ def init_db():
     _add_column_if_missing(db, "sessions", "status",
                            "TEXT DEFAULT 'Active'")
     _ensure_import_department(db)
+    _add_column_if_missing(db, "correspondence", "file_name", "TEXT")
+    _add_column_if_missing(db, "correspondence", "mime_type", "TEXT")
+    _add_column_if_missing(db, "correspondence", "file_data",
+                           "BYTEA" if USE_PG else "BLOB")
+    _add_column_if_missing(db, "students", "photo_name", "TEXT")
+    _add_column_if_missing(db, "students", "photo_mime", "TEXT")
+    _add_column_if_missing(db, "students", "photo_data",
+                           "BYTEA" if USE_PG else "BLOB")
     # Admin password: the env var is the source of truth. Only overwrite
     # the stored hash when the env var is actually set, so a missing env
     # var can never silently downgrade the live password to a fallback.
@@ -1729,6 +1737,13 @@ def _student_where(args):
             "AND status NOT IN ('Pass Out','Left','Admission Cancelled',"
             "'Freeze')")
         params.append(cutoff)
+    if (args.get("viva_passed_stale") or "") == "1":
+        # Viva result is Pass but the status was never moved on
+        # (pending-actions group 4 — the missing Reports card).
+        where.append(
+            "id IN (SELECT student_id FROM viva_records"
+            " WHERE result='Pass') AND status IN"
+            " ('Continue', 'Viva Pending', 'Defense Pending')")
     if (args.get("needs_coe") or "") == "1":
         # Final Thesis received but never forwarded to COE (pending group 1)
         # NOTE: thesis_forward_coe is DATE on Postgres, and '' is not a
@@ -1773,7 +1788,14 @@ def query_students(args, limit=None, offset=None):
     if limit is not None:
         sql += " LIMIT ? OFFSET ?"
         params += [limit, offset or 0]
-    return [dict(r) for r in get_db().fetchall(sql, params)]
+    rows = []
+    for r in get_db().fetchall(sql, params):
+        d = dict(r)
+        d["has_photo"] = 1 if d.pop("photo_data", None) else 0
+        d.pop("photo_name", None)
+        d.pop("photo_mime", None)
+        rows.append(d)
+    return rows
 
 
 JOURNEY_STAGES = ["Admission", "Synopsis", "Semi-Final Thesis",
@@ -2125,6 +2147,43 @@ def admin_dashboard():
         if v in months:
             by_month[v] = by_month.get(v, 0) + 1
     trend_counts = [by_month.get(x, 0) for x in months]
+    trend_labels = [datetime.strptime(x, "%Y-%m").strftime("%b %y")
+                    for x in months]
+    # viva outcomes trend over the same 6 months (Advanced #16)
+    viva_pass = {x: 0 for x in months}
+    viva_fail = {x: 0 for x in months}
+    for r in db.fetchall("SELECT viva_date, result FROM viva_records"):
+        r = dict(r)
+        k = (r.get("viva_date") or "")[:7]
+        if k in viva_pass:
+            if r.get("result") == "Pass":
+                viva_pass[k] += 1
+            elif r.get("result") == "Fail":
+                viva_fail[k] += 1
+    # deadlines due in the next 7 days, from the saved schedules
+    # (Advanced #10) — adjusted dates are the effective ones
+    deadlines = []
+    try:
+        today_d = now.date()
+        for rec in db.fetchall("SELECT * FROM saved_schedules"):
+            rec = dict(rec)
+            try:
+                srows = deserialize_rows(
+                    _json.loads(rec.get("rows_json") or "[]"))
+            except Exception:
+                continue
+            for srow in srows:
+                for d in srow["adjusted"]:
+                    if today_d <= d <= today_d + timedelta(days=7):
+                        deadlines.append({
+                            "session": rec.get("session"),
+                            "document": srow["document"],
+                            "date": d.strftime("%d %b %Y"),
+                            "days": (d - today_d).days})
+        deadlines.sort(key=lambda x: x["days"])
+        deadlines = deadlines[:10]
+    except Exception:
+        deadlines = []
     cur_month = months[-1]
     prev_month = months[-2]
     ym_pat = cur_month + "%"
@@ -2159,6 +2218,10 @@ def admin_dashboard():
         pending=pending, pipeline=pipeline, dept_rows=dept_rows,
         uploads_queue=uploads_queue, activity=activity, quality=quality,
         trend_months=months, trend_counts=trend_counts,
+        trend_labels=trend_labels,
+        viva_pass=[viva_pass[x] for x in months],
+        viva_fail=[viva_fail[x] for x in months],
+        deadlines=deadlines,
         trend_current=by_month.get(cur_month, 0),
         trend_previous=by_month.get(prev_month, 0),
         viva_month=viva_month, uploads_pending_total=uploads_pending_total,
@@ -3451,7 +3514,7 @@ def _backup_counts():
     return counts
 
 
-def _backup_payload():
+def _backup_payload(include_docs=True):
     import base64 as b64
     db = get_db()
     payload = {"system": "DAS Student Portal — CUVAS",
@@ -3471,6 +3534,8 @@ def _backup_payload():
             d = dict(r)
             if tbl == "settings" and d.get("key") == "admin_pw":
                 d["value"] = "(excluded)"
+            if not include_docs and tbl == "documents":
+                d["file_data"] = "(excluded in light backup)"
             for k, v in list(d.items()):
                 if isinstance(v, (bytes, memoryview)):
                     d[k] = {"__b64__": b64.b64encode(bytes(v)).decode()}
@@ -3525,8 +3590,15 @@ def admin_users_shared_login():
 def admin_backup():
     counts = _backup_counts()
     total = sum(v for v in counts.values() if v)
-    return render_template("admin_backup.html", uni=UNI_NAME,
-                           title=PORTAL_TITLE, counts=counts, total=total)
+    drow = get_db().fetchone(
+        "SELECT COUNT(*) AS n, COALESCE(SUM(LENGTH(file_data)), 0)"
+        " AS b FROM documents")
+    docs_n = (drow["n"] if isinstance(drow, dict) else drow[0]) or 0
+    docs_b = (drow["b"] if isinstance(drow, dict) else drow[1]) or 0
+    return render_template(
+        "admin_backup.html", uni=UNI_NAME, title=PORTAL_TITLE,
+        counts=counts, total=total, docs_n=docs_n,
+        docs_mb=round(docs_b / 1048576, 1))
 
 
 @app.route("/admin/backup/download")
@@ -3535,9 +3607,11 @@ def admin_backup_download():
     guard = _super_only()
     if guard:
         return guard
-    payload = _backup_payload()
+    light = request.args.get("docs") == "0"
+    payload = _backup_payload(include_docs=not light)
     log_activity(current_admin()["name"], "backup_download",
-                 "Full JSON backup downloaded")
+                 "Light JSON backup downloaded (documents excluded)"
+                 if light else "Full JSON backup downloaded")
     fname = "das-backup-" + datetime.now().strftime("%Y%m%d-%H%M") + ".json"
     return Response(_json.dumps(payload, indent=1),
                     mimetype="application/json",
@@ -4006,6 +4080,10 @@ def _report_catalog():
                 {"overdue": "1"}),
             stu("Needs COE", "Final Thesis received but the COE date is "
                 "still missing.", {"needs_coe": "1"}),
+            stu("Viva Passed — Status Not Updated",
+                "The viva result is Pass, but the student status still "
+                "says Continue / Viva Pending / Defense Pending.",
+                {"viva_passed_stale": "1"}),
         ]},
         {"title": "Programme & Gender", "icon": _ICON_CAP, "cards": [
             stu("MPhil Students", "All MPhil students, every department.",
@@ -4034,6 +4112,61 @@ def _report_catalog():
                  "Rescheduled"),
         ]},
     ]
+
+
+REPORT_COLUMNS = [
+    ("name", "Name", 26), ("reg_no", "Reg. No.", 16),
+    ("cnic", "CNIC", 17), ("father_name", "Father Name", 24),
+    ("gender", "Gender", 10), ("degree", "Degree", 22),
+    ("session", "Session", 12), ("department", "Department", 24),
+    ("status", "Status", 14), ("synopsis", "Synopsis", 13),
+    ("semi_final_thesis", "Semi-Final Thesis", 15),
+    ("final_thesis", "Final Thesis", 13),
+    ("folder_file", "Folder/File", 13), ("coe", "Thesis Forward (COE)", 16),
+    ("created_at", "Added On", 16),
+]
+
+
+@app.route("/admin/reports/custom", methods=["GET", "POST"])
+@admin_required
+def admin_reports_custom():
+    """Custom export builder (Advanced #13): pick the columns and
+    filters, download as Excel or PDF."""
+    if request.method == "POST":
+        keys = [k for k, _, _ in REPORT_COLUMNS
+                if request.form.get(f"col_{k}")]
+        if not keys:
+            keys = ["name", "reg_no", "status"]
+        args = {k: (request.form.get(k) or "").strip()
+                for k in ("status", "session", "degree", "department")}
+        students = query_students(args)
+        meta_map = {k: (lbl, w) for k, lbl, w in REPORT_COLUMNS}
+        headers = [meta_map[k][0] for k in keys]
+        widths = [meta_map[k][1] for k in keys]
+        rows = []
+        for s in students:
+            row = []
+            for k in keys:
+                if k == "coe":
+                    row.append(fmt_coe(s.get("thesis_forward_coe")))
+                elif k == "created_at":
+                    row.append((s.get("created_at") or "")[:16])
+                else:
+                    row.append(s.get(k) or "")
+            rows.append(row)
+        title = "Custom Student Export"
+        meta = [f"{len(rows)} student(s)",
+                "Columns: " + ", ".join(headers)]
+        if (request.form.get("format") or "excel") == "pdf":
+            return _report_pdf(title, meta, headers, widths, rows,
+                               "custom-export.pdf")
+        return _report_excel(title, meta, headers, widths, rows,
+                             "custom-export.xlsx")
+    return render_template(
+        "admin_reports_custom.html", uni=UNI_NAME, title=PORTAL_TITLE,
+        columns=REPORT_COLUMNS, status_list=STATUS_LIST,
+        sessions=distinct_values("session"),
+        degrees=distinct_values("degree"), departments=dept_names())
 
 
 @app.route("/admin/reports")
@@ -6444,6 +6577,97 @@ def admin_student_profile(sid):
                            departments=dept_names())
 
 
+@app.route("/photo/<int:sid>")
+def student_photo(sid):
+    """Student photo (Advanced #19). Visible to the admin, the
+    student themself, their own department and their current
+    supervisor — nobody else."""
+    db = get_db()
+    ok = False
+    if session.get("admin"):
+        ok = True
+    elif session.get("student_id") == sid:
+        ok = True
+    elif session.get("dept_id"):
+        dept = current_dept()
+        srow = db.fetchone(
+            "SELECT department FROM students WHERE id=?", (sid,))
+        if dept and srow:
+            norm = lambda v: (v or "").lower().replace(
+                "department of ", "").strip()
+            ok = norm(dict(srow).get("department")) == norm(dept["name"])
+    elif session.get("supervisor_id"):
+        ok = bool(db.fetchone(
+            "SELECT id FROM supervisor_assignments WHERE student_id=?"
+            " AND supervisor_id=? AND is_current=1",
+            (sid, session["supervisor_id"])))
+    if not ok:
+        return Response("Not found", status=404)
+    row = db.fetchone(
+        "SELECT photo_mime, photo_data FROM students WHERE id=?", (sid,))
+    if not row or not dict(row).get("photo_data"):
+        return Response("Not found", status=404)
+    d = dict(row)
+    data = d["photo_data"]
+    if isinstance(data, memoryview):
+        data = bytes(data)
+    resp = Response(data, mimetype=d.get("photo_mime") or "image/jpeg")
+    resp.headers["Cache-Control"] = "private, max-age=300"
+    return resp
+
+
+@app.route("/admin/student/<int:sid>/photo", methods=["POST"])
+@admin_required
+def admin_student_photo(sid):
+    """Upload / replace a student's photo (JPG or PNG)."""
+    s = get_student(sid)
+    if not s:
+        return render_template("notfound.html", uni=UNI_NAME,
+                               title=PORTAL_TITLE), 404
+    f = request.files.get("photo")
+    if not f or not f.filename:
+        flash("Choose a photo file first.")
+        return redirect(url_for("admin_student_profile", sid=sid))
+    ext = (f.filename.rsplit(".", 1)[-1].lower()
+           if "." in f.filename else "")
+    mimes = {"jpg": "image/jpeg", "jpeg": "image/jpeg",
+             "png": "image/png"}
+    if ext not in mimes:
+        flash("The photo must be a JPG or PNG image.")
+        return redirect(url_for("admin_student_profile", sid=sid))
+    data = f.read()
+    if len(data) > 5 * 1024 * 1024:
+        flash("The photo is too large — please keep it under 5 MB.")
+        return redirect(url_for("admin_student_profile", sid=sid))
+    db = get_db()
+    db.execute(
+        "UPDATE students SET photo_name=?, photo_mime=?, photo_data=?"
+        " WHERE id=?", (f.filename, mimes[ext], data, sid))
+    db.commit()
+    log_activity(current_admin()["name"], "student_photo",
+                 f"Photo updated for {s['name']} ({s['reg_no']})")
+    flash("Student photo updated.")
+    return redirect(url_for("admin_student_profile", sid=sid))
+
+
+@app.route("/admin/student/<int:sid>/photo/remove", methods=["POST"])
+@admin_required
+def admin_student_photo_remove(sid):
+    s = get_student(sid)
+    if not s:
+        return render_template("notfound.html", uni=UNI_NAME,
+                               title=PORTAL_TITLE), 404
+    db = get_db()
+    db.execute(
+        "UPDATE students SET photo_name=NULL, photo_mime=NULL,"
+        " photo_data=NULL WHERE id=?", (sid,))
+    db.commit()
+    log_activity(current_admin()["name"], "student_photo",
+                 f"Photo removed for {s['name']} ({s['reg_no']})")
+    flash("Student photo removed.")
+    return redirect(url_for("admin_student_profile", sid=sid))
+
+
 @app.route("/admin/student/<int:sid>/save", methods=["POST"])
 @admin_required
 def admin_student_save(sid):
@@ -6943,6 +7167,7 @@ def admin_students_search():
             "final_date": fmt_stamp_parts(s.get("final_thesis_at"))[0],
             "final_time": fmt_stamp_parts(s.get("final_thesis_at"))[1],
             "status": st, "pill": status_pill_class(st),
+            "has_photo": s.get("has_photo", 0),
         })
     return {"ok": True, "total": len(rows), "students": out}
 
@@ -8811,6 +9036,52 @@ def admin_degree_completion():
                            title=PORTAL_TITLE, rows=rows)
 
 
+@app.route("/admin/search.json")
+@admin_required
+def admin_global_search():
+    """Ctrl+K global search (Advanced #9): students, supervisors,
+    thesis cases and correspondence in one box."""
+    q = (request.args.get("q") or "").strip()
+    if len(q) < 2:
+        return jsonify(results=[])
+    db = get_db()
+    like = f"%{q}%"
+    out = []
+    for r in db.fetchall(
+            "SELECT id, name, reg_no, degree FROM students WHERE"
+            " name LIKE ? OR reg_no LIKE ? OR cnic LIKE ?"
+            " ORDER BY name LIMIT 8", (like, like, like)):
+        out.append({"kind": "Student", "title": r["name"],
+                    "sub": f"{r['reg_no']} · {r['degree'] or ''}",
+                    "url": url_for("admin_student_profile",
+                                   sid=r["id"])})
+    for r in db.fetchall(
+            "SELECT id, name, email FROM supervisors WHERE name LIKE ?"
+            " OR email LIKE ? ORDER BY name LIMIT 4", (like, like)):
+        out.append({"kind": "Supervisor", "title": r["name"],
+                    "sub": r["email"] or "",
+                    "url": url_for("admin_supervisors")})
+    for r in db.fetchall(
+            "SELECT c.case_status, s.id AS sid, s.name, s.reg_no"
+            " FROM thesis_cases c JOIN students s ON s.id=c.student_id"
+            " WHERE s.name LIKE ? OR s.reg_no LIKE ? LIMIT 5",
+            (like, like)):
+        out.append({"kind": "Thesis Case", "title": r["name"],
+                    "sub": f"{r['reg_no']} · {r['case_status']}",
+                    "url": url_for("admin_student_thesis",
+                                   sid=r["sid"])})
+    for r in db.fetchall(
+            "SELECT id, subject, dispatch_no, diary_no FROM"
+            " correspondence WHERE subject LIKE ? OR dispatch_no"
+            " LIKE ? OR diary_no LIKE ? ORDER BY id DESC LIMIT 5",
+            (like, like, like)):
+        ref = r["dispatch_no"] or r["diary_no"] or ""
+        out.append({"kind": "Letter", "title": r["subject"] or "(no subject)",
+                    "sub": ref,
+                    "url": url_for("admin_correspondence", q=q)})
+    return jsonify(results=out)
+
+
 @app.route("/admin/tasks", methods=["GET", "POST"])
 @admin_required
 def admin_tasks():
@@ -8886,6 +9157,25 @@ def admin_task_reopen(tid):
     return redirect(request.referrer or url_for("admin_tasks"))
 
 
+def _corr_days_waiting(rows):
+    """For outward letters still Dispatched: how many days the
+    acknowledgment has been awaited (Advanced #12)."""
+    today = datetime.now().date()
+    for r in rows:
+        r["days_waiting"] = None
+        if (r.get("direction") == "Outward"
+                and r.get("status") == "Dispatched"):
+            src = (r.get("sent_date") or r.get("letter_date")
+                   or "")[:10]
+            try:
+                r["days_waiting"] = (
+                    today - datetime.strptime(src, "%Y-%m-%d").date()
+                ).days
+            except Exception:
+                pass
+    return rows
+
+
 @app.route("/admin/student/<int:sid>/correspondence")
 @admin_required
 def admin_student_correspondence(sid):
@@ -8894,9 +9184,9 @@ def admin_student_correspondence(sid):
         return render_template("notfound.html", uni=UNI_NAME,
                                title=PORTAL_TITLE,
                                message="Student not found."), 404
-    rows = [dict(r) for r in get_db().execute(
+    rows = _corr_days_waiting([dict(r) for r in get_db().execute(
         "SELECT * FROM correspondence WHERE student_id=?"
-        " ORDER BY id DESC", (sid,)).fetchall()]
+        " ORDER BY id DESC", (sid,)).fetchall()])
     return render_template(
         "admin_student_correspondence.html", uni=UNI_NAME,
         title=PORTAL_TITLE, s=s, rows=rows,
@@ -8927,7 +9217,23 @@ def admin_correspondence_add(sid):
         status = "Dispatched"
         sent = (request.form.get("letter_date") or "").strip() or now[:10]
         received = ""
-    _cvals = (sid or None, direction,
+    att_name = att_mime = att_data = None
+    att = request.files.get("attachment")
+    if att and att.filename:
+        ext = (att.filename.rsplit(".", 1)[-1].lower()
+               if "." in att.filename else "")
+        _mimes = {"pdf": "application/pdf", "jpg": "image/jpeg",
+                  "jpeg": "image/jpeg", "png": "image/png"}
+        if ext not in _mimes:
+            flash("Attachments must be a PDF or an image (JPG / PNG).")
+            if not sid or request.form.get("back") == "register":
+                return redirect(url_for("admin_correspondence"))
+            return redirect(url_for("admin_student_correspondence",
+                                    sid=sid))
+        att_data = att.read()
+        att_name = att.filename
+        att_mime = _mimes[ext]
+    _cvals = (att_name, att_mime, att_data, sid or None, direction,
               (request.form.get("subject") or "").strip(),
               (request.form.get("party") or "").strip(),
               (request.form.get("ref_no") or "").strip(),
@@ -8937,11 +9243,12 @@ def admin_correspondence_add(sid):
               sent, received, status,
               (request.form.get("remarks") or "").strip(),
               current_admin()["name"], now)
-    _csql = ("INSERT INTO correspondence (student_id, direction,"
+    _csql = ("INSERT INTO correspondence (file_name, mime_type,"
+             " file_data, student_id, direction,"
              " subject, party, ref_no, diary_no, dispatch_no,"
              " letter_date, sent_date, received_date, status, remarks,"
              " recorded_by, created_at) VALUES"
-             " (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
+             " (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
     if USE_PG:
         cid = db.fetchone(_csql + " RETURNING id", _cvals)["id"]
     else:
@@ -9010,6 +9317,23 @@ def admin_correspondence_delete(cid):
                                 sid=dict(row)["student_id"]))
     return redirect(url_for("admin_correspondence"))
 
+@app.route("/admin/correspondence/<int:cid>/attachment")
+@admin_required
+def admin_correspondence_attachment(cid):
+    """Download a letter's scanned attachment (Advanced #12)."""
+    row = get_db().fetchone(
+        "SELECT * FROM correspondence WHERE id=?", (cid,))
+    if not row or not dict(row).get("file_name"):
+        flash("This letter has no attachment.")
+        return redirect(url_for("admin_correspondence"))
+    d = dict(row)
+    return Response(
+        doc_bytes(d),
+        mimetype=d.get("mime_type") or "application/octet-stream",
+        headers={"Content-Disposition":
+                 f'attachment; filename="{d["file_name"]}"'})
+
+
 
 @app.route("/admin/correspondence")
 @admin_required
@@ -9017,6 +9341,7 @@ def admin_correspondence():
     db = get_db()
     direction = (request.args.get("direction") or "").strip()
     status = (request.args.get("status") or "").strip()
+    awaiting = (request.args.get("awaiting") or "").strip()
     q = (request.args.get("q") or "").strip()
     sql = ("SELECT c.*, st.name AS student_name, st.reg_no"
            " FROM correspondence c"
@@ -9028,6 +9353,8 @@ def admin_correspondence():
     if status:
         sql += " AND c.status=?"
         params.append(status)
+    if awaiting:
+        sql += " AND c.direction='Outward' AND c.status='Dispatched'"
     if q:
         sql += (" AND (LOWER(c.subject) LIKE ? OR LOWER(c.party) LIKE ?"
                 " OR c.diary_no LIKE ? OR c.dispatch_no LIKE ?"
@@ -9035,14 +9362,16 @@ def admin_correspondence():
         like = f"%{q.lower()}%"
         params += [like, like, f"%{q}%", f"%{q}%", like]
     sql += " ORDER BY c.id DESC LIMIT 300"
-    rows = [dict(r) for r in db.execute(sql, params).fetchall()]
+    rows = _corr_days_waiting(
+        [dict(r) for r in db.execute(sql, params).fetchall()])
     students = [dict(r) for r in db.execute(
         "SELECT id, name, reg_no FROM students ORDER BY name"
     ).fetchall()]
     return render_template(
         "admin_correspondence.html", uni=UNI_NAME, title=PORTAL_TITLE,
         rows=rows, students=students, direction=direction,
-        status=status, q=q, today=datetime.now().strftime("%Y-%m-%d"))
+        status=status, awaiting=awaiting, q=q,
+        today=datetime.now().strftime("%Y-%m-%d"))
 
 
 # ---------------- student portal ----------------
@@ -9427,14 +9756,29 @@ def _student_profile_pdf_bytes(s, docs, vivas):
         str(x) for x in (s.get("degree"),
                          f"Session {s.get('session')}" if s.get("session")
                          else None) if x) or "N/A"
-    identity = Table(
-        [[
-            [P(s.get("name") or "N/A", name_style),
-             P(s.get("reg_no") or "N/A", id_style),
-             P(degree_line, id_style)],
-            Pill(status, badge_bg, badge_fg),
-        ]],
-        colWidths=[W * 0.72, W * 0.28])
+    _photo_img = None
+    _pdata = s.get("photo_data")
+    if _pdata:
+        try:
+            from reportlab.platypus import Image as _RLImage
+            if isinstance(_pdata, memoryview):
+                _pdata = bytes(_pdata)
+            _photo_img = _RLImage(io.BytesIO(_pdata), width=22 * mm,
+                                  height=22 * mm, kind="proportional")
+            _photo_img.hAlign = "LEFT"
+        except Exception:
+            _photo_img = None
+    _id_text = [P(s.get("name") or "N/A", name_style),
+                P(s.get("reg_no") or "N/A", id_style),
+                P(degree_line, id_style)]
+    if _photo_img:
+        identity = Table(
+            [[_photo_img, _id_text, Pill(status, badge_bg, badge_fg)]],
+            colWidths=[24 * mm, W * 0.72 - 24 * mm, W * 0.28])
+    else:
+        identity = Table(
+            [[_id_text, Pill(status, badge_bg, badge_fg)]],
+            colWidths=[W * 0.72, W * 0.28])
     identity.setStyle(TableStyle([
         ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
         ("ALIGN", (1, 0), (1, 0), "RIGHT"),
