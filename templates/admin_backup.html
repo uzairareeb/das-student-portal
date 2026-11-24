@@ -6,6 +6,8 @@
     <p>One-click full backup of the whole system — every table, including uploaded files. Keep the downloaded file somewhere safe.</p>
   </div>
   <a class="btn primary" href="{{ url_for('admin_backup_download') }}">Download backup (JSON)</a>
+  <a class="btn ghost" href="{{ url_for('admin_backup_download', docs='0') }}">Download without document files (light)</a>
+  <p class="hint">Document storage inside the database: <strong>{{ docs_n }} file(s) · {{ docs_mb }} MB</strong>.{% if docs_mb >= 50 %} This is getting large — full backups will be slow to download; prefer the light backup for routine copies and keep one full backup in a safe place.{% else %} The full backup includes these files; the light backup keeps every record but skips the file bytes, so it stays small and fast.{% endif %}</p>
 </div>
 
 <div class="card section">

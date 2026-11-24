@@ -111,6 +111,23 @@
 
 <!-- Row: Status + Viva -->
 <div class="dash-row">
+  <!-- 3b. Deadlines This Week -->
+  <section class="card dash-card">
+    <div class="dash-card-head">
+      <h3><span class="dash-ico blue"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg></span> Deadlines This Week</h3>
+      <a href="{{ url_for('admin_schedule') }}">Schedule Generator</a>
+    </div>
+    {% if deadlines %}
+    <ul class="legend-list">
+      {% for d in deadlines %}
+      <li><span class="dot" style="background:#1769e8"></span>{{ d.document }} — {{ d.session }}<strong>{{ d.date }}{% if d.days == 0 %} (today){% elif d.days == 1 %} (tomorrow){% else %} (in {{ d.days }} days){% endif %}</strong></li>
+      {% endfor %}
+    </ul>
+    {% else %}
+    <p class="hint" style="margin:0">No schedule deadlines fall in the next 7 days. Deadlines come from the saved schedules in the Schedule Generator.</p>
+    {% endif %}
+  </section>
+
   <!-- 4. Students by Status -->
   <section class="card dash-card">
     <div class="dash-card-head">
@@ -144,6 +161,17 @@
 
 <!-- Row: Session + Top Degrees -->
 <div class="dash-row">
+  <!-- 5b. Trends -->
+  <section class="card dash-card">
+    <div class="dash-card-head">
+      <h3><span class="dash-ico teal"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg></span> Trends — Last 6 Months</h3>
+    </div>
+    <p class="hint" style="margin:0 0 6px">New students added</p>
+    <div class="chart-box"><canvas id="chTrend"></canvas></div>
+    <p class="hint" style="margin:12px 0 6px">Viva outcomes (Pass / Fail)</p>
+    <div class="chart-box"><canvas id="chVivaTrend"></canvas></div>
+  </section>
+
   <!-- 6. Students by Academic Session -->
   <section class="card dash-card">
     <div class="dash-card-head">
@@ -271,6 +299,27 @@
       datasets: [{ data: {{ sessions|map(attribute=1)|list|tojson }}, backgroundColor: palette, borderRadius: 8, barThickness: 42 }]
     },
     options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } },
+      scales: { y: { beginAtZero: true, ticks: { precision: 0 }, grid: { color: '#eef2f7' } }, x: { grid: { display: false } } } }
+  });
+  new Chart(document.getElementById('chTrend'), {
+    type: 'bar',
+    data: {
+      labels: {{ trend_labels|tojson }},
+      datasets: [{ data: {{ trend_counts|tojson }}, backgroundColor: '#1769e8', borderRadius: 8, barThickness: 42 }]
+    },
+    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } },
+      scales: { y: { beginAtZero: true, ticks: { precision: 0 }, grid: { color: '#eef2f7' } }, x: { grid: { display: false } } } }
+  });
+  new Chart(document.getElementById('chVivaTrend'), {
+    type: 'bar',
+    data: {
+      labels: {{ trend_labels|tojson }},
+      datasets: [
+        { label: 'Pass', data: {{ viva_pass|tojson }}, backgroundColor: '#15803d', borderRadius: 6, barThickness: 18 },
+        { label: 'Fail', data: {{ viva_fail|tojson }}, backgroundColor: '#b91c1c', borderRadius: 6, barThickness: 18 }
+      ]
+    },
+    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom' } },
       scales: { y: { beginAtZero: true, ticks: { precision: 0 }, grid: { color: '#eef2f7' } }, x: { grid: { display: false } } } }
   });
 })();
