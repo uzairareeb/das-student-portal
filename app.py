@@ -2209,6 +2209,17 @@ def admin_dashboard():
         "SELECT COUNT(*) AS n FROM dept_uploads WHERE status='pending'")
     greeting = ("Good Morning" if now.hour < 12 else
                 "Good Afternoon" if now.hour < 17 else "Good Evening")
+    try:
+        dash_tasks = [dict(r) for r in db.fetchall(
+            "SELECT t.id, t.title, t.responsible_role, t.due_date, "
+            "t.priority, t.student_id, s.name AS student_name "
+            "FROM workflow_tasks t "
+            "LEFT JOIN students s ON s.id = t.student_id "
+            "WHERE t.status='Pending' "
+            "ORDER BY CASE WHEN t.due_date IS NULL OR t.due_date='' "
+            "THEN 1 ELSE 0 END, t.due_date LIMIT 5")]
+    except Exception:
+        dash_tasks = []
     return render_template(
         "admin_dashboard.html", uni=UNI_NAME, title=PORTAL_TITLE,
         total=total, stats=stats, status_list=STATUS_LIST,
@@ -2226,7 +2237,8 @@ def admin_dashboard():
         trend_previous=by_month.get(prev_month, 0),
         viva_month=viva_month, uploads_pending_total=uploads_pending_total,
         today_str=now.strftime("%A, %d %B %Y"),
-        greeting=greeting, top_programs=top_programs)
+        greeting=greeting, top_programs=top_programs,
+        dash_tasks=dash_tasks, today_iso=now.date().isoformat())
 
 
 @app.route("/admin/students")

@@ -46,7 +46,7 @@
     </div>
     <div class="tile-grid">
       <a class="tile t-blue" href="{{ url_for('admin_students') }}">
-        <span class="tile-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></span><div><div class="n">{{ total }}</div><div class="t">Total Students</div><div class="tile-bar"><span style="width: 100%; background: #1769e8"></span></div><div class="tile-pct">All students</div></div>
+        <span class="tile-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></span><div><div class="n">{{ total }}</div><div class="t">Total Students</div><div class="tile-bar"><span style="width: 100%; background: #2563EB"></span></div><div class="tile-pct">All students</div></div>
       </a>
       {% for st in status_list %}
       {% if st == 'Continue' %}{% set tc = 't-green' %}
@@ -60,7 +60,7 @@
       {% elif st == 'Pass Out' %}{% set tc = 't-red2' %}
       {% else %}{% set tc = 't-slate' %}{% endif %}
       {% set pct = ((stats.get(st, 0) / total * 100)|round(1)) if total else 0 %}
-      {% set bar_c = {'t-blue': '#1769e8', 't-green': '#047857', 't-green2': '#059669', 't-amber': '#d97706', 't-purple': '#6654a3', 't-purple2': '#7c3aed', 't-red': '#b91c1c', 't-red2': '#e11d48', 't-blue2': '#2563eb', 't-blue3': '#0284c7', 't-slate': '#475569'} %}
+      {% set bar_c = {'t-blue': '#2563EB', 't-green': '#047857', 't-green2': '#059669', 't-amber': '#d97706', 't-purple': '#6654a3', 't-purple2': '#3157A4', 't-red': '#b91c1c', 't-red2': '#e11d48', 't-blue2': '#2563eb', 't-blue3': '#0284c7', 't-slate': '#475569'} %}
       <a class="tile {{ tc }}" href="{{ url_for('admin_students', status=st) }}">
         <span class="tile-ico">{% if st == 'Continue' %}<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="6 3 20 12 6 21 6 3"/></svg>{% elif st == 'Freeze' %}<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="14" y="4" width="4" height="16" rx="1"/><rect x="6" y="4" width="4" height="16" rx="1"/></svg>{% elif st == 'Left' %}<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>{% elif st == 'Admission Cancelled' %}<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>{% elif st == 'Viva Done' %}<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>{% elif st == 'Viva Pending' %}<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>{% elif st == 'Defense Pending' %}<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>{% elif st == 'Sent to COE' %}<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>{% elif st == 'Pass Out' %}<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 10L12 5 2 10l10 5 10-5z"/><path d="M6 12v5c0 1.7 2.7 3 6 3s6-1.3 6-3v-5"/><line x1="22" y1="10" x2="22" y2="16"/></svg>{% endif %}</span><div><div class="n">{{ stats.get(st, 0) }}</div><div class="t">{{ st }}</div><div class="tile-bar"><span style="width: {{ pct }}%; background: {{ bar_c[tc] }}"></span></div><div class="tile-pct">{{ pct }}% of total</div></div>
       </a>
@@ -71,7 +71,7 @@
   <!-- 2. Quick Actions -->
   <section class="card dash-card">
     <div class="dash-card-head">
-      <h3><span class="dash-ico purple"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg></span> Quick Actions</h3>
+      <h3><span class="dash-ico blue"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg></span> Quick Actions</h3>
     </div>
     <div class="quick-list">
       <a class="quick-row" href="{{ url_for('admin_student_new') }}"><span class="q-ico blue"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg></span><span><strong>Add Student</strong><small>Create a new student record</small></span></a>
@@ -109,8 +109,29 @@
   {% endif %}
 </section>
 
-<!-- Row: Status + Viva -->
+<!-- Row: Tasks + Deadlines -->
 <div class="dash-row">
+  <!-- 3a. Pending Tasks -->
+  <section class="card dash-card">
+    <div class="dash-card-head">
+      <h3><span class="dash-ico blue"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg></span> Pending Tasks</h3>
+      <a href="{{ url_for('admin_tasks') }}">View all tasks</a>
+    </div>
+    {% if dash_tasks %}
+    {% for t in dash_tasks %}
+    <div class="flex items-start justify-between gap-3 border-b border-line py-2.5 last:border-0">
+      <div class="min-w-0">
+        <div class="text-sm font-semibold text-ink">{{ t.title }}</div>
+        <div class="text-xs text-muted">{{ t.responsible_role }}{% if t.student_name %} &middot; <a class="font-semibold text-primary" href="{{ url_for('admin_student_profile', sid=t.student_id) }}">{{ t.student_name }}</a>{% endif %}{% if t.priority == 'High' %} &middot; <span class="font-bold text-red-700">High priority</span>{% endif %}</div>
+      </div>
+      {% if t.due_date %}<span class="badge {% if t.due_date < today_iso %}badge-bad{% else %}badge-neutral{% endif %}">{{ t.due_date }}{% if t.due_date < today_iso %} &middot; overdue{% endif %}</span>{% endif %}
+    </div>
+    {% endfor %}
+    {% else %}
+    <p class="hint" style="margin:0">No pending tasks. Tasks are created automatically — upload reviews, thesis receipts, letter acknowledgments — or added from the Tasks page.</p>
+    {% endif %}
+  </section>
+
   <!-- 3b. Deadlines This Week -->
   <section class="card dash-card">
     <div class="dash-card-head">
@@ -120,14 +141,17 @@
     {% if deadlines %}
     <ul class="legend-list">
       {% for d in deadlines %}
-      <li><span class="dot" style="background:#1769e8"></span>{{ d.document }} — {{ d.session }}<strong>{{ d.date }}{% if d.days == 0 %} (today){% elif d.days == 1 %} (tomorrow){% else %} (in {{ d.days }} days){% endif %}</strong></li>
+      <li><span class="dot" style="background:#2563EB"></span>{{ d.document }} — {{ d.session }}<strong>{{ d.date }}{% if d.days == 0 %} (today){% elif d.days == 1 %} (tomorrow){% else %} (in {{ d.days }} days){% endif %}</strong></li>
       {% endfor %}
     </ul>
     {% else %}
     <p class="hint" style="margin:0">No schedule deadlines fall in the next 7 days. Deadlines come from the saved schedules in the Schedule Generator.</p>
     {% endif %}
   </section>
+</div>
 
+<!-- Row: Status + Viva -->
+<div class="dash-row">
   <!-- 4. Students by Status -->
   <section class="card dash-card">
     <div class="dash-card-head">
@@ -138,7 +162,7 @@
       <div class="donut-box"><canvas id="chStatus"></canvas><div class="donut-centre"><div class="n">{{ total }}</div><div class="t">Total</div></div></div>
       <ul class="legend-list">
         {% for st in status_list %}
-        <li><span class="dot" style="background:{{ ['#2457a7', '#15803d', '#d97706', '#7c3aed', '#b91c1c', '#0e7490', '#db2777', '#475569', '#f59e0b'][loop.index0 % 9] }}"></span>{{ st }}<strong>{{ stats.get(st, 0) }} ({{ (stats.get(st, 0) * 100 // total) if total else 0 }}%)</strong></li>
+        <li><span class="dot" style="background:{{ ['#3157A4', '#15803d', '#d97706', '#3157A4', '#b91c1c', '#0e7490', '#db2777', '#475569', '#f59e0b'][loop.index0 % 9] }}"></span>{{ st }}<strong>{{ stats.get(st, 0) }} ({{ (stats.get(st, 0) * 100 // total) if total else 0 }}%)</strong></li>
         {% endfor %}
       </ul>
     </div>
@@ -184,14 +208,14 @@
   <!-- 7. Top Degree Programmes -->
   <section class="card dash-card">
     <div class="dash-card-head">
-      <h3><span class="dash-ico purple"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 10L12 5 2 10l10 5 10-5z"/><path d="M6 12v5c0 1.7 2.7 3 6 3s6-1.3 6-3v-5"/><line x1="22" y1="10" x2="22" y2="16"/></svg></span> Top Degree Programmes</h3>
+      <h3><span class="dash-ico blue"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 10L12 5 2 10l10 5 10-5z"/><path d="M6 12v5c0 1.7 2.7 3 6 3s6-1.3 6-3v-5"/><line x1="22" y1="10" x2="22" y2="16"/></svg></span> Top Degree Programmes</h3>
       <a href="{{ url_for('admin_students') }}">View All</a>
     </div>
     <div class="donut-wrap">
       <div class="donut-box"><canvas id="chProgram"></canvas><div class="donut-centre"><div class="n">{{ total }}</div><div class="t">Total</div></div></div>
       <ul class="legend-list">
         {% for name, n in top_programs %}
-        <li><span class="dot" style="background:{{ ['#6654a3', '#2457a7', '#15803d', '#d97706'][loop.index0 % 4] }}"></span>{{ name }}<strong>{{ n }} ({{ (n * 100 // total) if total else 0 }}%)</strong></li>
+        <li><span class="dot" style="background:{{ ['#6654a3', '#3157A4', '#15803d', '#d97706'][loop.index0 % 4] }}"></span>{{ name }}<strong>{{ n }} ({{ (n * 100 // total) if total else 0 }}%)</strong></li>
         {% endfor %}
       </ul>
     </div>
@@ -282,7 +306,7 @@
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 <script>
 (function () {
-  var palette = ['#2457a7', '#15803d', '#d97706', '#7c3aed', '#b91c1c', '#0e7490', '#db2777', '#475569', '#f59e0b'];
+  var palette = ['#3157A4', '#15803d', '#d97706', '#3157A4', '#b91c1c', '#0e7490', '#db2777', '#475569', '#f59e0b'];
   function doughnut(id, labels, data) {
     new Chart(document.getElementById(id), {
       type: 'doughnut',
@@ -305,7 +329,7 @@
     type: 'bar',
     data: {
       labels: {{ trend_labels|tojson }},
-      datasets: [{ data: {{ trend_counts|tojson }}, backgroundColor: '#1769e8', borderRadius: 8, barThickness: 42 }]
+      datasets: [{ data: {{ trend_counts|tojson }}, backgroundColor: '#2563EB', borderRadius: 8, barThickness: 42 }]
     },
     options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } },
       scales: { y: { beginAtZero: true, ticks: { precision: 0 }, grid: { color: '#eef2f7' } }, x: { grid: { display: false } } } }
