@@ -15,7 +15,7 @@
   {% if rows %}
   <div class="table-scroll">
     <table class="data-table">
-      <thead><tr><th>Student</th><th>Degree / Session</th><th>Checklist</th><th>State</th><th></th></tr></thead>
+      <thead><tr><th>Student</th><th>Degree / Session</th><th>Checklist</th><th>State</th><th>Waiting On</th><th></th></tr></thead>
       <tbody>
         {% for r in rows %}
         <tr>
@@ -23,6 +23,7 @@
           <td>{{ r.s.degree or '—' }} / {{ r.s.session or '—' }}</td>
           <td>{{ r.done }} of {{ r.req }} required</td>
           <td>{% if r.rec %}<span class="pill q">Issued {{ r.rec.issued_date }}</span>{% elif r.ready %}<span class="pill q">Ready to Issue</span>{% else %}<span class="pill">{{ r.s.degree_status or '—' }}</span>{% endif %}</td>
+          <td>{% if r.blockers %}{% for b in r.blockers[:3] %}<span class="pill">{{ b }}</span> {% endfor %}{% if r.blockers|length > 3 %}<span class="hint">+{{ r.blockers|length - 3 }} more</span>{% endif %}{% elif r.rec %}—{% else %}—{% endif %}</td>
           <td><a class="btn ghost sm" href="{{ url_for('admin_student_progress', sid=r.s.id) }}">Open</a></td>
         </tr>
         {% endfor %}

@@ -307,3 +307,40 @@ def student_timeline(db, student_id, limit=100):
         "SELECT * FROM workflow_events WHERE student_id=?"
         " ORDER BY id DESC LIMIT ?", (student_id, limit)).fetchall()
     return [dict(r) for r in rows]
+
+
+def ensure_task(db, student_id, responsible_role, action, title,
+                due_date="", priority="Normal", created_by="system"):
+    """Create a task unless an identical open one already exists
+    (Advanced #1 auto-tasks). Caller commits."""
+    if student_id is None:
+        row = db.execute(
+            "SELECT id FROM workflow_tasks WHERE student_id IS NULL"
+            " AND action=? AND status='Pending'",
+            (action,)).fetchone()
+    else:
+        row = db.execute(
+            "SELECT id FROM workflow_tasks WHERE student_id=?"
+            " AND action=? AND status='Pending'",
+            (student_id, action)).fetchone()
+    if row:
+        return row["id"] if isinstance(row, dict) else row[0]
+    return create_task(db, student_id, responsible_role, action, title,
+                       due_date=due_date, priority=priority,
+                       created_by=created_by)
+
+
+def complete_open_tasks(db, student_id, action, completed_by):
+    """Complete every pending task with this action for the student
+    (or for general, student-less tasks when student_id is None)."""
+    if student_id is None:
+        db.execute(
+            "UPDATE workflow_tasks SET status='Done', completed_at=?,"
+            " completed_by=? WHERE student_id IS NULL AND action=?"
+            " AND status='Pending'", (_now(), completed_by, action))
+    else:
+        db.execute(
+            "UPDATE workflow_tasks SET status='Done', completed_at=?,"
+            " completed_by=? WHERE student_id=? AND action=?"
+            " AND status='Pending'",
+            (_now(), completed_by, student_id, action))

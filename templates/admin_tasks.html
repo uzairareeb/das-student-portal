@@ -1,0 +1,82 @@
+{% extends "admin_base.html" %}
+{% block container_extra %} wide{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <h2>Office Tasks</h2>
+    <p>Who owes what, by when. The system creates tasks itself — a department upload awaiting review, a thesis case awaiting the Controller's receipt, a letter awaiting acknowledgment — and completing the real step completes the task. You can also add tasks by hand.</p>
+  </div>
+</div>
+
+<div class="card section">
+  <div class="section-head">
+    <span class="section-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg></span>
+    <h3>Add a Task</h3>
+  </div>
+  <form method="post" class="row" style="gap:8px;flex-wrap:wrap">
+    <input class="no-icon" type="text" name="title" placeholder="Task title" required style="min-width:260px">
+    <select class="no-icon" name="student_id">
+      <option value="">— General (no student) —</option>
+      {% for st in students %}<option value="{{ st.id }}">{{ st.name }} ({{ st.reg_no }})</option>{% endfor %}
+    </select>
+    <select class="no-icon" name="role">
+      {% for r in roles %}<option value="{{ r }}">{{ r }}</option>{% endfor %}
+    </select>
+    <input class="no-icon" type="date" name="due_date">
+    <select class="no-icon" name="priority">
+      <option>Normal</option><option>High</option><option>Low</option>
+    </select>
+    <button type="submit" class="btn primary">Add Task</button>
+  </form>
+</div>
+
+<div class="card section">
+  <div class="section-head">
+    <span class="section-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg></span>
+    <h3>Tasks ({{ rows|length }})</h3>
+  </div>
+  <div class="row mb-4" style="gap:6px;flex-wrap:wrap">
+    <a class="btn {% if not role_f %}primary{% else %}ghost{% endif %} sm" href="{{ url_for('admin_tasks', done='1' if show_done else None) }}">All offices</a>
+    {% for r in roles %}
+    <a class="btn {% if role_f == r %}primary{% else %}ghost{% endif %} sm" href="{{ url_for('admin_tasks', role=r, done='1' if show_done else None) }}">{{ r }}</a>
+    {% endfor %}
+    {% if show_done %}
+    <a class="btn light sm" href="{{ url_for('admin_tasks', role=role_f or None) }}">Hide completed</a>
+    {% else %}
+    <a class="btn light sm" href="{{ url_for('admin_tasks', role=role_f or None, done='1') }}">Show completed</a>
+    {% endif %}
+  </div>
+  {% if rows %}
+  <div class="table-scroll">
+    <table class="data-table">
+      <thead><tr><th>Task</th><th>Student</th><th>Office</th><th>Due</th><th>Priority</th><th>Status</th><th></th></tr></thead>
+      <tbody>
+        {% for r in rows %}
+        <tr>
+          <td>{{ r.title }}<div class="hint">Created by {{ r.created_by or 'system' }} · {{ (r.created_at or '')[:10] }}</div></td>
+          <td>{% if r.student_id %}<a href="{{ url_for('admin_student_profile', sid=r.student_id) }}">{{ r.student_name }}</a><div class="hint">{{ r.student_reg }}</div>{% else %}—{% endif %}</td>
+          <td>{{ r.responsible_role }}</td>
+          <td>{% if r.due_date %}<span{% if r.overdue %} style="color:#c0392b;font-weight:700"{% endif %}>{{ r.due_date }}{% if r.overdue %} (overdue){% endif %}</span>{% else %}—{% endif %}</td>
+          <td>{% if r.priority == 'High' %}<span class="pill q">High</span>{% else %}{{ r.priority or 'Normal' }}{% endif %}</td>
+          <td>{% if r.status == 'Done' %}<span class="pill q">Done</span><div class="hint">{{ r.completed_by or '' }}</div>{% else %}<span class="pill">Pending</span>{% endif %}</td>
+          <td>
+            {% if r.status == 'Pending' %}
+            <form method="post" action="{{ url_for('admin_task_done', tid=r.id) }}">
+              <button type="submit" class="btn primary sm">Mark Done</button>
+            </form>
+            {% else %}
+            <form method="post" action="{{ url_for('admin_task_reopen', tid=r.id) }}">
+              <button type="submit" class="btn ghost sm">Reopen</button>
+            </form>
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="empty"><p>No tasks here. New tasks appear automatically as work flows through the system.</p></div>
+  {% endif %}
+</div>
+{% endblock %}

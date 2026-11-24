@@ -3270,6 +3270,8 @@ def admin_upload_approve(uid):
                (added, current_admin()["name"], now, uid))
     db.commit()
     _sync_missing_dimensions(db)
+    wf.complete_open_tasks(db, None, f"upload_review:{uid}",
+                           current_admin()["name"])
     db.commit()
     log_activity(current_admin()["name"], "upload_approve",
                  f"{u['dept_name']}: {added} imported, {linked} linked,"
@@ -3313,6 +3315,8 @@ def admin_upload_reject(uid):
                " WHERE id=?",
                (comment, current_admin()["name"],
                 datetime.now().strftime("%Y-%m-%d %H:%M"), uid))
+    wf.complete_open_tasks(db, None, f"upload_review:{uid}",
+                           current_admin()["name"])
     db.commit()
     log_activity(current_admin()["name"], "upload_return",
                  f"{u['dept_name']}: {comment[:120]}",
@@ -3543,27 +3547,75 @@ def admin_backup_download():
 
 # ==================== ACTIVITY LOG (admin) ====================
 
+def _activity_filter(args):
+    """Shared WHERE builder for the Activity Log page + export."""
+    where, params = [], []
+    q = (args.get("q") or "").strip()
+    if q:
+        where.append("(actor LIKE ? OR detail LIKE ? OR action LIKE ?)")
+        like = f"%{q}%"
+        params += [like, like, like]
+    action = (args.get("action") or "").strip()
+    if action:
+        where.append("action=?")
+        params.append(action)
+    dfrom = (args.get("from") or "").strip()
+    if dfrom:
+        where.append("created_at>=?")
+        params.append(dfrom + " 00:00")
+    dto = (args.get("to") or "").strip()
+    if dto:
+        where.append("created_at<=?")
+        params.append(dto + " 23:59")
+    return where, params
+
+
 @app.route("/admin/activity")
 @admin_required
 def admin_activity():
     """Who did what, when — transparency for every change."""
     db = get_db()
+    where, params = _activity_filter(request.args)
+    wsql = (" WHERE " + " AND ".join(where)) if where else ""
     try:
         page = max(int(request.args.get("page", 1) or 1), 1)
     except (TypeError, ValueError):
         page = 1
     per = 50
-    total_row = db.fetchone("SELECT COUNT(*) AS n FROM activity_log")
+    total_row = db.fetchone(
+        f"SELECT COUNT(*) AS n FROM activity_log{wsql}", params)
     total = (total_row["n"] if isinstance(total_row, dict)
              else total_row[0]) if total_row else 0
     pages = max((total + per - 1) // per, 1)
     page = min(page, pages)
     rows = [dict(r) for r in db.fetchall(
-        "SELECT * FROM activity_log ORDER BY id DESC LIMIT ? OFFSET ?",
-        (per, (page - 1) * per))]
+        f"SELECT * FROM activity_log{wsql} ORDER BY id DESC"
+        " LIMIT ? OFFSET ?", params + [per, (page - 1) * per])]
+    actions = [r["action"] for r in db.fetchall(
+        "SELECT DISTINCT action FROM activity_log ORDER BY action")]
     return render_template("admin_activity.html", uni=UNI_NAME,
                            title=PORTAL_TITLE, rows=rows, total=total,
-                           page=page, pages=pages)
+                           page=page, pages=pages, actions=actions,
+                           f=request.args)
+
+
+@app.route("/admin/activity/export.xlsx")
+@admin_required
+def admin_activity_export():
+    """The Activity Log as Excel, with the page's filters applied
+    (Advanced #14)."""
+    db = get_db()
+    where, params = _activity_filter(request.args)
+    wsql = (" WHERE " + " AND ".join(where)) if where else ""
+    rows = [[r["created_at"], r["actor"], r["action"], r["detail"]]
+            for r in db.fetchall(
+                f"SELECT * FROM activity_log{wsql} ORDER BY id DESC"
+                " LIMIT 2000", params)]
+    return _report_excel(
+        "Activity Log", ["Exported with the current filters"],
+        ["When", "Who", "Action", "Details"], [18, 22, 20, 80], rows,
+        "activity-log.xlsx")
+
 
 
 # ==================== REPORTS (admin, printable) ====================
@@ -5124,6 +5176,14 @@ def inject_admin_counts():
     if session.get("admin"):
         try:
             db = get_db()
+            try:
+                orow = db.fetchone(
+                    "SELECT COUNT(*) AS n FROM workflow_tasks"
+                    " WHERE status='Pending'")
+                open_tasks = (orow["n"] if isinstance(orow, dict)
+                              else orow[0]) if orow else 0
+            except Exception:
+                open_tasks = 0
             row = db.fetchone(
                 "SELECT COUNT(*) AS n FROM dept_uploads WHERE status='pending'")
             n = (row["n"] if isinstance(row, dict) else row[0]) if row else 0
@@ -5143,6 +5203,7 @@ def inject_admin_counts():
             except Exception:
                 ac = 0
             return {"pending_uploads": n, "new_vivas": nv,
+                    "open_tasks": open_tasks,
                     "trash_count": tc, "archive_count": ac,
                     "admin_name": session.get("admin_name")
                     or "Administrator",
@@ -5150,7 +5211,8 @@ def inject_admin_counts():
                     or "Admin Portal"}
         except Exception:
             pass
-    return {"pending_uploads": 0, "new_vivas": 0, "trash_count": 0,
+    return {"pending_uploads": 0, "new_vivas": 0, "open_tasks": 0,
+            "trash_count": 0,
             "archive_count": 0, "admin_name": "Administrator",
             "admin_role": "Admin Portal"}
 
@@ -5578,6 +5640,12 @@ def dept_upload():
     except Exception as e:
         db.execute("UPDATE dept_uploads SET parse_error=? WHERE id=?",
                    (str(e)[:300], uid))
+    wf.ensure_task(db, None, "DAS", f"upload_review:{uid}",
+                   f"Review department upload — {file.filename}"
+                   f" ({dept['name']})",
+                   due_date=(datetime.now()
+                             + timedelta(days=3)).strftime("%Y-%m-%d"),
+                   created_by=f"dept:{dept['name']}")
     db.commit()
     log_activity(f"dept:{dept['name']}", "upload",
                  f"{len(recs)} row(s) sent for review ({file.filename})",
@@ -6235,6 +6303,11 @@ def admin_import_upload():
     except Exception as e:
         db.execute("UPDATE dept_uploads SET parse_error=? WHERE id=?",
                    (str(e)[:300], uid))
+    wf.ensure_task(db, None, "DAS", f"upload_review:{uid}",
+                   f"Review admin import — {file.filename}",
+                   due_date=(datetime.now()
+                             + timedelta(days=3)).strftime("%Y-%m-%d"),
+                   created_by=current_admin()["name"])
     db.commit()
     log_activity(current_admin()["name"], "import",
                  f"admin import sent to review: {len(recs)} rows"
@@ -8132,6 +8205,14 @@ def admin_thesis_das(sid):
         _case_event(db, sid, "Thesis forwarded to Controller",
                     current_admin()["name"], current_admin()["role"],
                     f"Dispatch {dispatch or '—'}")
+        wf.ensure_task(
+            db, sid, "Controller", "case_receipt",
+            f"Record receipt of thesis case —"
+            f" {s.get('name') if s else 'Student'}"
+            f" ({s.get('reg_no') if s else ''})",
+            due_date=(datetime.now()
+                      + timedelta(days=7)).strftime("%Y-%m-%d"),
+            priority="High", created_by=current_admin()["name"])
         notify_controllers(
             "thesis", "Thesis forwarded — awaiting receipt",
             f"{s.get('name') if s else 'Student'}"
@@ -8155,6 +8236,16 @@ def admin_thesis_das(sid):
              now, case["id"]))
         _case_event(db, sid, "Corrections submitted",
                     current_admin()["name"], current_admin()["role"])
+        wf.complete_open_tasks(db, sid, "case_resubmit",
+                               current_admin()["name"])
+        wf.ensure_task(
+            db, sid, "Controller", "case_receipt",
+            f"Record receipt of thesis case —"
+            f" {s.get('name') if s else 'Student'}"
+            f" ({s.get('reg_no') if s else ''})",
+            due_date=(datetime.now()
+                      + timedelta(days=7)).strftime("%Y-%m-%d"),
+            priority="High", created_by=current_admin()["name"])
         notify_controllers(
             "thesis", "Corrections submitted",
             f"{s.get('name') if s else 'Student'}"
@@ -8395,6 +8486,7 @@ def controller_case_action(sid):
             ((request.form.get("date") or "").strip() or today, who))
         _case_event(db, sid, "Thesis received by Controller", who,
                     "Controller")
+        wf.complete_open_tasks(db, sid, "case_receipt", who)
         notify_admin("thesis", "Thesis received by Controller",
                      f"{s.get('name') if s else 'Student'}"
                      f" ({s.get('reg_no') if s else ''}) — received by"
@@ -8416,6 +8508,13 @@ def controller_case_action(sid):
             " updated_at=? WHERE id=?", (today, objections))
         _case_event(db, sid, "Thesis returned with objections", who,
                     "Controller", objections[:120])
+        wf.ensure_task(
+            db, sid, "DAS", "case_resubmit",
+            f"Thesis returned with objections — follow up the"
+            f" resubmission ({s.get('name') if s else 'Student'})",
+            due_date=(datetime.now()
+                      + timedelta(days=14)).strftime("%Y-%m-%d"),
+            priority="High", created_by=who)
         notify_admin("thesis", "Thesis returned with objections",
                      f"{s.get('name') if s else 'Student'}"
                      f" ({s.get('reg_no') if s else ''}): {objections}",
@@ -8698,12 +8797,93 @@ def admin_degree_completion():
         rec = degree_record_of(db, s["id"])
         if rec or ready or s.get("degree_status") in (
                 "Eligible", "Issued"):
+            blockers = []
+            if not rec and not ready:
+                blockers = [r["item"]["name"] for r in
+                            completion_state(db, s)
+                            if r["item"].get("required")
+                            and not r["done"]]
             rows.append({"s": s, "ready": ready, "done": done,
-                         "req": req, "rec": rec})
+                         "req": req, "rec": rec, "blockers": blockers})
     rows.sort(key=lambda r: (0 if r["rec"] else 1 if r["ready"] else 2,
                              r["s"]["name"]))
     return render_template("admin_degree_completion.html", uni=UNI_NAME,
                            title=PORTAL_TITLE, rows=rows)
+
+
+@app.route("/admin/tasks", methods=["GET", "POST"])
+@admin_required
+def admin_tasks():
+    """Office Tasks (Advanced #1): the workflow engine's task list —
+    auto-created by system events (uploads awaiting review, thesis
+    cases awaiting receipt, letters awaiting acknowledgment) plus
+    manual tasks an officer adds here."""
+    db = get_db()
+    if request.method == "POST":
+        title = (request.form.get("title") or "").strip()
+        if title:
+            sid_raw = (request.form.get("student_id") or "").strip()
+            sid = int(sid_raw) if sid_raw.isdigit() else None
+            role = request.form.get("role")
+            if role not in wf.TASK_ROLES:
+                role = "DAS"
+            wf.create_task(
+                db, sid, role, "manual", title,
+                due_date=(request.form.get("due_date") or "").strip(),
+                priority=pick(request.form.get("priority"),
+                              ["Low", "Normal", "High"], "Normal"),
+                created_by=current_admin()["name"])
+            db.commit()
+            flash("Task added.")
+        return redirect(url_for("admin_tasks"))
+    role_f = (request.args.get("role") or "").strip()
+    show_done = request.args.get("done") == "1"
+    where, params = [], []
+    if not show_done:
+        where.append("t.status='Pending'")
+    if role_f in wf.TASK_ROLES:
+        where.append("t.responsible_role=?")
+        params.append(role_f)
+    wsql = (" WHERE " + " AND ".join(where)) if where else ""
+    rows = [dict(r) for r in db.fetchall(
+        "SELECT t.*, s.name AS student_name, s.reg_no AS student_reg"
+        " FROM workflow_tasks t LEFT JOIN students s"
+        f" ON s.id=t.student_id{wsql}"
+        " ORDER BY (t.status='Pending') DESC, t.due_date, t.id DESC"
+        " LIMIT 300", params)]
+    today = datetime.now().strftime("%Y-%m-%d")
+    for r in rows:
+        r["overdue"] = bool(r["status"] == "Pending" and r["due_date"]
+                            and r["due_date"] < today)
+    students = [dict(r) for r in db.fetchall(
+        "SELECT id, name, reg_no FROM students ORDER BY name")]
+    return render_template("admin_tasks.html", uni=UNI_NAME,
+                           title=PORTAL_TITLE, rows=rows,
+                           roles=wf.TASK_ROLES, role_f=role_f,
+                           show_done=show_done, students=students,
+                           today=today)
+
+
+@app.route("/admin/tasks/<int:tid>/done", methods=["POST"])
+@admin_required
+def admin_task_done(tid):
+    db = get_db()
+    wf.complete_task(db, tid, current_admin()["name"])
+    db.commit()
+    flash("Task marked done.")
+    return redirect(request.referrer or url_for("admin_tasks"))
+
+
+@app.route("/admin/tasks/<int:tid>/reopen", methods=["POST"])
+@admin_required
+def admin_task_reopen(tid):
+    db = get_db()
+    db.execute("UPDATE workflow_tasks SET status='Pending',"
+               " completed_at=NULL, completed_by=NULL WHERE id=?",
+               (tid,))
+    db.commit()
+    flash("Task reopened.")
+    return redirect(request.referrer or url_for("admin_tasks"))
 
 
 @app.route("/admin/student/<int:sid>/correspondence")
@@ -8747,21 +8927,33 @@ def admin_correspondence_add(sid):
         status = "Dispatched"
         sent = (request.form.get("letter_date") or "").strip() or now[:10]
         received = ""
-    db.execute(
-        "INSERT INTO correspondence (student_id, direction, subject,"
-        " party, ref_no, diary_no, dispatch_no, letter_date, sent_date,"
-        " received_date, status, remarks, recorded_by, created_at)"
-        " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-        (sid or None, direction,
-         (request.form.get("subject") or "").strip(),
-         (request.form.get("party") or "").strip(),
-         (request.form.get("ref_no") or "").strip(),
-         (request.form.get("diary_no") or "").strip(),
-         (request.form.get("dispatch_no") or "").strip(),
-         (request.form.get("letter_date") or "").strip(),
-         sent, received, status,
-         (request.form.get("remarks") or "").strip(),
-         current_admin()["name"], now))
+    _cvals = (sid or None, direction,
+              (request.form.get("subject") or "").strip(),
+              (request.form.get("party") or "").strip(),
+              (request.form.get("ref_no") or "").strip(),
+              (request.form.get("diary_no") or "").strip(),
+              (request.form.get("dispatch_no") or "").strip(),
+              (request.form.get("letter_date") or "").strip(),
+              sent, received, status,
+              (request.form.get("remarks") or "").strip(),
+              current_admin()["name"], now)
+    _csql = ("INSERT INTO correspondence (student_id, direction,"
+             " subject, party, ref_no, diary_no, dispatch_no,"
+             " letter_date, sent_date, received_date, status, remarks,"
+             " recorded_by, created_at) VALUES"
+             " (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
+    if USE_PG:
+        cid = db.fetchone(_csql + " RETURNING id", _cvals)["id"]
+    else:
+        cid = db.execute(_csql, _cvals).lastrowid
+    if direction == "Outward":
+        wf.ensure_task(
+            db, sid or None, "DAS", f"corr_ack:{cid}",
+            f"Acknowledgment follow-up —"
+            f" {(request.form.get('subject') or 'letter')[:60]}",
+            due_date=(datetime.now()
+                      + timedelta(days=14)).strftime("%Y-%m-%d"),
+            created_by=current_admin()["name"])
     db.commit()
     log_activity(current_admin()["name"], "correspondence_add",
                  f"{direction} letter for student id={sid}:"
@@ -8795,6 +8987,8 @@ def admin_correspondence_receive(cid):
         db.execute("UPDATE correspondence SET status='Filed'"
                    " WHERE id=?", (cid,))
         flash("Inward letter marked as filed.")
+    wf.complete_open_tasks(db, c.get("student_id"), f"corr_ack:{cid}",
+                           current_admin()["name"])
     db.commit()
     if c.get("student_id") and request.form.get("back") != "register":
         return redirect(url_for("admin_student_correspondence",
