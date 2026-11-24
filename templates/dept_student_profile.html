@@ -3,7 +3,7 @@
 {% set parts = s.name.split(' ') %}
 <div class="sp-hero">
   <div class="sp-hero-top">
-    <span class="sp-avatar">{{ parts[0][0] }}{% if parts|length > 1 %}{{ parts[1][0] }}{% endif %}</span>
+    {% if s.photo_data %}<img class="sp-avatar" style="object-fit:cover" src="{{ url_for('student_photo', sid=s.id) }}" alt="Student photo">{% else %}<span class="sp-avatar">{{ parts[0][0] }}{% if parts|length > 1 %}{{ parts[1][0] }}{% endif %}</span>{% endif %}
     <div>
       <h2>{{ s.name }}</h2>
       <p class="sp-sub">{{ s.reg_no }} &middot; {{ s.degree or '—' }} &middot; Session {{ s.session or '—' }}{% if s.department %} &middot; {{ s.department }}{% endif %}</p>

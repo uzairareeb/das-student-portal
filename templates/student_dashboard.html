@@ -4,7 +4,7 @@
 <div class="sp-hero">
   <span class="hero-accent"></span>
   <div class="sp-hero-top">
-    <span class="sp-avatar">{{ parts[0][0] }}{% if parts|length > 1 %}{{ parts[1][0] }}{% endif %}</span>
+    {% if s.photo_data %}<img class="sp-avatar" style="object-fit:cover" src="{{ url_for('student_photo', sid=s.id) }}" alt="My photo">{% else %}<span class="sp-avatar">{{ parts[0][0] }}{% if parts|length > 1 %}{{ parts[1][0] }}{% endif %}</span>{% endif %}
     <div class="sp-identity">
       <h2>{{ s.name }}</h2>
       <div class="sp-chips">

@@ -5,7 +5,7 @@
 <div class="sp-hero">
   <span class="hero-accent"></span>
   <div class="sp-hero-top">
-    <span class="sp-avatar">{{ parts[0][0] }}{% if parts|length > 1 %}{{ parts[1][0] }}{% endif %}</span>
+    {% if s.photo_data %}<img class="sp-avatar" style="object-fit:cover" src="{{ url_for('student_photo', sid=s.id) }}" alt="Student photo">{% else %}<span class="sp-avatar">{{ parts[0][0] }}{% if parts|length > 1 %}{{ parts[1][0] }}{% endif %}</span>{% endif %}
     <div class="sp-identity">
       <h2>{{ s.name }}</h2>
       <div class="sp-chips">
@@ -27,6 +27,17 @@
         <span class="sp-chip">Degree: <strong>{{ s.degree_status }}</strong></span>
       </div>
       {% endif %}
+      <div class="sp-chips" style="margin-top:10px">
+        <form method="post" enctype="multipart/form-data" action="{{ url_for('admin_student_photo', sid=s.id) }}" class="row" style="gap:6px">
+          <input class="no-icon" type="file" name="photo" accept=".jpg,.jpeg,.png" style="max-width:230px;background:rgba(255,255,255,.85)">
+          <button type="submit" class="btn primary sm">{{ 'Replace Photo' if s.photo_data else 'Upload Photo' }}</button>
+        </form>
+        {% if s.photo_data %}
+        <form method="post" action="{{ url_for('admin_student_photo_remove', sid=s.id) }}">
+          <button type="submit" class="btn ghost sm">Remove Photo</button>
+        </form>
+        {% endif %}
+      </div>
     </div>
     <div class="sp-ring">
       <div class="ring-wrap">

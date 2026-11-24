@@ -150,7 +150,7 @@
           {% for s in students %}
           <tr data-dept="{{ s.department or '' }}">
             <td class="cb"><input type="checkbox" class="selBox" name="sel" value="{{ s.id }}"></td>
-            <td><div class="name-cell"><span class="row-avatar">{{ s.name[0] if s.name else '?' }}</span><span class="name-stack"><span class="row-name">{{ s.name }}</span><span class="name-sub" data-col="reg">{{ s.reg_no }}</span></span></div></td>
+            <td><div class="name-cell">{% if s.has_photo %}<img class="row-avatar" style="object-fit:cover" src="{{ url_for('student_photo', sid=s.id) }}" alt="">{% else %}<span class="row-avatar">{{ s.name[0] if s.name else '?' }}</span>{% endif %}<span class="name-stack"><span class="row-name">{{ s.name }}</span><span class="name-sub" data-col="reg">{{ s.reg_no }}</span></span></div></td>
             <td class="degree-cell" data-col="degree">{{ s.degree or '—' }}</td>
             {% set steps = [('File', s.folder_file == 'Completed'), ('Synopsis', s.synopsis == 'Received'), ('Semi-Final', s.semi_final_thesis == 'Received'), ('Final', s.final_thesis == 'Received')] %}
             {% set done_count = steps | map(attribute=1) | sum %}
@@ -476,7 +476,7 @@
     function rowHTML(s) {
       return '<tr data-dept="' + esc(s.department) + '">'
         + '<td class="cb"><input type="checkbox" class="selBox" name="sel" value="' + s.id + '"></td>'
-        + '<td><div class="name-cell"><span class="row-avatar">' + esc(s.name.charAt(0) || '?') + '</span><span class="name-stack"><span class="row-name">' + esc(s.name) + '</span><span class="name-sub" data-col="reg">' + esc(s.reg_no) + '</span></span></div></td>'
+        + '<td><div class="name-cell">' + (s.has_photo ? '<img class="row-avatar" style="object-fit:cover" src="/photo/' + s.id + '">' : '<span class="row-avatar">' + esc(s.name.charAt(0) || '?') + '</span>') + '<span class="name-stack"><span class="row-name">' + esc(s.name) + '</span><span class="name-sub" data-col="reg">' + esc(s.reg_no) + '</span></span></div></td>'
         + '<td class="degree-cell" data-col="degree">' + esc(s.degree || '\u2014') + '</td>'
         + progTd(s)
         + '<td class="dates-cell" data-col="folderdates"><div class="dt-stack"><span class="dt-date">' + esc(s.folder_date) + '</span>' + (s.folder_time ? '<span class="dt-time">' + esc(s.folder_time) + '</span>' : '') + '</div></td>'
@@ -554,7 +554,7 @@
         var html = list.map(function (s) {
           var cls = s.pill === 'q' ? 'sp-ok' : (s.pill === 'warn' ? 'sp-warn' : 'sp-bad');
           return '<button type="button" class="qf-item" data-sid="' + s.id + '">'
-            + '<span class="row-avatar">' + esc((s.name || '?').charAt(0)) + '</span>'
+            + (s.has_photo ? '<img class="row-avatar" style="object-fit:cover" src="/photo/' + s.id + '">' : '<span class="row-avatar">' + esc((s.name || '?').charAt(0)) + '</span>')
             + '<span class="qf-main"><span class="qf-name">' + esc(s.name) + '</span>'
             + '<span class="qf-sub">' + esc(s.reg_no) + (s.degree ? ' \u00B7 ' + esc(s.degree) : '') + '</span></span>'
             + '<span class="status-plain ' + cls + '"><span class="dot"></span>' + esc(s.status) + '</span>'
