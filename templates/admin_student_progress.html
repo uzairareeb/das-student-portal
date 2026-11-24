@@ -10,7 +10,10 @@
 {% set tab_active = 'progress' %}{% include "_profile_tabs.html" %}
 
 <div class="card section">
-  <h3 style="margin-top:0">Status Dimensions</h3>
+  <div class="section-head">
+    <span class="section-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg></span>
+    <h3>Status Dimensions</h3>
+  </div>
   <p class="hint" style="margin-top:0">Each dimension moves only when the responsible office records the event — forwarding is not receipt, a conducted viva is not an approved result, and an approved result is not an issued degree.</p>
   <div class="row" style="gap:10px;flex-wrap:wrap">
     {% for label, val in dims %}
@@ -20,7 +23,10 @@
 </div>
 
 <div class="card section">
-  <h3 style="margin-top:0">Progress Summary</h3>
+  <div class="section-head">
+    <span class="section-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1"/></svg></span>
+    <h3>Progress Summary</h3>
+  </div>
   <div class="table-scroll">
     <table class="data-table">
       <thead><tr><th>Milestone</th><th>State</th></tr></thead>

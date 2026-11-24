@@ -46,7 +46,8 @@ def audit(client, label, url):
     r = client.get(url, follow_redirects=True)
     h = r.data.decode("utf-8", "replace")
     ok = (r.status_code == 200 and "· Phase" not in h
-          and "Traceback" not in h and "</html>" in h)
+          and "Traceback" not in h and "</html>" in h
+          and '<h3 style=' not in h)
     print(("PASS " if ok else "FAIL ") + f"{label} {url}"
           + ("" if ok else f" (status {r.status_code})"))
     if not ok:
