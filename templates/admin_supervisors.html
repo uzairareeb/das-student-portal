@@ -9,32 +9,35 @@
 </div>
 
 <div class="card section">
-  <h3 style="margin-top:0">Add supervisor account</h3>
+  <div class="section-head">
+    <span class="section-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="19" y1="8" x2="19" y2="14"/><line x1="22" y1="11" x2="16" y2="11"/></svg></span>
+    <h3>Add supervisor account</h3>
+  </div>
   <form method="post" class="form-grid">
     <div>
       <label class="f-label" for="sv-name">Full name</label>
-      <input id="sv-name" name="name" required placeholder="e.g. Dr. Ayesha Khan">
+      <input class="no-icon" id="sv-name" name="name" required placeholder="e.g. Dr. Ayesha Khan">
     </div>
     <div>
       <label class="f-label" for="sv-email">Email (login)</label>
-      <input id="sv-email" name="email" type="email" required placeholder="name@cuvas.edu.pk">
+      <input class="no-icon" id="sv-email" name="email" type="email" required placeholder="name@cuvas.edu.pk">
     </div>
     <div>
       <label class="f-label" for="sv-pass">Password (min 6)</label>
-      <input id="sv-pass" name="password" type="text" required placeholder="Temporary password">
+      <input class="no-icon" id="sv-pass" name="password" type="text" required placeholder="Temporary password">
     </div>
     <div>
       <label class="f-label" for="sv-desig">Designation</label>
-      <input id="sv-desig" name="designation" placeholder="e.g. Associate Professor">
+      <input class="no-icon" id="sv-desig" name="designation" placeholder="e.g. Associate Professor">
     </div>
     <div>
       <label class="f-label" for="sv-dept">Department</label>
-      <input id="sv-dept" name="department" list="deptNames" placeholder="Department">
+      <input class="no-icon" id="sv-dept" name="department" list="deptNames" placeholder="Department">
       <datalist id="deptNames">{% for d in departments %}<option value="{{ d }}">{% endfor %}</datalist>
     </div>
     <div>
       <label class="f-label" for="sv-phone">Phone</label>
-      <input id="sv-phone" name="phone" placeholder="Optional">
+      <input class="no-icon" id="sv-phone" name="phone" placeholder="Optional">
     </div>
     <div>
       <button type="submit" class="btn primary">Create Account</button>
@@ -43,7 +46,10 @@
 </div>
 
 <div class="card section">
-  <h3 style="margin-top:0">Supervisor Accounts ({{ sups|length }})</h3>
+  <div class="section-head">
+    <span class="section-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></span>
+    <h3>Supervisor Accounts ({{ sups|length }})</h3>
+  </div>
   {% if sups %}
   {% for sp in sups %}
   <div class="card" style="padding:14px;margin-bottom:12px">
@@ -55,15 +61,15 @@
       </div>
     </div>
     <form method="post" action="{{ url_for('admin_supervisor_save', spid=sp.id) }}" class="row" style="gap:8px;flex-wrap:wrap;margin-top:10px">
-      <input name="name" value="{{ sp.name }}" required>
-      <input name="designation" value="{{ sp.designation or '' }}" placeholder="Designation">
-      <input name="department" value="{{ sp.department or '' }}" placeholder="Department" list="deptNames">
-      <input name="phone" value="{{ sp.phone or '' }}" placeholder="Phone">
+      <input class="no-icon" name="name" value="{{ sp.name }}" required>
+      <input class="no-icon" name="designation" value="{{ sp.designation or '' }}" placeholder="Designation">
+      <input class="no-icon" name="department" value="{{ sp.department or '' }}" placeholder="Department" list="deptNames">
+      <input class="no-icon" name="phone" value="{{ sp.phone or '' }}" placeholder="Phone">
       <label class="f-label" style="margin:0"><input type="checkbox" name="is_active" {% if sp.is_active %}checked{% endif %}> Active</label>
       <button type="submit" class="btn ghost sm">Save</button>
     </form>
     <form method="post" action="{{ url_for('admin_supervisor_password', spid=sp.id) }}" class="row" style="gap:8px;margin-top:8px">
-      <input name="password" type="text" placeholder="New password (min 6)" required>
+      <input class="no-icon" name="password" type="text" placeholder="New password (min 6)" required>
       <button type="submit" class="btn ghost sm">Set Password</button>
     </form>
   </div>

@@ -41,7 +41,7 @@
       <input type="hidden" name="action" value="submitted">
       <h4 style="margin:0 0 8px">Thesis submitted to DAS</h4>
       <div class="row" style="gap:8px">
-        <input type="date" name="date" value="{{ today }}">
+        <input class="no-icon" type="date" name="date" value="{{ today }}">
         <button type="submit" class="btn primary sm">Record</button>
       </div>
     </form>
@@ -49,8 +49,8 @@
       <input type="hidden" name="action" value="forward">
       <h4 style="margin:0 0 8px">Forward to Controller</h4>
       <div class="row" style="gap:8px">
-        <input type="date" name="date" value="{{ today }}">
-        <input type="text" name="dispatch_no" placeholder="Dispatch No.">
+        <input class="no-icon" type="date" name="date" value="{{ today }}">
+        <input class="no-icon" type="text" name="dispatch_no" placeholder="Dispatch No.">
         <button type="submit" class="btn primary sm">Record Forwarding</button>
       </div>
     </form>
@@ -59,7 +59,7 @@
       <input type="hidden" name="action" value="resubmit">
       <h4 style="margin:0 0 8px">Corrections submitted</h4>
       <div class="row" style="gap:8px">
-        <input type="date" name="date" value="{{ today }}">
+        <input class="no-icon" type="date" name="date" value="{{ today }}">
         <button type="submit" class="btn primary sm">Record</button>
       </div>
     </form>
@@ -92,7 +92,7 @@
                 <option value="Awaited" {% if e.report_status != 'Received' %}selected{% endif %}>Awaited</option>
                 <option value="Received" {% if e.report_status == 'Received' %}selected{% endif %}>Received</option>
               </select>
-              <input type="date" name="report_date" value="{{ e.report_date or '' }}">
+              <input class="no-icon" type="date" name="report_date" value="{{ e.report_date or '' }}">
               <button type="submit" class="btn ghost sm">Save</button>
             </form>
           </td>
@@ -105,13 +105,13 @@
   <div class="empty"><p>No examiners recorded yet.</p></div>
   {% endif %}
   <form method="post" action="{{ url_for('admin_thesis_examiner_add', sid=s.id) }}" class="row" style="gap:8px;flex-wrap:wrap;margin-top:14px">
-    <input type="text" name="examiner_name" placeholder="Examiner name" required>
-    <input type="text" name="affiliation" placeholder="Affiliation / university">
+    <input class="no-icon" type="text" name="examiner_name" placeholder="Examiner name" required>
+    <input class="no-icon" type="text" name="affiliation" placeholder="Affiliation / university">
     <select name="examiner_role" class="no-icon">
       <option value="External">External</option>
       <option value="Internal">Internal</option>
     </select>
-    <input type="date" name="appointed_date" value="{{ today }}">
+    <input class="no-icon" type="date" name="appointed_date" value="{{ today }}">
     <button type="submit" class="btn primary sm">Add Examiner</button>
   </form>
 </div>

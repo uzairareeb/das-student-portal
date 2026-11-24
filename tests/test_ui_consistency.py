@@ -29,7 +29,19 @@ db = get_db()
 FAILED = []
 
 
+ICON_PAGES = set()
+
+
 def audit(client, label, url):
+    if url in ICON_PAGES:
+        N[0] += 1
+        r0 = client.get(url, follow_redirects=True)
+        h0 = r0.data.decode("utf-8", "replace")
+        ok0 = "section-icon" in h0
+        print(("PASS " if ok0 else "FAIL ") + f"design {url}"
+              + ("" if ok0 else " (no section-icon)"))
+        if not ok0:
+            FAILED.append(url + " (design)")
     N[0] += 1
     r = client.get(url, follow_redirects=True)
     h = r.data.decode("utf-8", "replace")
@@ -50,6 +62,17 @@ pub = app.test_client()
 for url in ["/", "/admin", "/student", "/dept", "/supervisor",
             "/controller"]:
     audit(pub, "public", url)
+
+ICON_PAGES.update([
+    "/admin/archive", "/admin/trash", "/admin/supervisors",
+    "/admin/asrb", "/admin/thesis-cases", "/admin/controller-users",
+    "/admin/degree-completion", "/admin/completion-items",
+    "/admin/correspondence", "/admin/doc-catalogue", "/admin/users",
+    "/admin/backup", "/admin/activity", "/admin/notifications",
+    "/controller/cases", "/supervisor/students",
+    "/student/notifications", "/supervisor/notifications",
+    "/controller/notifications", "/dept/notifications",
+])
 
 # admin pages
 for url in ["/admin/dashboard", "/admin/students", "/admin/archive",

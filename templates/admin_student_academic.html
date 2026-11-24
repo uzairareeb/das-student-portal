@@ -39,17 +39,17 @@
   <div class="empty"><p>No semester records yet.</p></div>
   {% endif %}
   <form method="post" action="{{ url_for('admin_student_semester_add', sid=s.id) }}" class="row" style="gap:8px;flex-wrap:wrap;margin-top:14px">
-    <input type="number" name="semester_no" min="1" max="12" placeholder="Semester #" required style="max-width:120px">
-    <input type="text" name="term" placeholder="Term (e.g. Fall 2026)">
+    <input class="no-icon" type="number" name="semester_no" min="1" max="12" placeholder="Semester #" required style="max-width:120px">
+    <input class="no-icon" type="text" name="term" placeholder="Term (e.g. Fall 2026)">
     <select name="status" class="no-icon">
       <option value="Enrolled">Enrolled</option>
       <option value="Completed">Completed</option>
       <option value="Repeat">Repeat</option>
       <option value="Dropped">Dropped</option>
     </select>
-    <input type="number" name="gpa" step="0.01" min="0" max="4" placeholder="GPA" style="max-width:100px">
-    <input type="number" name="cgpa" step="0.01" min="0" max="4" placeholder="CGPA" style="max-width:100px">
-    <input type="text" name="remarks" placeholder="Remarks">
+    <input class="no-icon" type="number" name="gpa" step="0.01" min="0" max="4" placeholder="GPA" style="max-width:100px">
+    <input class="no-icon" type="number" name="cgpa" step="0.01" min="0" max="4" placeholder="CGPA" style="max-width:100px">
+    <input class="no-icon" type="text" name="remarks" placeholder="Remarks">
     <button type="submit" class="btn primary sm">Add Semester</button>
   </form>
   <p class="hint" style="margin-bottom:0">Required semester counts, CGPA thresholds and coursework rules are set by DAS regulations — until DAS supplies them they stay <strong>Not configured</strong> and nothing here enforces them.</p>
@@ -75,13 +75,13 @@
   <div class="empty"><p>No comprehensive exam record yet.</p></div>
   {% endif %}
   <form method="post" action="{{ url_for('admin_student_comprehensive_add', sid=s.id) }}" class="row" style="gap:8px;flex-wrap:wrap;margin-top:14px">
-    <input type="date" name="exam_date" value="{{ today }}">
+    <input class="no-icon" type="date" name="exam_date" value="{{ today }}">
     <select name="result" class="no-icon">
       <option value="Pending">Pending</option>
       <option value="Pass">Pass</option>
       <option value="Fail">Fail</option>
     </select>
-    <input type="text" name="remarks" placeholder="Remarks">
+    <input class="no-icon" type="text" name="remarks" placeholder="Remarks">
     <button type="submit" class="btn primary sm">Add Exam Record</button>
   </form>
 </div>
@@ -95,11 +95,11 @@
     <div class="form-grid">
       <div style="grid-column:1/-1">
         <label class="f-label" for="syn-title">Research title</label>
-        <input id="syn-title" name="title" value="{{ syn.title if syn else '' }}" placeholder="Thesis / synopsis title">
+        <input class="no-icon" id="syn-title" name="title" value="{{ syn.title if syn else '' }}" placeholder="Thesis / synopsis title">
       </div>
       <div>
         <label class="f-label" for="syn-date">Submitted on</label>
-        <input id="syn-date" type="date" name="submitted_date" value="{{ syn.submitted_date if syn else '' }}">
+        <input class="no-icon" id="syn-date" type="date" name="submitted_date" value="{{ syn.submitted_date if syn else '' }}">
       </div>
       <div>
         <label class="f-label" for="syn-status">ASRB status</label>
@@ -121,12 +121,12 @@
       <select name="asrb_status" class="no-icon">
         {% for st in asrb_statuses %}<option value="{{ st }}" {% if syn.asrb_status == st %}selected{% endif %}>{{ st }}</option>{% endfor %}
       </select>
-      <input type="text" name="meeting_no" placeholder="Meeting No." value="{{ syn.meeting_no or '' }}">
-      <input type="date" name="meeting_date" value="{{ syn.meeting_date or '' }}">
-      <input type="text" name="decision" placeholder="Decision" value="{{ syn.decision or '' }}" style="min-width:200px">
-      <input type="text" name="minutes_ref" placeholder="Minutes ref." value="{{ syn.minutes_ref or '' }}">
-      <input type="text" name="approval_letter_ref" placeholder="Approval letter ref." value="{{ syn.approval_letter_ref or '' }}">
-      <input type="text" name="remarks" placeholder="Remarks" value="{{ syn.remarks or '' }}">
+      <input class="no-icon" type="text" name="meeting_no" placeholder="Meeting No." value="{{ syn.meeting_no or '' }}">
+      <input class="no-icon" type="date" name="meeting_date" value="{{ syn.meeting_date or '' }}">
+      <input class="no-icon" type="text" name="decision" placeholder="Decision" value="{{ syn.decision or '' }}" style="min-width:200px">
+      <input class="no-icon" type="text" name="minutes_ref" placeholder="Minutes ref." value="{{ syn.minutes_ref or '' }}">
+      <input class="no-icon" type="text" name="approval_letter_ref" placeholder="Approval letter ref." value="{{ syn.approval_letter_ref or '' }}">
+      <input class="no-icon" type="text" name="remarks" placeholder="Remarks" value="{{ syn.remarks or '' }}">
       <button type="submit" class="btn primary sm">Record Outcome</button>
     </div>
   </form>

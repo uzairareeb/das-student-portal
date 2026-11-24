@@ -61,7 +61,7 @@
                 <option value="Waived">Waived</option>
                 <option value="Pending">Pending</option>
               </select>
-              <input type="text" name="remarks" placeholder="Remarks">
+              <input class="no-icon" type="text" name="remarks" placeholder="Remarks">
               <button type="submit" class="btn ghost sm">Save</button>
             </form>
             {% endif %}
@@ -96,9 +96,9 @@
   {% elif ready %}
   <p class="hint" style="margin-top:0">All required checklist items are complete. Only an authorized DAS officer can mark the degree Issued — this is a separate, recorded act; nothing issues a degree automatically.</p>
   <form method="post" action="{{ url_for('admin_degree_issue', sid=s.id) }}" class="row" style="gap:8px;flex-wrap:wrap">
-    <input type="date" name="issued_date" value="{{ today }}">
-    <input type="text" name="degree_no" placeholder="Degree No.">
-    <input type="text" name="remarks" placeholder="Remarks">
+    <input class="no-icon" type="date" name="issued_date" value="{{ today }}">
+    <input class="no-icon" type="text" name="degree_no" placeholder="Degree No.">
+    <input class="no-icon" type="text" name="remarks" placeholder="Remarks">
     <button type="submit" class="btn primary" data-confirm="Mark this degree as ISSUED? This is recorded with your name.">Mark Degree Issued</button>
   </form>
   {% else %}

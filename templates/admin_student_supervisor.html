@@ -45,8 +45,8 @@
       <option value="Supervisor">Supervisor</option>
       <option value="Co-supervisor">Co-supervisor</option>
     </select>
-    <input type="date" name="assigned_date" value="{{ today }}">
-    <input type="text" name="remarks" placeholder="Remarks (e.g. notification ref.)">
+    <input class="no-icon" type="date" name="assigned_date" value="{{ today }}">
+    <input class="no-icon" type="text" name="remarks" placeholder="Remarks (e.g. notification ref.)">
     <button type="submit" class="btn primary sm">Assign</button>
   </form>
   {% if not sups %}<p class="hint" style="margin-bottom:0">No active supervisor accounts exist yet — create them on the <a href="{{ url_for('admin_supervisors') }}">Supervisors page</a>.</p>{% endif %}
@@ -101,7 +101,7 @@
                 <option value="Reviewed">Reviewed</option>
                 <option value="Returned">Returned</option>
               </select>
-              <input type="text" name="das_remarks" placeholder="DAS remarks" value="{{ r.das_remarks or '' }}">
+              <input class="no-icon" type="text" name="das_remarks" placeholder="DAS remarks" value="{{ r.das_remarks or '' }}">
               <button type="submit" class="btn ghost sm">Save</button>
             </form>
           </td>

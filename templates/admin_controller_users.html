@@ -9,23 +9,26 @@
 </div>
 
 <div class="card section">
-  <h3 style="margin-top:0">Add Controller Office account</h3>
+  <div class="section-head">
+    <span class="section-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="19" y1="8" x2="19" y2="14"/><line x1="22" y1="11" x2="16" y2="11"/></svg></span>
+    <h3>Add Controller Office account</h3>
+  </div>
   <form method="post" class="form-grid">
     <div>
       <label class="f-label" for="cu-name">Full name</label>
-      <input id="cu-name" name="name" required placeholder="e.g. Muhammad Rafiq">
+      <input class="no-icon" id="cu-name" name="name" required placeholder="e.g. Muhammad Rafiq">
     </div>
     <div>
       <label class="f-label" for="cu-email">Email (login)</label>
-      <input id="cu-email" name="email" type="email" required placeholder="name@cuvas.edu.pk">
+      <input class="no-icon" id="cu-email" name="email" type="email" required placeholder="name@cuvas.edu.pk">
     </div>
     <div>
       <label class="f-label" for="cu-pass">Password (min 6)</label>
-      <input id="cu-pass" name="password" type="text" required placeholder="Temporary password">
+      <input class="no-icon" id="cu-pass" name="password" type="text" required placeholder="Temporary password">
     </div>
     <div>
       <label class="f-label" for="cu-desig">Designation</label>
-      <input id="cu-desig" name="designation" placeholder="e.g. Deputy Controller">
+      <input class="no-icon" id="cu-desig" name="designation" placeholder="e.g. Deputy Controller">
     </div>
     <div>
       <button type="submit" class="btn primary">Create Account</button>
@@ -34,7 +37,10 @@
 </div>
 
 <div class="card section">
-  <h3 style="margin-top:0">Controller Office Accounts ({{ users|length }})</h3>
+  <div class="section-head">
+    <span class="section-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg></span>
+    <h3>Controller Office Accounts ({{ users|length }})</h3>
+  </div>
   {% if users %}
   {% for u in users %}
   <div class="card" style="padding:14px;margin-bottom:12px">
@@ -43,13 +49,13 @@
       <div class="hint">Last login: {{ u.last_login_at or 'never' }}</div>
     </div>
     <form method="post" action="{{ url_for('admin_controller_user_save', uid=u.id) }}" class="row" style="gap:8px;flex-wrap:wrap;margin-top:10px">
-      <input name="name" value="{{ u.name }}" required>
-      <input name="designation" value="{{ u.designation or '' }}" placeholder="Designation">
+      <input class="no-icon" name="name" value="{{ u.name }}" required>
+      <input class="no-icon" name="designation" value="{{ u.designation or '' }}" placeholder="Designation">
       <label class="f-label" style="margin:0"><input type="checkbox" name="is_active" {% if u.is_active %}checked{% endif %}> Active</label>
       <button type="submit" class="btn ghost sm">Save</button>
     </form>
     <form method="post" action="{{ url_for('admin_controller_user_password', uid=u.id) }}" class="row" style="gap:8px;margin-top:8px">
-      <input name="password" type="text" placeholder="New password (min 6)" required>
+      <input class="no-icon" name="password" type="text" placeholder="New password (min 6)" required>
       <button type="submit" class="btn ghost sm">Set Password</button>
     </form>
   </div>

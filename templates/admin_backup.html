@@ -9,7 +9,10 @@
 </div>
 
 <div class="card section">
-  <h3 style="margin-top:0">What is inside ({{ total }} records)</h3>
+  <div class="section-head">
+    <span class="section-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg></span>
+    <h3>What is inside ({{ total }} records)</h3>
+  </div>
   <div class="table-scroll">
     <table class="data-table">
       <thead><tr><th>Table</th><th>Records</th></tr></thead>
@@ -20,6 +23,6 @@
       </tbody>
     </table>
   </div>
-  <p class="muted" style="margin-bottom:0">The shared admin password hash is excluded on purpose — the live password always comes from the server environment. Department and officer password hashes are included so accounts can be restored exactly. Recommended: download a backup before every big change and at least once a week.</p>
+  <p class="hint" style="margin-bottom:0">The shared admin password hash is excluded on purpose — the live password always comes from the server environment. Department and officer password hashes are included so accounts can be restored exactly. Recommended: download a backup before every big change and at least once a week.</p>
 </div>
 {% endblock %}

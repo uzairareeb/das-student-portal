@@ -9,15 +9,18 @@
 </div>
 
 <div class="card section">
-  <h3 style="margin-top:0">Add catalogue entry</h3>
+  <div class="section-head">
+    <span class="section-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg></span>
+    <h3>Add catalogue entry</h3>
+  </div>
   <form method="post" class="form-grid">
     <div>
       <label class="f-label" for="dc-code">Code (e.g. GS-08)</label>
-      <input id="dc-code" name="code" placeholder="Optional">
+      <input class="no-icon" id="dc-code" name="code" placeholder="Optional">
     </div>
     <div>
       <label class="f-label" for="dc-name">Document name</label>
-      <input id="dc-name" name="name" required placeholder="Document name">
+      <input class="no-icon" id="dc-name" name="name" required placeholder="Document name">
     </div>
     <div>
       <label class="f-label" for="dc-level">Applies to</label>
@@ -29,7 +32,7 @@
     </div>
     <div>
       <label class="f-label" for="dc-stage">Stage</label>
-      <input id="dc-stage" name="stage" value="General">
+      <input class="no-icon" id="dc-stage" name="stage" value="General">
     </div>
     <div>
       <label class="f-label"><input type="checkbox" name="required" checked> Required</label>
@@ -42,7 +45,10 @@
 </div>
 
 <div class="card section">
-  <h3 style="margin-top:0">Catalogue ({{ items|length }})</h3>
+  <div class="section-head">
+    <span class="section-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg></span>
+    <h3>Catalogue ({{ items|length }})</h3>
+  </div>
   {% for it in items %}<form id="dcf-{{ it.id }}" method="post" action="{{ url_for('admin_doc_catalogue_save', tid=it.id) }}"></form>{% endfor %}
   <div class="table-scroll">
     <table class="data-table">
@@ -50,14 +56,14 @@
       <tbody>
         {% for it in items %}
         <tr>
-          <td><input form="dcf-{{ it.id }}" name="code" value="{{ it.code or '' }}" style="max-width:80px" placeholder="—"></td>
-          <td><input form="dcf-{{ it.id }}" name="name" value="{{ it.name }}" required style="min-width:220px"></td>
+          <td><input class="no-icon" form="dcf-{{ it.id }}" name="code" value="{{ it.code or '' }}" style="max-width:80px" placeholder="—"></td>
+          <td><input class="no-icon" form="dcf-{{ it.id }}" name="name" value="{{ it.name }}" required style="min-width:220px"></td>
           <td>
             <select form="dcf-{{ it.id }}" name="applies_to" class="no-icon">
               {% for lv in ['All', 'MPhil', 'PhD'] %}<option value="{{ lv }}" {% if it.applies_to == lv %}selected{% endif %}>{{ lv }}</option>{% endfor %}
             </select>
           </td>
-          <td><input form="dcf-{{ it.id }}" name="stage" value="{{ it.stage or 'General' }}" style="max-width:110px"></td>
+          <td><input class="no-icon" form="dcf-{{ it.id }}" name="stage" value="{{ it.stage or 'General' }}" style="max-width:110px"></td>
           <td><input form="dcf-{{ it.id }}" type="checkbox" name="required" {% if it.required %}checked{% endif %}></td>
           <td><input form="dcf-{{ it.id }}" type="checkbox" name="requires_hardcopy" {% if it.requires_hardcopy %}checked{% endif %}></td>
           <td><input form="dcf-{{ it.id }}" type="checkbox" name="active" {% if it.active %}checked{% endif %}></td>

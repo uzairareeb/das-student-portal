@@ -41,10 +41,10 @@
       <h4 style="margin:0 0 8px">Complete file arrived?</h4>
       <p class="hint" style="margin:0 0 10px">Mark every outstanding hard-copy item received at once.</p>
       <div class="row" style="gap:8px;flex-wrap:wrap">
-        <input type="date" name="received_date" value="{{ today }}" required>
-        <input type="text" name="received_by" placeholder="Received by (name)">
-        <input type="text" name="office" placeholder="Office" value="DAS">
-        <input type="text" name="diary_no" placeholder="Diary No.">
+        <input class="no-icon" type="date" name="received_date" value="{{ today }}" required>
+        <input class="no-icon" type="text" name="received_by" placeholder="Received by (name)">
+        <input class="no-icon" type="text" name="office" placeholder="Office" value="DAS">
+        <input class="no-icon" type="text" name="diary_no" placeholder="Diary No.">
         <button type="submit" class="btn primary sm">Mark All Received</button>
       </div>
     </form>
@@ -54,11 +54,11 @@
         <select name="doc_type_id" class="no-icon" required>
           {% for it in checklist %}<option value="{{ it.id }}">{{ it.code ~ ' — ' if it.code }}{{ it.name }}</option>{% endfor %}
         </select>
-        <input type="date" name="received_date" value="{{ today }}" required>
-        <input type="text" name="received_by" placeholder="Received by (name)">
-        <input type="text" name="office" placeholder="Office" value="DAS">
-        <input type="text" name="diary_no" placeholder="Diary No.">
-        <input type="text" name="remarks" placeholder="Remarks (optional)">
+        <input class="no-icon" type="date" name="received_date" value="{{ today }}" required>
+        <input class="no-icon" type="text" name="received_by" placeholder="Received by (name)">
+        <input class="no-icon" type="text" name="office" placeholder="Office" value="DAS">
+        <input class="no-icon" type="text" name="diary_no" placeholder="Diary No.">
+        <input class="no-icon" type="text" name="remarks" placeholder="Remarks (optional)">
         <button type="submit" class="btn primary sm">Record Receipt</button>
       </div>
     </form>

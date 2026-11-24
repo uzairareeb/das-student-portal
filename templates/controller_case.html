@@ -32,7 +32,7 @@
       <input type="hidden" name="action" value="receive">
       <h4 style="margin:0 0 8px">Record receipt</h4>
       <div class="row" style="gap:8px">
-        <input type="date" name="date" value="{{ today }}">
+        <input class="no-icon" type="date" name="date" value="{{ today }}">
         <button type="submit" class="btn primary sm">Mark Received</button>
       </div>
     </form>
@@ -40,7 +40,7 @@
       <input type="hidden" name="action" value="return">
       <h4 style="margin:0 0 8px">Return with objections</h4>
       <div class="row" style="gap:8px">
-        <input type="text" name="objections" placeholder="Objections (required)" required style="min-width:260px">
+        <input class="no-icon" type="text" name="objections" placeholder="Objections (required)" required style="min-width:260px">
         <button type="submit" class="btn danger sm">Return Thesis</button>
       </div>
     </form>
@@ -56,7 +56,7 @@
       <input type="hidden" name="action" value="corrections_required">
       <h4 style="margin:0 0 8px">Corrections required</h4>
       <div class="row" style="gap:8px">
-        <input type="text" name="objections" placeholder="Summary of corrections" style="min-width:240px">
+        <input class="no-icon" type="text" name="objections" placeholder="Summary of corrections" style="min-width:240px">
         <button type="submit" class="btn ghost sm">Record</button>
       </div>
     </form>
@@ -75,8 +75,8 @@
           <option value="Declared — Fail">Declared — Fail</option>
           <option value="Declared — Referred">Declared — Referred</option>
         </select>
-        <input type="date" name="date" value="{{ today }}">
-        <input type="text" name="result_remarks" placeholder="Remarks / notification ref.">
+        <input class="no-icon" type="date" name="date" value="{{ today }}">
+        <input class="no-icon" type="text" name="result_remarks" placeholder="Remarks / notification ref.">
         <button type="submit" class="btn primary sm">Declare Result</button>
       </div>
     </form>
@@ -113,7 +113,7 @@
                 <option value="Awaited" {% if e.report_status != 'Received' %}selected{% endif %}>Awaited</option>
                 <option value="Received" {% if e.report_status == 'Received' %}selected{% endif %}>Received</option>
               </select>
-              <input type="date" name="report_date" value="{{ e.report_date or '' }}">
+              <input class="no-icon" type="date" name="report_date" value="{{ e.report_date or '' }}">
               <button type="submit" class="btn ghost sm">Save</button>
             </form>
           </td>

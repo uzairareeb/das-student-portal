@@ -33,7 +33,10 @@
 <form method="post" action="{{ url_for('admin_upload_decisions', uid=u.id) }}">
 {% endif %}
 <div class="card section">
-  <h3 style="margin-top:0">Rows ({{ rows|length }})</h3>
+  <div class="section-head">
+    <span class="section-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1"/></svg></span>
+    <h3>Rows ({{ rows|length }})</h3>
+  </div>
   {% if rows %}
   <div class="table-scroll">
     <table class="data-table">
@@ -92,13 +95,16 @@
 </form>
 
 <div class="card section">
-  <h3 style="margin-top:0">Finish Review</h3>
+  <div class="section-head">
+    <span class="section-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg></span>
+    <h3>Finish Review</h3>
+  </div>
   <div class="row" style="gap:10px;flex-wrap:wrap;align-items:flex-start">
     <form method="post" action="{{ url_for('admin_upload_approve', uid=u.id) }}" style="margin:0">
       <button type="submit" class="btn primary" data-confirm="Approve this batch? Rows decided 'Import' will be added as students, 'Link' rows will be attached to the existing records, and the batch will lock.">Approve &amp; Import</button>
     </form>
     <form method="post" action="{{ url_for('admin_upload_reject', uid=u.id) }}" class="reject-form" style="flex:1;min-width:280px">
-      <input type="text" name="comment" placeholder="If returning: what is missing or wrong? Write it here…" required>
+      <input class="no-icon" type="text" name="comment" placeholder="If returning: what is missing or wrong? Write it here…" required>
       <button type="submit" class="btn danger" data-confirm="Return this batch to the department with your comment?">Return to Department</button>
     </form>
   </div>

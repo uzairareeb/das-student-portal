@@ -9,19 +9,22 @@
 </div>
 
 <div class="card section">
-  <h3 style="margin-top:0">Add officer account</h3>
+  <div class="section-head">
+    <span class="section-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="19" y1="8" x2="19" y2="14"/><line x1="22" y1="11" x2="16" y2="11"/></svg></span>
+    <h3>Add officer account</h3>
+  </div>
   <form method="post" class="form-grid">
     <div>
       <label class="f-label" for="u-name">Full name</label>
-      <input id="u-name" name="name" required placeholder="e.g. Muhammad Ahmad">
+      <input class="no-icon" id="u-name" name="name" required placeholder="e.g. Muhammad Ahmad">
     </div>
     <div>
       <label class="f-label" for="u-email">Email</label>
-      <input id="u-email" name="email" type="email" required placeholder="officer@cuvas.edu.pk">
+      <input class="no-icon" id="u-email" name="email" type="email" required placeholder="officer@cuvas.edu.pk">
     </div>
     <div>
       <label class="f-label" for="u-pw">Password</label>
-      <input id="u-pw" name="password" type="password" required minlength="6" placeholder="Minimum 6 characters">
+      <input class="no-icon" id="u-pw" name="password" type="password" required minlength="6" placeholder="Minimum 6 characters">
     </div>
     <div>
       <label class="f-label" for="u-role">Role</label>
@@ -37,7 +40,10 @@
 </div>
 
 <div class="card section">
-  <h3 style="margin-top:0">Officer accounts ({{ users|length }})</h3>
+  <div class="section-head">
+    <span class="section-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></span>
+    <h3>Officer accounts ({{ users|length }})</h3>
+  </div>
   {% if users %}
   <div class="table-scroll">
     <table class="data-table">
@@ -54,12 +60,12 @@
           <td class="nowrap">{{ u.created_at or '—' }}</td>
           <td class="nowrap">{{ u.last_login_at or 'Never' }}</td>
           <td>
-            <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+            <div class="row">
               <form method="post" action="{{ url_for('admin_user_toggle', uid=u.id) }}">
                 <button type="submit" class="btn ghost">{{ 'Deactivate' if u.is_active else 'Activate' }}</button>
               </form>
-              <form method="post" action="{{ url_for('admin_user_password', uid=u.id) }}" style="display:flex;gap:6px;align-items:center">
-                <input name="password" type="password" minlength="6" placeholder="New password" style="max-width:150px">
+              <form method="post" action="{{ url_for('admin_user_password', uid=u.id) }}" class="row">
+                <input class="no-icon" name="password" type="password" minlength="6" placeholder="New password" style="max-width:150px">
                 <button type="submit" class="btn primary">Reset</button>
               </form>
             </div>
@@ -70,7 +76,7 @@
     </table>
   </div>
   {% else %}
-  <p class="muted">No officer accounts yet. Create the first one above — until then, the shared admin password is the only way in.</p>
+  <div class="empty"><p>No officer accounts yet. Create the first one above — until then, the shared admin password is the only way in.</p></div>
   {% endif %}
 </div>
 {% endblock %}

@@ -33,7 +33,7 @@
             <div class="row" style="gap:6px">
               {% if c.direction == 'Outward' and c.status == 'Dispatched' %}
               <form method="post" action="{{ url_for('admin_correspondence_receive', cid=c.id) }}" class="row" style="gap:6px">
-                <input type="date" name="received_date" value="{{ today }}">
+                <input class="no-icon" type="date" name="received_date" value="{{ today }}">
                 <button type="submit" class="btn ghost sm">Mark Received</button>
               </form>
               {% elif c.direction == 'Inward' and c.status == 'Received' %}
@@ -62,13 +62,13 @@
         <option value="Inward">Inward (received)</option>
         <option value="Outward">Outward (sent)</option>
       </select>
-      <input type="text" name="subject" placeholder="Subject" required style="min-width:260px">
-      <input type="text" name="party" placeholder="From / To (office or person)">
-      <input type="text" name="ref_no" placeholder="Letter No. / Ref">
-      <input type="text" name="diary_no" placeholder="Diary No. (inward)">
-      <input type="text" name="dispatch_no" placeholder="Dispatch No. (outward)">
-      <input type="date" name="letter_date" value="{{ today }}">
-      <input type="text" name="remarks" placeholder="Remarks">
+      <input class="no-icon" type="text" name="subject" placeholder="Subject" required style="min-width:260px">
+      <input class="no-icon" type="text" name="party" placeholder="From / To (office or person)">
+      <input class="no-icon" type="text" name="ref_no" placeholder="Letter No. / Ref">
+      <input class="no-icon" type="text" name="diary_no" placeholder="Diary No. (inward)">
+      <input class="no-icon" type="text" name="dispatch_no" placeholder="Dispatch No. (outward)">
+      <input class="no-icon" type="date" name="letter_date" value="{{ today }}">
+      <input class="no-icon" type="text" name="remarks" placeholder="Remarks">
       <button type="submit" class="btn primary sm">Record</button>
     </div>
   </form>

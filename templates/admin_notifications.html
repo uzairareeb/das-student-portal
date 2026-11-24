@@ -1,7 +1,10 @@
 {% extends "admin_base.html" %}
 {% block container_extra %} wide<div class="card section" style="margin-top: 22px">
-  <h3 style="margin: 0 0 4px">Recently Performed Tasks</h3>
-  <p class="muted" style="margin: 0 0 14px">Every action taken in the system — student additions, edits, imports, approvals and more.</p>
+  <div class="section-head">
+    <span class="section-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg></span>
+    <h3>Recently Performed Tasks</h3>
+  </div>
+  <p class="hint" style="margin: 0 0 14px">Every action taken in the system — student additions, edits, imports, approvals and more.</p>
   {% if tasks %}
   <div class="doc-list">
     {% for task in tasks %}
@@ -30,6 +33,10 @@
 </div>
 
 <div class="card section">
+  <div class="section-head">
+    <span class="section-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg></span>
+    <h3>All Notifications</h3>
+  </div>
   {% if notes %}
   <div class="doc-list">
     {% for n in notes %}
