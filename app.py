@@ -45,6 +45,25 @@ app = Flask(__name__,
             static_folder=os.path.join(BASE_DIR, "static"))
 app.secret_key = os.environ.get("PORTAL_SECRET", "das-student-portal-dev-key")
 app.config["MAX_CONTENT_LENGTH"] = 26 * 1024 * 1024  # 26 MB (PDF uploads up to ~25 MB)
+app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
+app.config["SESSION_COOKIE_HTTPONLY"] = True
+
+
+@app.before_request
+def _csrf_guard():
+    """Browser CSRF defence. Browsers always send an Origin header on
+    POSTs, and a cross-site form post carries the attacker's origin, so
+    a mismatched Origin (or Referer, when Origin is absent) is
+    rejected. Same-site requests and non-browser clients (which send
+    neither header) are unaffected, and SameSite=Lax session cookies
+    add a second layer. No form markup needs to change."""
+    if request.method in ("POST", "PUT", "PATCH", "DELETE"):
+        from urllib.parse import urlparse
+        origin = request.headers.get("Origin")
+        ref = request.headers.get("Referer")
+        src = origin or ref
+        if src and urlparse(src).netloc != request.host:
+            return ("Cross-site request blocked.", 403)
 app.permanent_session_lifetime = timedelta(days=30)  # "Remember me" on admin login
 
 UNI_NAME = "Advanced Studies Office"
@@ -364,6 +383,7 @@ def init_db():
     _create_phase4_tables(db)
     _create_phase5_tables(db)
     _create_phase6_tables(db)
+    _create_indexes(db)
     # Admin password: the env var is the source of truth. Only overwrite
     # the stored hash when the env var is actually set, so a missing env
     # var can never silently downgrade the live password to a fallback.
@@ -1209,6 +1229,40 @@ _COMPLETION_SEED = [
 ]
 
 
+def _create_indexes(db):
+    """Lookup indexes (Advanced #3) — created once, IF NOT EXISTS, so
+    searches stay fast as the student body grows."""
+    for stmt in (
+        "CREATE INDEX IF NOT EXISTS idx_students_reg ON students(reg_no)",
+        "CREATE INDEX IF NOT EXISTS idx_students_cnic ON students(cnic)",
+        "CREATE INDEX IF NOT EXISTS idx_students_name ON students(name)",
+        "CREATE INDEX IF NOT EXISTS idx_students_dept"
+        " ON students(department)",
+        "CREATE INDEX IF NOT EXISTS idx_students_status"
+        " ON students(status)",
+        "CREATE INDEX IF NOT EXISTS idx_students_session"
+        " ON students(session)",
+        "CREATE INDEX IF NOT EXISTS idx_viva_student"
+        " ON viva_records(student_id)",
+        "CREATE INDEX IF NOT EXISTS idx_docs_student"
+        " ON documents(student_id)",
+        "CREATE INDEX IF NOT EXISTS idx_events_student"
+        " ON workflow_events(student_id)",
+        "CREATE INDEX IF NOT EXISTS idx_tasks_student"
+        " ON workflow_tasks(student_id)",
+        "CREATE INDEX IF NOT EXISTS idx_corr_student"
+        " ON correspondence(student_id)",
+        "CREATE INDEX IF NOT EXISTS idx_assign_student"
+        " ON supervisor_assignments(student_id)",
+        "CREATE INDEX IF NOT EXISTS idx_cases_student"
+        " ON thesis_cases(student_id)",
+    ):
+        try:
+            db.execute(stmt)
+        except Exception:
+            pass
+
+
 def _create_phase6_tables(db):
     """Phase 6 (Central System): degree completion checklist, degree
     issuance records and the correspondence register."""
@@ -1857,6 +1911,14 @@ def admin_login():
                              entity_type="admin_user",
                              entity_id=user["id"])
                 return redirect(url_for("admin_dashboard"))
+            elif not email and _shared_login_disabled(get_db()):
+                _login_fail("admin")
+                log_activity("unknown", "login_failed",
+                             "admin portal sign-in via the disabled"
+                             " shared password")
+                error = ("The shared admin password is disabled on "
+                         "this system. Please sign in with your "
+                         "officer email and password.")
             elif not email and check_admin_password(pw):
                 session["admin"] = True
                 session.pop("admin_user_id", None)
@@ -1866,12 +1928,13 @@ def admin_login():
                 _login_ok("admin")
                 log_activity("admin", "login", "admin portal sign-in")
                 return redirect(url_for("admin_dashboard"))
-            _login_fail("admin")
-            log_activity("unknown", "login_failed",
-                         "admin portal failed sign-in"
-                         + (f" for {email}" if email else ""))
-            error = "Wrong email or password." if email \
-                else "Wrong password."
+            if error is None:
+                _login_fail("admin")
+                log_activity("unknown", "login_failed",
+                             "admin portal failed sign-in"
+                             + (f" for {email}" if email else ""))
+                error = "Wrong email or password." if email \
+                    else "Wrong password."
     return render_template("admin_login.html", uni=UNI_NAME, title=PORTAL_TITLE,
                            error=error)
 
@@ -2561,6 +2624,27 @@ def current_admin():
             "role": session.get("admin_role") or "Super Admin"}
 
 
+def is_super_admin():
+    return current_admin().get("role") == "Super Admin"
+
+
+def _super_only():
+    """Guard for destructive / governance actions (Advanced #17):
+    returns a redirect when the signed-in admin is a DAS Officer
+    rather than a Super Admin, else None."""
+    if not is_super_admin():
+        flash("Only a Super Admin can do this — your officer account "
+              "does not have this permission.")
+        return redirect(request.referrer or url_for("admin_dashboard"))
+    return None
+
+
+def _shared_login_disabled(db):
+    row = db.fetchone(
+        "SELECT value FROM settings WHERE key='shared_login_disabled'")
+    return bool(row and str(row["value"]).strip() == "1")
+
+
 # ---- login rate limiting (per portal + IP, in-memory) ----
 _LOGIN_FAILS = {}
 
@@ -3198,6 +3282,9 @@ def admin_upload_reject(uid):
 @app.route("/admin/users", methods=["GET", "POST"])
 @admin_required
 def admin_users():
+    guard = _super_only()
+    if guard:
+        return guard
     db = get_db()
     if request.method == "POST":
         name = (request.form.get("name") or "").strip()
@@ -3232,12 +3319,16 @@ def admin_users():
         " last_login_at FROM admin_users ORDER BY id").fetchall()]
     return render_template("admin_users.html", uni=UNI_NAME,
                            title=PORTAL_TITLE, users=users,
+                           shared_disabled=_shared_login_disabled(db),
                            me=session.get("admin_user_id"))
 
 
 @app.route("/admin/users/<int:uid>/toggle", methods=["POST"])
 @admin_required
 def admin_user_toggle(uid):
+    guard = _super_only()
+    if guard:
+        return guard
     if session.get("admin_user_id") == uid:
         flash("You cannot deactivate your own account.")
         return redirect(url_for("admin_users"))
@@ -3263,6 +3354,9 @@ def admin_user_toggle(uid):
 @app.route("/admin/users/<int:uid>/password", methods=["POST"])
 @admin_required
 def admin_user_password(uid):
+    guard = _super_only()
+    if guard:
+        return guard
     pw = request.form.get("password") or ""
     if len(pw) < 6:
         flash("New password must be at least 6 characters.")
@@ -3333,6 +3427,45 @@ def _backup_payload():
     return payload
 
 
+
+@app.route("/admin/users/shared-login", methods=["POST"])
+@admin_required
+def admin_users_shared_login():
+    """Enable/disable the shared admin password (Advanced #18).
+    Enabling requires at least one active Super Admin officer account,
+    so the office can never lock itself out."""
+    guard = _super_only()
+    if guard:
+        return guard
+    db = get_db()
+    action = (request.form.get("action") or "").strip()
+    if action == "disable":
+        row = db.fetchone(
+            "SELECT COUNT(*) AS n FROM admin_users WHERE is_active=1"
+            " AND role='Super Admin'")
+        if not row or not row["n"]:
+            flash("Cannot disable the shared password yet: create an "
+                  "active Super Admin officer account first, otherwise "
+                  "nobody could sign in.")
+            return redirect(url_for("admin_users"))
+        val = "1"
+        flash("Shared admin password disabled. Officers now sign in "
+              "with their own email and password only.")
+    else:
+        val = "0"
+        flash("Shared admin password enabled again.")
+    cur = db.execute(
+        "UPDATE settings SET value=? WHERE key='shared_login_disabled'",
+        (val,))
+    if not cur.rowcount:
+        db.execute("INSERT INTO settings(key, value) VALUES"
+                   " ('shared_login_disabled', ?)", (val,))
+    db.commit()
+    log_activity(current_admin()["name"], "shared_login",
+                 f"shared admin password {'disabled' if val == '1' else 'enabled'}",
+                 entity_type="settings", entity_id=None)
+    return redirect(url_for("admin_users"))
+
 @app.route("/admin/backup")
 @admin_required
 def admin_backup():
@@ -3345,6 +3478,9 @@ def admin_backup():
 @app.route("/admin/backup/download")
 @admin_required
 def admin_backup_download():
+    guard = _super_only()
+    if guard:
+        return guard
     payload = _backup_payload()
     log_activity(current_admin()["name"], "backup_download",
                  "Full JSON backup downloaded")
@@ -6415,6 +6551,9 @@ def admin_trash_restore(tid):
 @app.route("/admin/trash/<int:tid>/delete", methods=["POST"])
 @admin_required
 def admin_trash_delete(tid):
+    guard = _super_only()
+    if guard:
+        return guard
     db = get_db()
     db.execute("DELETE FROM deleted_students WHERE id=?", (tid,))
     db.commit()
@@ -6425,6 +6564,9 @@ def admin_trash_delete(tid):
 @app.route("/admin/trash/empty", methods=["POST"])
 @admin_required
 def admin_trash_empty():
+    guard = _super_only()
+    if guard:
+        return guard
     db = get_db()
     db.execute("DELETE FROM deleted_students")
     db.commit()
@@ -6559,6 +6701,9 @@ def admin_students_bulk_update():
 @app.route("/admin/students/delete-all", methods=["POST"])
 @admin_required
 def admin_students_delete_all():
+    guard = _super_only()
+    if guard:
+        return guard
     db = get_db()
     rows = [dict(r) for r in db.fetchall("SELECT * FROM students")]
     _trash_student_rows(db, rows)
@@ -6574,6 +6719,9 @@ def admin_students_delete_all():
 @app.route("/admin/student/<int:sid>/delete", methods=["POST"])
 @admin_required
 def admin_student_delete(sid):
+    guard = _super_only()
+    if guard:
+        return guard
     db = get_db()
     row = db.fetchone("SELECT * FROM students WHERE id=?", (sid,))
     if row:
@@ -8197,6 +8345,9 @@ def admin_completion_mark(sid, item_id):
 def admin_degree_issue(sid):
     """The ONLY place a degree becomes Issued: every required checklist
     item must be satisfied by records or authorized marks first."""
+    guard = _super_only()
+    if guard:
+        return guard
     db = get_db()
     s = get_student(sid)
     if not s:
@@ -8240,6 +8391,9 @@ def admin_degree_issue(sid):
 def admin_degree_revoke(sid):
     """Correct an issuance recorded in error: removes the record and
     lets the degree dimension derive from the facts again."""
+    guard = _super_only()
+    if guard:
+        return guard
     db = get_db()
     s = get_student(sid)
     rec = degree_record_of(db, sid)

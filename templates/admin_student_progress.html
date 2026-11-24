@@ -96,17 +96,25 @@
       </tbody>
     </table>
   </div>
+  {% if admin_role == 'Super Admin' %}
   <form method="post" action="{{ url_for('admin_degree_revoke', sid=s.id) }}" style="margin-top:12px">
     <button type="submit" class="btn danger sm" data-confirm="Revoke this issuance? The degree status will follow the recorded facts again.">Revoke Issuance (correction)</button>
   </form>
+  {% else %}
+  <p class="hint" style="margin-top:12px">Only a Super Admin can revoke an issuance.</p>
+  {% endif %}
   {% elif ready %}
   <p class="hint" style="margin-top:0">All required checklist items are complete. Only an authorized DAS officer can mark the degree Issued — this is a separate, recorded act; nothing issues a degree automatically.</p>
+  {% if admin_role == 'Super Admin' %}
   <form method="post" action="{{ url_for('admin_degree_issue', sid=s.id) }}" class="row" style="gap:8px;flex-wrap:wrap">
     <input class="no-icon" type="date" name="issued_date" value="{{ today }}">
     <input class="no-icon" type="text" name="degree_no" placeholder="Degree No.">
     <input class="no-icon" type="text" name="remarks" placeholder="Remarks">
     <button type="submit" class="btn primary" data-confirm="Mark this degree as ISSUED? This is recorded with your name.">Mark Degree Issued</button>
   </form>
+  {% else %}
+  <div class="empty"><p>Only a Super Admin can mark a degree Issued.</p></div>
+  {% endif %}
   {% else %}
   <div class="empty"><p>The degree cannot be issued yet — {{ creq - cdone }} required checklist item(s) are still pending above.</p></div>
   {% endif %}
