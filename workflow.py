@@ -55,7 +55,22 @@ def _completed(v):
     return (v or "").strip().lower() == "completed"
 
 
-def derive_dimensions(s, has_viva_pass=False, has_viva_record=False):
+_THESIS_ORDER = ["Not Due", "In Preparation", "Submitted",
+                 "Under Scrutiny", "Forwarded", "Under Evaluation",
+                 "Corrections Required", "Accepted"]
+_RESULT_ORDER = ["Awaited", "Received", "Under Verification",
+                 "Approved", "Notified"]
+
+
+def _at_least(current, floor, order):
+    try:
+        return order[max(order.index(current), order.index(floor))]
+    except ValueError:
+        return current
+
+
+def derive_dimensions(s, has_viva_pass=False, has_viva_record=False,
+                      case=None):
     """Derive the six status dimensions from a student row dict.
 
     ``s`` needs: status, synopsis, semi_final_thesis, final_thesis,
@@ -124,6 +139,35 @@ def derive_dimensions(s, has_viva_pass=False, has_viva_record=False):
     else:
         result = "Awaited"
 
+    # --- thesis case (Phase 5): the case is a recorded fact of its own;
+    # the dimensions must reflect it, otherwise a declared Controller
+    # result would leave Thesis/Result looking untouched until some
+    # unrelated legacy field moves. The case only ever RAISES a
+    # dimension to match what the offices recorded.
+    if case:
+        cs = (case.get("case_status") or "").strip()
+        if cs in ("Result Declared", "Closed"):
+            thesis = "Accepted"
+        elif cs in ("Corrections Required", "Returned with Objections"):
+            thesis = "Corrections Required"
+        elif cs in ("Under Evaluation", "Corrections Submitted",
+                    "Evaluation Complete"):
+            thesis = _at_least(thesis, "Under Evaluation", _THESIS_ORDER)
+        elif cs in ("Forwarded to Controller", "Received by Controller"):
+            thesis = _at_least(thesis, "Forwarded", _THESIS_ORDER)
+        elif cs == "Submitted to DAS":
+            thesis = _at_least(thesis, "Submitted", _THESIS_ORDER)
+        if cs not in ("", "Not Started", "Submitted to DAS") \
+                and das in ("Not Received", "Received",
+                            "Under Verification", "Returned", "Verified"):
+            das = "Forwarded"
+        rs = (case.get("result_status") or "").strip()
+        if rs.startswith("Declared"):
+            if "Pass" in rs:
+                result = "Approved"
+            else:
+                result = _at_least(result, "Received", _RESULT_ORDER)
+
     # --- degree ---
     if status == "Pass Out":
         degree = "Eligible"
@@ -167,10 +211,44 @@ def sync_student_dimensions(db, sid, actor="system", actor_role="System",
         " END) AS p FROM viva_records WHERE student_id=?", (sid,))
     has_record = bool(viva and viva["n"])
     has_pass = bool(viva and viva["p"])
+    # Phase 5 thesis case (table may not exist on a half-migrated DB).
+    case = None
+    try:
+        crow = db.fetchone(
+            "SELECT * FROM thesis_cases WHERE student_id=?", (sid,))
+        case = dict(crow) if crow else None
+    except Exception:
+        case = None
+    # Synopsis reconciliation: a synopsis record with a submission date
+    # (Phase 4) IS the fact that the synopsis was submitted; the legacy
+    # submission field must not keep claiming "Not Received" on the
+    # Overview / student journey. Only ever fills an empty legacy field.
+    try:
+        syn = db.fetchone(
+            "SELECT * FROM synopsis_records WHERE student_id=?"
+            " ORDER BY id DESC", (sid,))
+        if syn and (syn["submitted_date"] or "").strip() \
+                and not _received(s.get("synopsis")):
+            old_syn = s.get("synopsis") or ""
+            db.execute(
+                "UPDATE students SET synopsis='Received' WHERE id=?",
+                (sid,))
+            if not (s.get("synopsis_at") or "").strip():
+                db.execute(
+                    "UPDATE students SET synopsis_at=? WHERE id=?",
+                    (syn["submitted_date"], sid))
+            s["synopsis"] = "Received"
+            if write_events:
+                record_event(db, sid, "synopsis", old_syn,
+                             "Received", actor, actor_role,
+                             "Submission field reconciled from the"
+                             " synopsis record")
+    except Exception:
+        pass
     coe = s.get("thesis_forward_coe")
     s["thesis_forward_coe"] = "" if coe is None else str(coe)
     target = derive_dimensions(s, has_viva_pass=has_pass,
-                               has_viva_record=has_record)
+                               has_viva_record=has_record, case=case)
     changes = []
     for col, new_val in target.items():
         old_val = s.get(col)
