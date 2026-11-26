@@ -35,7 +35,7 @@
   }
   /* Sidebar layout behaviour (JS toggles body.sidebar-open on mobile). */
   body.has-sidebar .page-shell {
-    @apply lg:ml-[252px];
+    @apply lg:ml-[288px];
   }
   @media (max-width: 960px) {
     body.has-sidebar .page-shell { margin-left: 0; }
@@ -83,7 +83,7 @@
 
   /* ---------- sidebar ---------- */
   .sidebar {
-    @apply fixed top-0 left-0 bottom-0 z-[200] flex w-[252px] flex-col border-r border-line bg-white text-ink shadow-sm;
+    @apply fixed top-0 left-0 bottom-0 z-[200] flex w-[288px] flex-col border-r border-line bg-white text-ink shadow-sm;
   }
   .side-brand { @apply flex items-center gap-3 border-b border-line px-5 py-5; }
   .side-brand .mark, .side-brand .sp-mark {
@@ -96,16 +96,15 @@
   .side-brand .t2 { @apply mt-0.5 text-[11.5px] text-muted; }
   .side-nav { @apply flex flex-1 flex-col gap-1 overflow-y-auto px-3 py-4; }
   .side-nav a {
-    @apply relative flex items-center gap-3 rounded-[11px] px-3.5 py-3 text-sm font-semibold text-slate-600 no-underline transition-colors hover:bg-soft hover:text-navy;
+    @apply relative flex items-center gap-3 whitespace-nowrap rounded-[11px] px-3.5 py-3 text-sm font-semibold text-slate-600 no-underline transition-colors hover:bg-soft hover:text-navy;
   }
   .side-nav a svg { @apply h-5 w-5 shrink-0 opacity-80; }
-  .side-nav a.active { @apply bg-soft font-bold text-navy; }
-  .side-nav a.active::before { content: ""; position: absolute; left: 0; top: 8px; bottom: 8px; width: 3px; border-radius: 99px; background: var(--color-primary); }
-  .side-nav a.active svg { @apply opacity-100 text-primary; }
+  .side-nav a.active { @apply bg-primary text-white shadow-md; }
+  .side-nav a.active svg { @apply opacity-100; }
   .nav-group { @apply mt-1.5; }
-  .nav-group-head { @apply flex w-full cursor-pointer items-center gap-3 rounded-[11px] px-3.5 py-3 text-sm font-bold text-slate-600 transition-colors hover:bg-soft hover:text-navy; }
+  .nav-group-head { @apply flex w-full cursor-pointer items-center justify-start gap-3 whitespace-nowrap rounded-[11px] px-3.5 py-3 text-sm font-bold text-slate-600 transition-colors hover:bg-soft hover:text-navy; }
   .nav-group-head .nav-ico { @apply h-5 w-5 shrink-0 opacity-80; }
-  .nav-group-head .nav-group-title { @apply flex-1 text-left; white-space: normal; line-height: 1.25; }
+  .nav-group-head .nav-group-title { @apply flex-1 truncate text-left; }
   .nav-group-head .nav-chev { @apply h-4 w-4 shrink-0 transition-transform duration-200; }
   .nav-group.open > .nav-group-head, .nav-group:has(a.active) > .nav-group-head { @apply text-navy; }
   .nav-group.open > .nav-group-head .nav-ico, .nav-group:has(a.active) > .nav-group-head .nav-ico { @apply text-primary opacity-100; }
@@ -138,7 +137,7 @@
   .side-badge {
     @apply ml-auto inline-flex h-[22px] min-w-[22px] items-center justify-center rounded-full bg-soft px-1.5 text-[11px] font-extrabold text-primary;
   }
-  .side-nav a.active .side-badge { @apply bg-primary text-white; }
+  .side-nav a.active .side-badge { @apply bg-white text-primary; }
   .notif-badge {
     @apply ml-auto inline-flex h-5 min-w-5 items-center justify-center rounded-[10px] bg-red-700 px-1.5 text-[11px] font-extrabold text-white;
   }
@@ -176,7 +175,7 @@
     body.side-collapsed .side-profile #profileMenu { display: none !important; }
   }
   @media (max-width: 960px) {
-    body.side-collapsed .sidebar { width: 252px; transform: translateX(-105%); }
+    body.side-collapsed .sidebar { width: 288px; transform: translateX(-105%); }
     body.side-collapsed.has-sidebar .page-shell { margin-left: 0; }
     .tb-collapse-btn { display: none; }
   }

@@ -134,4 +134,13 @@ check("officer: still sees Notifications + Reports",
 check("officer blocked from Users page",
       officer.get("/admin/users").status_code in (302, 403))
 
+# ---- 9. polish (2026-11-26): wider sidebar, single-line text, old solid-blue active ----
+compiled = pathlib.Path(REPO, "static/css/tailwind.css").read_text()
+src = pathlib.Path(REPO, "static/css/tailwind-input.css").read_text()
+check("sidebar width 288px", "288px" in compiled and "252px" not in compiled)
+check("group titles single-line (nowrap)", "white-space: nowrap" in compiled)
+check("active state back to solid blue",
+      ".side-nav a.active { @apply bg-primary text-white shadow-md; }" in src
+      and "a.active::before" not in src)
+
 print(f"SIDEBAR NAV OK — {N[0]}/{N[0]} checks passed")
