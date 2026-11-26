@@ -137,7 +137,7 @@ check("officer blocked from Users page",
 # ---- 9. polish (2026-11-26): wider sidebar, single-line text, old solid-blue active ----
 compiled = pathlib.Path(REPO, "static/css/tailwind.css").read_text()
 src = pathlib.Path(REPO, "static/css/tailwind-input.css").read_text()
-check("sidebar width 300px", "300px" in compiled and "288px" not in compiled and "252px" not in compiled)
+check("sidebar width 320px", "flex w-[320px] flex-col" in src and "lg:ml-[320px]" in src)
 check("group titles single-line (nowrap)", "white-space: nowrap" in compiled)
 check("active state back to solid blue",
       ".side-nav a.active { @apply bg-primary text-white shadow-md; }" in src
