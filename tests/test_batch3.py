@@ -5,6 +5,7 @@ blockers, Activity Log filters + export.
 """
 import io
 import os
+import re
 import sys
 
 import pathlib
@@ -60,7 +61,8 @@ h = admin.get("/admin/tasks").data.decode()
 check("tasks page lists it as overdue",
       "Call the department about files" in h and "overdue" in h)
 h = admin.get("/admin/dashboard").data.decode()
-check("sidebar badge counts open tasks", "Tasks" in h)
+_nav = re.search(r'<nav class="side-nav">(.*?)</nav>', h, re.S).group(1)
+check("sidebar no longer lists Tasks (redesign 2026-11-26)", "Tasks" not in _nav)
 admin.post(f"/admin/tasks/{tk['id']}/done")
 check("mark done completes it", task("manual") is None
       and task("manual", "Done") is not None)

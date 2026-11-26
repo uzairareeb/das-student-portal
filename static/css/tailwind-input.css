@@ -99,15 +99,20 @@
     @apply relative flex items-center gap-3 rounded-[11px] px-3.5 py-3 text-sm font-semibold text-slate-600 no-underline transition-colors hover:bg-soft hover:text-navy;
   }
   .side-nav a svg { @apply h-5 w-5 shrink-0 opacity-80; }
-  .side-nav a.active { @apply bg-primary text-white shadow-md; }
-  .side-nav a.active svg { @apply opacity-100; }
+  .side-nav a.active { @apply bg-soft font-bold text-navy; }
+  .side-nav a.active::before { content: ""; position: absolute; left: 0; top: 8px; bottom: 8px; width: 3px; border-radius: 99px; background: var(--color-primary); }
+  .side-nav a.active svg { @apply opacity-100 text-primary; }
   .nav-group { @apply mt-1.5; }
-  .nav-group-head { @apply flex w-full cursor-pointer items-center justify-between rounded-[11px] px-3.5 py-2 text-[11px] font-extrabold uppercase tracking-[0.08em] text-muted transition-colors hover:bg-soft hover:text-navy; }
+  .nav-group-head { @apply flex w-full cursor-pointer items-center gap-3 rounded-[11px] px-3.5 py-3 text-sm font-bold text-slate-600 transition-colors hover:bg-soft hover:text-navy; }
+  .nav-group-head .nav-ico { @apply h-5 w-5 shrink-0 opacity-80; }
+  .nav-group-head .nav-group-title { @apply flex-1 truncate text-left; }
   .nav-group-head .nav-chev { @apply h-4 w-4 shrink-0 transition-transform duration-200; }
+  .nav-group.open > .nav-group-head, .nav-group:has(a.active) > .nav-group-head { @apply text-navy; }
+  .nav-group.open > .nav-group-head .nav-ico, .nav-group:has(a.active) > .nav-group-head .nav-ico { @apply text-primary opacity-100; }
   .nav-group:not(.open) .nav-chev { @apply -rotate-90; }
   .nav-group-items { @apply flex flex-col gap-1; }
   .nav-group:not(.open) .nav-group-items { @apply hidden; }
-  .nav-group-items a { @apply ps-5; }
+  .nav-group-items a { @apply ps-[46px]; }
   .side-foot { @apply border-t border-line px-3 pt-3.5 pb-4; }
   .side-foot a {
     @apply flex items-center gap-3 rounded-[11px] px-3.5 py-3 text-sm font-bold text-red-600 no-underline transition-colors hover:bg-red-50 hover:text-red-700;
@@ -124,6 +129,8 @@
   .side-profile .sp-sub { @apply truncate text-xs leading-tight text-muted; }
   .side-profile .sp-chev { @apply h-4 w-4 shrink-0 text-muted transition-transform duration-200; }
   #profileBtn[aria-expanded="true"] .sp-chev { transform: rotate(180deg); }
+  .tb-collapse-btn { @apply hidden h-10 w-10 cursor-pointer items-center justify-center rounded-lg border border-line bg-white text-slate-600 transition-colors hover:bg-soft hover:text-navy lg:inline-flex; }
+  .tb-collapse-btn svg { @apply h-5 w-5; }
   .side-toggle {
     @apply fixed top-3.5 left-3.5 z-[300] hidden h-11 w-11 cursor-pointer items-center justify-center rounded-xl border-0 bg-primary text-white shadow-lg;
   }
@@ -131,7 +138,7 @@
   .side-badge {
     @apply ml-auto inline-flex h-[22px] min-w-[22px] items-center justify-center rounded-full bg-soft px-1.5 text-[11px] font-extrabold text-primary;
   }
-  .side-nav a.active .side-badge { @apply bg-white text-primary; }
+  .side-nav a.active .side-badge { @apply bg-primary text-white; }
   .notif-badge {
     @apply ml-auto inline-flex h-5 min-w-5 items-center justify-center rounded-[10px] bg-red-700 px-1.5 text-[11px] font-extrabold text-white;
   }
@@ -140,6 +147,39 @@
   .notif-icon.kind-upload { @apply bg-soft text-primary; }
   .notif-icon.kind-viva { @apply bg-lavender text-accent; }
   .notif-icon.kind-student { @apply bg-emerald-50 text-emerald-700; }
+
+  /* ---------- sidebar redesign: collapsed icon-only mode ---------- */
+  .slim-tip { position: fixed; z-index: 400; pointer-events: none; border-radius: 8px; background: var(--color-navy); color: #fff; font-size: 12.5px; font-weight: 600; padding: 6px 10px; box-shadow: 0 6px 18px rgba(23, 54, 93, .25); white-space: nowrap; }
+  .slim-pop { position: fixed; left: 80px; z-index: 400; min-width: 210px; max-width: 260px; border-radius: 12px; border: 1px solid var(--color-line); background: #fff; box-shadow: 0 14px 34px rgba(23, 54, 93, .18); padding: 8px; }
+  .slim-pop-title { padding: 6px 10px 8px; font-size: 12px; font-weight: 800; text-transform: uppercase; letter-spacing: .06em; color: var(--color-muted); border-bottom: 1px solid var(--color-line); margin-bottom: 6px; }
+  .slim-pop-link { display: block; border-radius: 9px; padding: 8px 10px; font-size: 13.5px; font-weight: 600; color: var(--color-slate-600); text-decoration: none; }
+  .slim-pop-link:hover { background: var(--color-soft); color: var(--color-navy); }
+  .slim-pop-link.active { background: var(--color-soft); color: var(--color-navy); font-weight: 700; }
+  @media (min-width: 961px) {
+    .page-shell { transition: margin-left .25s ease; }
+    body.side-collapsed .sidebar { width: 72px; }
+    body.side-collapsed.has-sidebar .page-shell { margin-left: 72px; }
+    body.side-collapsed .side-brand { justify-content: center; padding: 16px 0; }
+    body.side-collapsed .side-brand .t1, body.side-collapsed .side-brand .t2 { display: none; }
+    body.side-collapsed .side-nav { padding: 12px 8px; }
+    body.side-collapsed .side-nav a, body.side-collapsed .nav-group-head { justify-content: center; padding-left: 0; padding-right: 0; }
+    body.side-collapsed .side-nav a { font-size: 0; }
+    body.side-collapsed .nav-group-head .nav-group-title, body.side-collapsed .nav-group-head .nav-chev { display: none; }
+    body.side-collapsed .side-nav a .notif-badge, body.side-collapsed .side-nav a .side-badge { display: none; }
+    body.side-collapsed #gsTrigger span, body.side-collapsed #gsTrigger .gs-kbd { display: none; }
+    body.side-collapsed #gsTrigger { justify-content: center; padding: 8px 4px; }
+    body.side-collapsed .side-foot { padding: 12px 8px 14px; }
+    body.side-collapsed .side-profile { padding: 6px; background: transparent; border-color: transparent; box-shadow: none; }
+    body.side-collapsed .side-profile .sp-head-btn { justify-content: center; padding: 0; }
+    body.side-collapsed .side-profile .sp-name, body.side-collapsed .side-profile .sp-sub, body.side-collapsed .side-profile .sp-chev { display: none; }
+    body.side-collapsed .side-foot a { justify-content: center; padding-left: 0; padding-right: 0; font-size: 0; }
+    body.side-collapsed .side-profile #profileMenu { display: none !important; }
+  }
+  @media (max-width: 960px) {
+    body.side-collapsed .sidebar { width: 252px; transform: translateX(-105%); }
+    body.side-collapsed.has-sidebar .page-shell { margin-left: 0; }
+    .tb-collapse-btn { display: none; }
+  }
 
   /* ---------- cards / headings ---------- */
   .card { @apply rounded-xl border border-line bg-white p-7 shadow-sm; }

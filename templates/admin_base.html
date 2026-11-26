@@ -2,7 +2,7 @@
 {% block body_class %}has-sidebar admin-portal{% endblock %}
 {% block topbar_brand %}{% endblock %}
 {% block topbar_actions %}
-
+<button type="button" id="sideCollapseBtn" class="tb-collapse-btn" aria-label="Collapse sidebar" title="Collapse sidebar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="9" y1="3" x2="9" y2="21"/></svg></button>
 <div class="relative"><button type="button" id="bellBtn" class="relative inline-flex h-10 w-10 items-center justify-center rounded-lg border border-line bg-white text-slate-600 hover:bg-soft hover:text-navy" aria-haspopup="true" aria-expanded="false" aria-label="Notifications"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:20px;height:20px"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>{% if admin_unread %}<span class="absolute -top-1 -right-1 inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold text-white">{{ admin_unread }}</span>{% endif %}</button><div id="bellMenu" hidden class="absolute right-0 top-[calc(100%+8px)] z-[150] w-80 max-w-[calc(100vw-2rem)] rounded-xl border border-line bg-white p-2 shadow-lg"><div class="mb-1 flex items-center justify-between border-b border-line px-3 py-2"><span class="text-sm font-bold text-navy">Notifications</span>{% if admin_unread %}<span class="text-xs font-bold text-red-600">{{ admin_unread }} new</span>{% endif %}</div>{% if admin_recent_notes %}<div class="max-h-80 overflow-y-auto">{% for n in admin_recent_notes %}<a href="{{ n.link or url_for('admin_notifications') }}" class="block rounded-lg px-3 py-2 hover:bg-soft"><div class="text-sm font-semibold text-ink">{{ n.title }}</div><div class="text-xs text-muted">{{ n.message }}</div><div class="text-[11px] text-muted">{{ n.created_at }}</div></a>{% endfor %}</div>{% else %}<p class="px-3 py-3 text-sm text-muted">No notifications yet.</p>{% endif %}<a href="{{ url_for('admin_notifications') }}" class="mt-1 block rounded-lg px-3 py-2.5 text-center text-sm font-bold text-primary hover:bg-soft">View all notifications</a></div></div>
 {% endblock %}
 {% block sidebar %}
@@ -25,16 +25,11 @@
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/></svg>
       Dashboard
     </a>
-    <a href="{{ url_for('admin_tasks') }}" class="{% if request.endpoint in ('admin_tasks', 'admin_task_done', 'admin_task_reopen') %}active{% endif %}">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
-      Tasks
-      {% if open_tasks %}<span class="notif-badge">{{ open_tasks }}</span>{% endif %}
-    </a>
-    <div class="nav-group open" data-group="students">
-      <button type="button" class="nav-group-head" aria-expanded="true"><span>Students</span><svg class="nav-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg></button>
+    <div class="nav-group{% if request.endpoint in ('admin_students', 'admin_student_new', 'admin_import', 'admin_archive', 'admin_trash', 'admin_duplicates', 'admin_student_profile', 'admin_student_documents', 'admin_student_academic', 'admin_student_supervisor', 'admin_student_thesis', 'admin_student_progress', 'admin_student_timeline', 'admin_student_correspondence', 'admin_student_viva') %} open{% endif %}" data-group="students">
+      <button type="button" class="nav-group-head" aria-expanded="false"><svg class="nav-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg><span class="nav-group-title">Student Management</span><svg class="nav-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg></button>
       <div class="nav-group-items">
-        <a id="nav-list" href="{{ url_for('admin_students') }}" class="{% if request.endpoint == 'admin_students' %}active{% endif %}">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+        <a href="{{ url_for('admin_students') }}" class="{% if request.endpoint in ('admin_students', 'admin_student_profile', 'admin_student_documents', 'admin_student_academic', 'admin_student_supervisor', 'admin_student_thesis', 'admin_student_progress', 'admin_student_timeline', 'admin_student_correspondence', 'admin_student_viva') %}active{% endif %}">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
           Student List
         </a>
         <a href="{{ url_for('admin_student_new') }}" class="{% if request.endpoint == 'admin_student_new' %}active{% endif %}">
@@ -43,117 +38,116 @@
         </a>
         <a href="{{ url_for('admin_import') }}" class="{% if request.endpoint == 'admin_import' %}active{% endif %}">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
-          Import
+          Import Students
+        </a>
+        <a href="{{ url_for('admin_archive') }}" class="{% if request.endpoint == 'admin_archive' %}active{% endif %}">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8v13H3V8"/><path d="M1 3h22v5H1z"/><path d="M10 12h4"/></svg>
+          Archived Students
+          {% if archive_count %}<span class="notif-badge">{{ archive_count }}</span>{% endif %}
         </a>
         <a href="{{ url_for('admin_trash') }}" class="{% if request.endpoint == 'admin_trash' %}active{% endif %}">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
           Recycle Bin
           {% if trash_count %}<span class="notif-badge">{{ trash_count }}</span>{% endif %}
         </a>
-        <a href="{{ url_for('admin_archive') }}" class="{% if request.endpoint == 'admin_archive' %}active{% endif %}">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8v13H3V8"/><path d="M1 3h22v5H1z"/><path d="M10 12h4"/></svg>
-          Archive
-          {% if archive_count %}<span class="notif-badge">{{ archive_count }}</span>{% endif %}
-        </a>
         <a href="{{ url_for('admin_duplicates') }}" class="{% if request.endpoint == 'admin_duplicates' %}active{% endif %}">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
-          Duplicates
-        </a>
-        <a href="{{ url_for('admin_data_quality') }}" class="{% if request.endpoint == 'admin_data_quality' %}active{% endif %}">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
-          Data Safai
+          Duplicate Records
         </a>
       </div>
     </div>
-    <div class="nav-group open" data-group="departments">
-      <button type="button" class="nav-group-head" aria-expanded="true"><span>Departments</span><svg class="nav-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg></button>
+    <div class="nav-group{% if request.endpoint in ('admin_departments', 'admin_uploads', 'admin_upload_review') %} open{% endif %}" data-group="departments">
+      <button type="button" class="nav-group-head" aria-expanded="false"><svg class="nav-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="2" width="16" height="20" rx="2"/><line x1="9" y1="22" x2="9" y2="18"/><line x1="15" y1="22" x2="15" y2="18"/><line x1="9" y1="6" x2="10" y2="6"/><line x1="14" y1="6" x2="15" y2="6"/><line x1="9" y1="10" x2="10" y2="10"/><line x1="14" y1="10" x2="15" y2="10"/></svg><span class="nav-group-title">Department Management</span><svg class="nav-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg></button>
       <div class="nav-group-items">
         <a href="{{ url_for('admin_departments') }}" class="{% if request.endpoint in ['admin_departments'] %}active{% endif %}">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
           Departments
         </a>
-        <a href="{{ url_for('admin_uploads') }}" class="{% if request.endpoint in ['admin_uploads'] %}active{% endif %}">
+        <a href="{{ url_for('admin_uploads') }}" class="{% if request.endpoint in ['admin_uploads', 'admin_upload_review'] %}active{% endif %}">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-6l-2 3h-4l-2-3H2"/><path d="M5.45 5.11L2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/></svg>
-          Dept Uploads
+          Department Uploads
           {% if pending_uploads %}<span class="side-badge">{{ pending_uploads }}</span>{% endif %}
         </a>
       </div>
     </div>
-    <div class="nav-group open" data-group="academic">
-      <button type="button" class="nav-group-head" aria-expanded="true"><span>Academic</span><svg class="nav-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg></button>
+    <div class="nav-group{% if request.endpoint in ('admin_thesis_cases', 'admin_asrb', 'admin_viva', 'admin_supervisors', 'admin_supervisor_save', 'admin_supervisor_password', 'admin_schedule', 'admin_schedule_pdf', 'admin_schedule_excel', 'admin_schedule_print', 'admin_degree_completion', 'admin_controller_users', 'admin_controller_user_save', 'admin_controller_user_password') %} open{% endif %}" data-group="academic">
+      <button type="button" class="nav-group-head" aria-expanded="false"><svg class="nav-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg><span class="nav-group-title">Academic & Research</span><svg class="nav-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg></button>
       <div class="nav-group-items">
+        <a href="{{ url_for('admin_thesis_cases') }}" class="{% if request.endpoint == 'admin_thesis_cases' %}active{% endif %}">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
+          Thesis Cases
+        </a>
+        <a href="{{ url_for('admin_asrb') }}" class="{% if request.endpoint == 'admin_asrb' %}active{% endif %}">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+          Synopsis & ASRB
+        </a>
         <a href="{{ url_for('admin_viva') }}" class="{% if request.endpoint == 'admin_viva' %}active{% endif %}">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
           Viva Records
           {% if new_vivas %}<span class="side-badge">{{ new_vivas }}</span>{% endif %}
         </a>
-        <a href="{{ url_for('admin_reports') }}" class="{% if request.endpoint == 'admin_reports' %}active{% endif %}">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
-          Reports
+        <a href="{{ url_for('admin_supervisors') }}" class="{% if request.endpoint in ('admin_supervisors', 'admin_supervisor_save', 'admin_supervisor_password') %}active{% endif %}">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 10L12 5 2 10l10 5 10-5z"/><path d="M6 12v5c0 1.7 2.7 3 6 3s6-1.3 6-3v-5"/></svg>
+          Supervisors
         </a>
         <a href="{{ url_for('admin_schedule') }}" class="{% if request.endpoint in ['admin_schedule', 'admin_schedule_pdf', 'admin_schedule_excel', 'admin_schedule_print'] %}active{% endif %}">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/><polyline points="9 16 11 18 15 14"/></svg>
           Schedule Generator
         </a>
-        <a href="{{ url_for('admin_supervisors') }}" class="{% if request.endpoint in ('admin_supervisors', 'admin_supervisor_save', 'admin_supervisor_password') %}active{% endif %}">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 10L12 5 2 10l10 5 10-5z"/><path d="M6 12v5c0 1.7 2.7 3 6 3s6-1.3 6-3v-5"/></svg>
-          Supervisors
-        </a>
-        <a href="{{ url_for('admin_asrb') }}" class="{% if request.endpoint == 'admin_asrb' %}active{% endif %}">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
-          Synopsis &amp; ASRB
-        </a>
-        <a href="{{ url_for('admin_thesis_cases') }}" class="{% if request.endpoint == 'admin_thesis_cases' %}active{% endif %}">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
-          Thesis Cases
+        <a href="{{ url_for('admin_degree_completion') }}" class="{% if request.endpoint == 'admin_degree_completion' %}active{% endif %}">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="6"/><path d="M15.5 13 17 22l-5-3-5 3 1.5-9"/></svg>
+          Degree Completion
         </a>
         <a href="{{ url_for('admin_controller_users') }}" class="{% if request.endpoint in ('admin_controller_users', 'admin_controller_user_save', 'admin_controller_user_password') %}active{% endif %}">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9 12l2 2 4-4"/></svg>
           Controller Office
         </a>
-        <a href="{{ url_for('admin_degree_completion') }}" class="{% if request.endpoint == 'admin_degree_completion' %}active{% endif %}">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="6"/><path d="M15.5 13 17 22l-5-3-5 3 1.5-9"/></svg>
-          Degree Completion
+      </div>
+    </div>
+    <div class="nav-group{% if request.endpoint in ('admin_reports', 'admin_reports_custom', 'admin_doc_catalogue', 'admin_doc_catalogue_save') %} open{% endif %}" data-group="reports">
+      <button type="button" class="nav-group-head" aria-expanded="false"><svg class="nav-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg><span class="nav-group-title">Reports & Documents</span><svg class="nav-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg></button>
+      <div class="nav-group-items">
+        <a href="{{ url_for('admin_reports') }}" class="{% if request.endpoint in ('admin_reports', 'admin_reports_custom') %}active{% endif %}">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+          Reports
+        </a>
+        <a href="{{ url_for('admin_doc_catalogue') }}" class="{% if request.endpoint in ('admin_doc_catalogue', 'admin_doc_catalogue_save') %}active{% endif %}">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+          Document Catalogue
         </a>
       </div>
     </div>
-    <div class="nav-group open" data-group="system">
-      <button type="button" class="nav-group-head" aria-expanded="true"><span>System</span><svg class="nav-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg></button>
+    <div class="nav-group{% if request.endpoint in ('admin_users', 'admin_notifications', 'admin_activity', 'admin_sessions', 'admin_session_toggle', 'admin_backup', 'admin_backup_download', 'admin_completion_items', 'admin_completion_item_save') %} open{% endif %}" data-group="system">
+      <button type="button" class="nav-group-head" aria-expanded="false"><svg class="nav-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg><span class="nav-group-title">System Administration</span><svg class="nav-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg></button>
       <div class="nav-group-items">
-        <a href="{{ url_for('admin_activity') }}" class="{% if request.endpoint == 'admin_activity' %}active{% endif %}">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-          Activity Log
+        {% if admin_role == 'Super Admin' %}
+        <a href="{{ url_for('admin_users') }}" class="{% if request.endpoint == 'admin_users' %}active{% endif %}">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+          User Management
         </a>
+        {% endif %}
         <a href="{{ url_for('admin_notifications') }}" class="{% if request.endpoint == 'admin_notifications' %}active{% endif %}">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
           Notifications
           {% if admin_unread %}<span class="notif-badge">{{ admin_unread }}</span>{% endif %}
         </a>
-        {% if admin_role == 'Super Admin' %}
-        <a href="{{ url_for('admin_users') }}" class="{% if request.endpoint == 'admin_users' %}active{% endif %}">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
-          Users
-        </a>
-        <a href="{{ url_for('admin_backup') }}" class="{% if request.endpoint in ('admin_backup', 'admin_backup_download') %}active{% endif %}">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-          Backup
-        </a>
-        {% endif %}
-        <a href="{{ url_for('admin_doc_catalogue') }}" class="{% if request.endpoint in ('admin_doc_catalogue', 'admin_doc_catalogue_save') %}active{% endif %}">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
-          Document Catalogue
+        <a href="{{ url_for('admin_activity') }}" class="{% if request.endpoint == 'admin_activity' %}active{% endif %}">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+          Activity Log
         </a>
         <a href="{{ url_for('admin_sessions') }}" class="{% if request.endpoint in ('admin_sessions', 'admin_session_toggle') %}active{% endif %}">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
-          Sessions
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/><polyline points="9 16 11 18 15 14"/></svg>
+          Session Management
         </a>
+        {% if admin_role == 'Super Admin' %}
+        <a href="{{ url_for('admin_backup') }}" class="{% if request.endpoint in ('admin_backup', 'admin_backup_download') %}active{% endif %}">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          Backup & Restore
+        </a>
+        {% endif %}
         <a href="{{ url_for('admin_completion_items') }}" class="{% if request.endpoint in ('admin_completion_items', 'admin_completion_item_save') %}active{% endif %}">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
           Completion Checklist
-        </a>
-        <a href="{{ url_for('admin_correspondence') }}" class="{% if request.endpoint == 'admin_correspondence' %}active{% endif %}">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
-          Correspondence
         </a>
       </div>
     </div>
@@ -270,22 +264,80 @@
     if (t) t.addEventListener('click', function () {
       document.body.classList.toggle('sidebar-open');
     });
-    // collapsible sidebar groups (collapsed state saved per group)
+    // tooltip + popover helpers (collapsed icon-only mode)
+    var tip = document.createElement('div');
+    tip.className = 'slim-tip'; tip.hidden = true; document.body.appendChild(tip);
+    var pop = document.createElement('div');
+    pop.className = 'slim-pop'; pop.hidden = true; document.body.appendChild(pop);
+    function cleanText(el) {
+      var c = el.cloneNode(true);
+      c.querySelectorAll('.notif-badge,.side-badge').forEach(function (b) { b.remove(); });
+      return (c.textContent || '').replace(/\s+/g, ' ').trim();
+    }
+    function showTip(el) {
+      if (!document.body.classList.contains('side-collapsed')) return;
+      var r = el.getBoundingClientRect();
+      tip.textContent = cleanText(el);
+      tip.hidden = false;
+      tip.style.left = '80px';
+      tip.style.top = Math.max(8, r.top + r.height / 2 - 16) + 'px';
+    }
+    function hideTip() { tip.hidden = true; }
+    function closePop() { pop.hidden = true; }
+    function openPop(g, head) {
+      var title = (head.querySelector('.nav-group-title') || {}).textContent || '';
+      var links = g.querySelectorAll('.nav-group-items a');
+      var html = '<div class="slim-pop-title">' + title.trim() + '</div>';
+      links.forEach(function (a) {
+        html += '<a class="slim-pop-link' + (a.classList.contains('active') ? ' active' : '') +
+          '" href="' + a.getAttribute('href') + '">' + cleanText(a) + '</a>';
+      });
+      pop.innerHTML = html;
+      var r = head.getBoundingClientRect();
+      var need = 44 + links.length * 38 + 12;
+      pop.style.top = Math.max(8, Math.min(r.top, window.innerHeight - need)) + 'px';
+      pop.hidden = false;
+    }
+    // accordion groups: active group stays open; state persisted per group
     document.querySelectorAll('.nav-group').forEach(function (g) {
       var key = 'das-nav-' + g.getAttribute('data-group');
       var head = g.querySelector('.nav-group-head');
       var hasActive = !!g.querySelector('a.active');
       try {
-        if (!hasActive && localStorage.getItem(key) === 'closed') {
-          g.classList.remove('open');
-          if (head) head.setAttribute('aria-expanded', 'false');
-        }
+        if (hasActive) g.classList.add('open');
+        else if (localStorage.getItem(key) === 'open') g.classList.add('open');
+        else if (localStorage.getItem(key) === 'closed') g.classList.remove('open');
       } catch (e) {}
+      function syncAria() { if (head) head.setAttribute('aria-expanded', g.classList.contains('open') ? 'true' : 'false'); }
+      syncAria();
       if (head) head.addEventListener('click', function () {
+        hideTip();
+        if (document.body.classList.contains('side-collapsed')) { openPop(g, head); return; }
+        if (hasActive) return; // the active group never closes unexpectedly
         var open = g.classList.toggle('open');
-        head.setAttribute('aria-expanded', open ? 'true' : 'false');
+        syncAria();
         try { localStorage.setItem(key, open ? 'open' : 'closed'); } catch (e) {}
       });
+    });
+    // collapsed icon-only mode (desktop)
+    var cb = document.getElementById('sideCollapseBtn');
+    try { if (localStorage.getItem('das-side-collapsed') === '1') document.body.classList.add('side-collapsed'); } catch (e) {}
+    if (cb) cb.addEventListener('click', function () {
+      var on = document.body.classList.toggle('side-collapsed');
+      closePop(); hideTip();
+      try { localStorage.setItem('das-side-collapsed', on ? '1' : '0'); } catch (e) {}
+    });
+    // tooltips on every nav item + group head (collapsed mode only)
+    document.querySelectorAll('.side-nav a, .nav-group-head').forEach(function (el) {
+      el.addEventListener('mouseenter', function () { showTip(el); });
+      el.addEventListener('mouseleave', hideTip);
+      el.addEventListener('click', hideTip);
+    });
+    document.addEventListener('click', function (e) {
+      if (!e.target.closest('.slim-pop') && !e.target.closest('.nav-group-head')) closePop();
+    });
+    document.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape') { closePop(); hideTip(); }
     });
     var sb = document.getElementById('sidebar');
     if (sb) sb.addEventListener('click', function (e) {
