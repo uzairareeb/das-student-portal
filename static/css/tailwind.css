@@ -982,10 +982,9 @@
   }
   .nav-group-head .nav-group-title {
     flex: 1;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
     text-align: left;
+    white-space: normal;
+    line-height: 1.25;
   }
   .nav-group-head .nav-chev {
     height: calc(var(--spacing) * 4);
